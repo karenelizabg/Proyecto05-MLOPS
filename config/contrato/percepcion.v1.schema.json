@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-tesla.local/contrato/percepcion.v1.schema.json",
+  "title": "Evento de percepción A → B (v1)",
+  "description": "Un evento por cuadro, del detector (grupo A) a la política (grupo B). Un cuadro correcto sin objetos es status=ok con detections=[]. status=stale o status=error NUNCA equivalen a vía libre. Reglas que el esquema no puede expresar (cajas dentro de la imagen, tiempo monótono, IDs únicos) las comprueba src/contrato.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "sequence_id",
+    "frame_id",
+    "t_capture_ms",
+    "t_emit_ms",
+    "image_width",
+    "image_height",
+    "model_sha256",
+    "config_sha256",
+    "status",
+    "bbox_format",
+    "bbox_unit",
+    "detections"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Versión del contrato. B debe reconocerla antes de producir comandos.",
+      "const": "1"
+    },
+    "run_id": {
+      "description": "Identifica una ejecución completa (un modelo y una configuración).",
+      "$ref": "#/$defs/id"
+    },
+    "sequence_id": {
+      "description": "Secuencia de cuadros a la que pertenece. Neutro: no codifica la clase ni el caso.",
+      "$ref": "#/$defs/id"
+    },
+    "frame_id": {
+      "description": "Único dentro del run. Neutro: no codifica la clase ni el caso.",
+      "$ref": "#/$defs/id"
+    },
+    "t_capture_ms": {
+      "description": "Instante de captura del cuadro, en milisegundos, reloj monotónico relativo al inicio del run (no hora de pared). Estrictamente creciente dentro de cada secuencia.",
+      "type": "number",
+      "minimum": 0
+    },
+    "t_emit_ms": {
+      "description": "Instante en que A publica el evento, en el mismo reloj y unidad que t_capture_ms. Nunca anterior a t_capture_ms. Edad del dato = t_emit_ms - t_capture_ms.",
+      "type": "number",
+      "minimum": 0
+    },
+    "image_width": {
+      "description": "Ancho en píxeles del cuadro procesado (el original, no el redimensionado). null solo si la imagen no se pudo leer.",
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "image_height": {
+      "description": "Alto en píxeles del cuadro procesado. null solo si la imagen no se pudo leer.",
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "model_sha256": {
+      "description": "SHA-256 de los pesos cargados.",
+      "$ref": "#/$defs/sha256"
+    },
+    "config_sha256": {
+      "description": "SHA-256 de los parámetros efectivos (umbrales, NMS, clases, resolución).",
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "description": "ok: cuadro procesado. stale: cuadro demasiado viejo o tardío, no confiable. error: el detector o la entrada fallaron.",
+      "enum": ["ok", "stale", "error"]
+    },
+    "bbox_format": {
+      "description": "xyxy = [x1, y1, x2, y2] (esquinas). xywh = [x, y, ancho, alto] (esquina superior izquierda y tamaño).",
+      "enum": ["xyxy", "xywh"]
+    },
+    "bbox_unit": {
+      "description": "Unidad de las cajas: píxeles del cuadro original. Origen arriba a la izquierda, x hacia la derecha, y hacia abajo.",
+      "const": "px"
+    },
+    "detections": {
+      "description": "Solo status=ok trae elementos. Con stale o error es siempre [].",
+      "type": "array",
+      "items": { "$ref": "#/$defs/deteccion" }
+    },
+    "error": {
+      "description": "Obligatorio con status=error; prohibido en los demás casos.",
+      "$ref": "#/$defs/error"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "image_width": { "type": "integer" },
+          "image_height": { "type": "integer" },
+          "error": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "stale" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "image_width": { "type": "integer" },
+          "image_height": { "type": "integer" },
+          "detections": { "maxItems": 0 },
+          "error": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "error" } }, "required": ["status"] },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "detections": { "maxItems": 0 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "deteccion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class_id", "confidence", "bbox"],
+      "properties": {
+        "class_id": {
+          "description": "Identificador de clase según modelo/clases.json (A1). Solo clases del dominio.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "class_name": {
+          "description": "Nombre legible, solo para lectura humana; B decide con class_id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "description": "Puntaje del detector, entre 0 y 1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "bbox": {
+          "description": "Cuatro números en píxeles, en el orden indicado por bbox_format.",
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "description": "B trata cualquier código desconocido como error: STOP.",
+          "enum": [
+            "unreadable_image",
+            "detector_exception",
+            "detector_timeout",
+            "invalid_output"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
