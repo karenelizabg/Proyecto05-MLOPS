@@ -1,0 +1,29 @@
+{
+  "schema_version": "1",
+  "run_id": "ejemplo-01",
+  "sequence_id": "S02",
+  "frame_id": "S02_f0003",
+  "t_capture_ms": 400,
+  "t_emit_ms": 437.5,
+  "image_width": 640,
+  "image_height": 480,
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "ok",
+  "bbox_format": "xyxy",
+  "bbox_unit": "px",
+  "detections": [
+    {
+      "class_id": 1,
+      "class_name": "mochila",
+      "confidence": 0.87,
+      "bbox": [212.0, 148.5, 431.0, 452.0]
+    },
+    {
+      "class_id": 0,
+      "class_name": "lata",
+      "confidence": 0.55,
+      "bbox": [20.0, 300.0, 88.5, 410.0]
+    }
+  ]
+}

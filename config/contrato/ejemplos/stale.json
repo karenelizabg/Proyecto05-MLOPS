@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "run_id": "ejemplo-01",
+  "sequence_id": "S02",
+  "frame_id": "S02_f0005",
+  "t_capture_ms": 800,
+  "t_emit_ms": 1650,
+  "image_width": 640,
+  "image_height": 480,
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "stale",
+  "bbox_format": "xyxy",
+  "bbox_unit": "px",
+  "detections": []
+}
