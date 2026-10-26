@@ -11,7 +11,7 @@
 >
 > **2026-10-26 — el carro está decidido:** es el kit que recomendó el profe (D-07). Se ajustaron PEND-06 y
 > PEND-12, se agregó PEND-13 y el ticket P5-19 (armar el carro) y cambiaron P5-03, P5-04, P5-09, P5-12, el plan y
-> los riesgos.
+> los riesgos. Los PR de los tickets los revisan entre sí los tres devs (sección 3).
 
 ## Leyenda
 
@@ -123,6 +123,16 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 `P5-NN: qué cambia`, título del PR `P5-NN: descripción`; en el PR, qué probaste y **qué no pudiste probar**;
 nunca secretos. El CI de P4 **rechaza ramas `p5-`** (`check-naming.sh` solo acepta `p2|p3|p4`): P5-01 lo arregla.
 
+**Revisión cruzada.** Cada PR lo abre su responsable y lo aprueba el revisor asignado antes de fusionarse;
+nadie aprueba su propio PR. El PM A no revisa los PR de los tickets: valida al cierre (guía, sección 10).
+Cada ticket lleva su revisor en la línea `Revisa el PR`. P5-19 lo hacen los tres y se revisan entre sí.
+
+| Tickets | Revisor |
+|---|---|
+| P5-01, P5-03, P5-09, P5-12, P5-15, P5-18 | A1 · Heri (`BeetlejuiceXD`) |
+| P5-04, P5-06, P5-07, P5-13, P5-14, P5-16 | A2 · Andy (`Andy-752109`) |
+| P5-02, P5-05, P5-08, P5-10, P5-11, P5-17 | A3 · Ale (`AleSarahi`) |
+
 ---
 
 ## 4. Orden de ejecución y dependencias
@@ -174,6 +184,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-01 · Repositorio, entorno fijado y CI mínimo
 - **Responsable:** A3 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 1 · **Marca:** `[GUÍA]` E1 + `[SUGERENCIA]`
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** PEND-03
 - **Por qué:** E1 pide instalación fijada y comandos para inferir, reproducir, probar y medir; el CI de P4 rechaza ramas `p5-`.
 - **Alcance**
@@ -189,6 +200,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-02 · Contrato A → B v1 (esquema, ejemplos y validador)
 - **Responsable:** A1 (con B3) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 1 · **Marca:** `[GUÍA]`
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** PEND-02, PEND-08
 - **Por qué:** es la frontera entre los dos grupos; si cambia coordenadas, clases o tiempos sin versión, B produce comandos equivocados.
 - **Alcance**
@@ -206,6 +218,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-03 · Dominio de obstáculos, clases y plan de filmación
 - **Responsable:** A2 · **Tamaño:** S · **Prioridad:** P0 · **Bloque:** 1 · **Marca:** `[GUÍA]` + `[SUGERENCIA]`
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** PEND-04, PEND-06
 - **Por qué:** sin dominio acordado no se sabe qué filmar ni qué clases etiquetar; las secuencias deben cubrir los casos de B.
 - **Alcance**
@@ -238,6 +251,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-04 · Selección del detector
 - **Responsable:** A1 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 1–2 · **Marca:** `[GUÍA]` + `[SUGERENCIA]`
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** PEND-04
 - **Por qué:** la guía lista como bloqueo "solo hay un clasificador": un clasificador de recortes no localiza obstáculos.
 - **Alcance**
@@ -256,7 +270,8 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 ### Bloque 2 — Primera entrega por grupo
 
 #### P5-19 · Armar el carro y poner a transmitir la ESP32-CAM
-- **Responsable:** A1 + A2 + A3 (los tres; **revisa el PM A**) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[SUGERENCIA]` (D-07)
+- **Responsable:** A1 + A2 + A3 (los tres) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[SUGERENCIA]` (D-07)
+- **Revisión:** los tres se revisan entre sí: cada medida y cada foto las comprueba alguien que no las tomó.
 - **Depende de:** PEND-13 (baterías y cargador)
 - **Por qué:** P5-09 (video con la óptica real) y P5-03 (regla obstáculo/transitable) necesitan el carro armado: el video de la ESP32-CAM y las medidas de llanta, chasis y cámara. Si no se logra a tiempo, el plan B es el celular (D-07).
 - **Alcance** (según la ficha de UNIT Electronics; todavía no se probó)
@@ -273,12 +288,13 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] Captura de pantalla del video transmitiendo desde la ESP32-CAM.
   - [ ] `datos/CARRO.md` con las medidas y la configuración de la cámara; PEND-06 y PEND-12 quedan resueltos.
   - [ ] Dos de los tres ven el video desde su propia computadora.
-  - [ ] El PM A revisó las fotos y las medidas.
+  - [ ] Otra persona del equipo comprobó las medidas (repitió al menos dos con regla o cinta).
 - **Evidencia:** fotos en `docs/carro/`, `datos/CARRO.md` y la captura del video.
 - **Pendientes:** PEND-06, PEND-12, PEND-13.
 
 #### P5-05 · Detector ejecutable en CPU y comando `infer`
 - **Responsable:** A1 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[GUÍA]` E2
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-02, P5-04
 - **Por qué:** sin detector ejecutable la nota se topa en 60.
 - **Alcance**
@@ -297,6 +313,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-09 · Captura de secuencias y extracción de cuadros únicos
 - **Responsable:** A2 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2–3 · **Marca:** `[GUÍA]` E3
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** P5-03, P5-19
 - **Por qué:** E3 pide ≥ 6 secuencias y 60 cuadros distintos extraídos como imágenes; B necesita secuencias **reales** pronto (bloque 4).
 - **Alcance**
@@ -318,6 +335,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-13 · Script de métricas de detección (TP/FP/FN, P/R/F1 a IoU 0.50)
 - **Responsable:** A3 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2–5 · **Marca:** `[GUÍA]` E6
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** P5-02 (datos sintéticos primero); datos reales con P5-11
 - **Por qué:** E6 exige un script de recálculo; las cifras resumidas no bastan.
 - **Alcance**
@@ -336,6 +354,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-15 · Arnés de benchmark (10 calentamientos + 100 ejecuciones)
 - **Responsable:** A3 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2 (arnés) y 6 (medición final) · **Marca:** `[GUÍA]` E7
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** P5-01; medición final con P5-05
 - **Por qué:** E7 pide registros individuales, calentamientos y fallos separados, tiempos por etapa y p50/p95.
 - **Alcance**
@@ -354,6 +373,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-10 · Anotación de cajas y estado esperado por cuadro
 - **Responsable:** A2 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 3 · **Marca:** `[GUÍA]` E3
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-09
 - **Alcance**
   - Anotar cajas con clase en cada cuadro (herramienta de D-03) en el formato acordado (PEND-08) y registrar el **estado esperado** del cuadro (obstáculo/despejado y, útil para B, la zona: izquierda / centro / derecha).
@@ -368,6 +388,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-11 · Manifiesto, verificación del conjunto y congelamiento
 - **Responsable:** A2 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 3 · **Marca:** `[GUÍA]` E3
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-10
 - **Alcance**
   - Manifiesto (CSV/JSON): `frame_id`, `sequence_id`, `t_relativo_ms`, ruta, SHA-256, `split` (ajuste/evaluación), estado esperado y procedencia.
@@ -381,6 +402,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-12 · Entradas para casos temporales y de fallo
 - **Responsable:** A2 (con A1) · **Tamaño:** S · **Prioridad:** P1 · **Bloque:** 3–4 · **Marca:** `[GUÍA]` (A aporta secuencias, aclara scores y define errores)
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** P5-03, P5-09
 - **Alcance**
   - Tabla `datos/MAPA_CASOS.md`: caso → secuencia(s) → cuadros → qué se espera de la percepción.
@@ -395,6 +417,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-08 · Primer recorrido: cuadro real → detector → comando de B
 - **Responsable:** A1 (con B3) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 4 (**objetivo lunes 26**) · **Marca:** `[GUÍA]`
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-05, P5-09 (primer lote)
 - **Por qué:** la guía lo señala como riesgo "Integración al final": si cada grupo muestra su parte pero no hay recorrido único, se pierde la compuerta de 60.
 - **Alcance**
@@ -408,6 +431,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-14 · Resultados por cuadro y trazabilidad completa
 - **Responsable:** A3 (con B3) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 4–5 · **Marca:** `[GUÍA]` E6
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** P5-02, P5-08
 - **Alcance**
   - Formato único por cuadro (JSONL/CSV, documentado) que une: `run_id`, `frame_id`, detecciones, estado, decisión, comando, `model_sha256`, `config_sha256` y errores.
@@ -420,6 +444,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-06 · Estados de percepción y manejo de errores del detector
 - **Responsable:** A1 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 2–5 · **Marca:** `[GUÍA]` (C9, C8)
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** P5-05
 - **Por qué:** C9 exige que una excepción, un tiempo agotado, una salida inválida o una imagen ilegible dejen **error registrado y STOP**; la parada ante pérdida de percepción es parte de la compuerta de 60.
 - **Alcance**
@@ -436,6 +461,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-07 · Paquete del detector: origen, licencia, hash y descarga automatizable
 - **Responsable:** A1 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 3–6 · **Marca:** `[GUÍA]` E2
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** P5-05 (y P5-04 para la licencia)
 - **Alcance**
   - `modelo/README.md`: origen (URL y versión), **licencia del código y de los pesos**, clases (`class_id` → nombre), resolución, preprocesamiento y posprocesamiento, SHA-256 y tamaño.
@@ -449,6 +475,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-16 · Reporte de límites y contraste con plazos
 - **Responsable:** A3 (con B2) · **Tamaño:** M · **Prioridad:** P1 · **Bloque:** 6 · **Marca:** `[GUÍA]` E7
+- **Revisa el PR:** A2 · Andy (`Andy-752109`)
 - **Depende de:** P5-15, plazos de B (PEND-09)
 - **Alcance**
   - Contrastar **p95 y peor tiempo** con los plazos declarados por B y con el watchdog.
@@ -462,6 +489,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-17 · Ensayo de reproducción de la parte A desde una copia limpia
 - **Responsable:** A2 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 6–7 (**jueves 29**) · **Marca:** `[GUÍA]` (recorrido de aceptación)
+- **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-07, P5-11, P5-13, P5-15
 - **Alcance**
   - En una copia limpia, **con CPU y sin red tras el setup**, seguir solo el README: recuperar pesos y datos, calcular hashes, cargar el detector, inferir imágenes elegidas por quien verifica, generar resultados nuevos, recalcular métricas y revisar el benchmark.
@@ -471,11 +499,12 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Criterios de aceptación**
   - [ ] Todo corre sin pedir ayuda al equipo, sin secretos y sin tokens.
   - [ ] Los fallos del ensayo quedan corregidos o declarados.
-  - [ ] **PM A valida** modelo identificable, clases y transformaciones, datos completos y congelados, métricas y benchmark auditables.
+  - [ ] Modelo identificable, clases y transformaciones, datos completos y congelados, métricas y benchmark auditables desde el README (esa validación final es del PM A; ver sección 3).
 - **Pendientes:** PEND-03, PEND-11.
 
 #### P5-18 · Documentación de la parte A (README y datos)
 - **Responsable:** A2 · **Tamaño:** S · **Prioridad:** P1 · **Bloque:** 7 · **Marca:** `[GUÍA]` E1
+- **Revisa el PR:** A1 · Heri (`BeetlejuiceXD`)
 - **Depende de:** P5-11
 - **Alcance**
   - Sección del README del grupo A: responsables y traspasos (con los **ocho nombres** y los dos PM cuando B aporte los suyos), comandos `infer`, `metrics`, `bench`, `verify_dataset`, versión de entrega.
