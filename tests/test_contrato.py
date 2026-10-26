@@ -101,7 +101,9 @@ INVALIDOS = {
     ),
     "stale con detecciones": mutar("stale.json", {"detections": [DETECCION]}),
     "stale con ancho null": mutar("stale.json", {"image_width": None}),
-    "confianza mayor que 1": mutar("valido.json", {"detections": [{**DETECCION, "confidence": 1.2}]}),
+    "confianza mayor que 1": mutar(
+        "valido.json", {"detections": [{**DETECCION, "confidence": 1.2}]}
+    ),
     "class_id negativo": mutar("valido.json", {"detections": [{**DETECCION, "class_id": -1}]}),
     "caja con tres valores": _caja("xyxy", [1, 2, 3]),
     "xyxy invertida": _caja("xyxy", [100, 100, 10, 10]),
