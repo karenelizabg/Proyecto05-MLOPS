@@ -195,7 +195,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] Documentadas las unidades de `bbox` y `t_capture_ms` y el significado de `stale`.
 - **Evidencia:** PR aprobado por A y B; ejemplos en `config/`.
 - **Pendientes:** PEND-02, PEND-08.
-- **Estado:** borrador v1 escrito en `config/contrato/` (esquema, 4 ejemplos, flujo de ejemplo, [CONTRATO.md](config/contrato/CONTRATO.md)) con validador en `src/contrato/` y pruebas en `tests/test_contrato.py`. Falta la aceptación de ambos PM y el recorrido con el detector real (P5-08).
+- **Estado:** v1 en `main` (esquema, 4 ejemplos, flujo de ejemplo, [CONTRATO.md](config/contrato/CONTRATO.md)) con validador en `src/contrato/` y pruebas en `tests/test_contrato.py`. Aceptado por el PM A y revisado por el PM B (2026-10-26). Solo queda abierta DC-5 (clases, con P5-04) y el recorrido con el detector real (P5-08).
 
 #### P5-03 · Dominio de obstáculos, clases y plan de filmación
 - **Responsable:** A2 · **Tamaño:** S · **Prioridad:** P0 · **Bloque:** 1 · **Marca:** `[GUÍA]` + `[SUGERENCIA]`
