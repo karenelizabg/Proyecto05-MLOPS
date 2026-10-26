@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "run_id": "ejemplo-01",
+  "frame_id": "S02_f0003",
+  "event": "frame",
+  "state_before": "AVANZANDO",
+  "state_after": "DETENIDO",
+  "action": "STOP",
+  "reason": "Obstáculo al centro (class_id 1, confianza 0.87).",
+  "speed": 0,
+  "steering": 0.0,
+  "t_decision_ms": 439.0,
+  "t_command_ms": 439.4,
+  "valid_until_ms": 639.4,
+  "received": true
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "run_id": "ejemplo-01",
+  "frame_id": null,
+  "event": "clock",
+  "state_before": "AVANZANDO",
+  "state_after": "DETENIDO",
+  "action": "STOP",
+  "reason": "Watchdog vencido: sin cuadro nuevo a tiempo.",
+  "speed": 0,
+  "steering": 0.0,
+  "t_decision_ms": 1100.0,
+  "t_command_ms": 1100.2,
+  "valid_until_ms": 1300.2,
+  "received": true
+}
