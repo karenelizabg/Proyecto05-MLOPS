@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-tesla.local/contrato/comando.v1.schema.json",
+  "title": "Comando de control B → adaptador (v1)",
+  "description": "Un comando por decisión de la política (grupo B) hacia el adaptador virtual, que lo registra sin mover motores. Lo produce un cuadro (event=frame) o un evento sin cuadro: reloj/watchdog, emergencia, rearme o apagado. action=STOP siempre lleva speed=0. Reglas que el esquema no puede expresar (orden de los tiempos) las comprueba src/contrato.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "frame_id",
+    "event",
+    "state_before",
+    "state_after",
+    "action",
+    "reason",
+    "speed",
+    "steering",
+    "t_decision_ms",
+    "t_command_ms",
+    "valid_until_ms",
+    "received"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Versión del contrato de comando. El adaptador debe reconocerla antes de aplicar el comando.",
+      "const": "1"
+    },
+    "run_id": {
+      "description": "La misma ejecución que el run_id de los eventos de percepción.",
+      "$ref": "#/$defs/id"
+    },
+    "frame_id": {
+      "description": "Cuadro de percepción que originó la decisión. Obligatorio con event=frame; null en eventos de reloj (no hay cuadro).",
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "event": {
+      "description": "Qué disparó la decisión. frame: llegó un evento de percepción. clock: tic del reloj o vencimiento del watchdog. emergency: paro de emergencia. rearm: rearme tras un paro. shutdown: fin del run.",
+      "enum": ["frame", "clock", "emergency", "rearm", "shutdown"]
+    },
+    "state_before": {
+      "description": "Estado de la máquina de estados de B antes de la decisión.",
+      "$ref": "#/$defs/estado"
+    },
+    "state_after": {
+      "description": "Estado de la máquina de estados de B después de la decisión.",
+      "$ref": "#/$defs/estado"
+    },
+    "action": {
+      "description": "Orden al adaptador.",
+      "enum": ["AVANZAR", "GIRAR_IZQ", "GIRAR_DER", "STOP"]
+    },
+    "reason": {
+      "description": "Por qué se tomó la acción, para leer en el registro.",
+      "type": "string",
+      "minLength": 1
+    },
+    "speed": {
+      "description": "Velocidad normalizada, de 0 (detenido) a 1 (máxima). Con action=STOP es 0.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "steering": {
+      "description": "Dirección normalizada, de -1 a 1; 0 es recto.",
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "t_decision_ms": {
+      "description": "Instante en que la política decide, en milisegundos, mismo reloj monotónico que t_capture_ms y t_emit_ms del contrato de percepción.",
+      "type": "number",
+      "minimum": 0
+    },
+    "t_command_ms": {
+      "description": "Instante en que B entrega el comando al adaptador, mismo reloj y unidad. Nunca anterior a t_decision_ms.",
+      "type": "number",
+      "minimum": 0
+    },
+    "valid_until_ms": {
+      "description": "Hasta cuándo vale el comando, mismo reloj y unidad. Nunca anterior a t_command_ms. Vencido sin un comando nuevo, el adaptador frena.",
+      "type": "number",
+      "minimum": 0
+    },
+    "received": {
+      "description": "true si el adaptador recibió el comando.",
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "const": "STOP" } }, "required": ["action"] },
+      "then": {
+        "properties": {
+          "speed": { "const": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "frame" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "frame_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event": { "const": "clock" } }, "required": ["event"] },
+      "then": {
+        "properties": {
+          "frame_id": { "type": "null" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "estado": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "run_id": "ejemplo-01",
+  "frame_id": "S01_f0001",
+  "event": "frame",
+  "state_before": "DETENIDO",
+  "state_after": "AVANZANDO",
+  "action": "AVANZAR",
+  "reason": "Cuadro ok sin detecciones: vía libre.",
+  "speed": 0.5,
+  "steering": 0.0,
+  "t_decision_ms": 43.0,
+  "t_command_ms": 43.5,
+  "valid_until_ms": 243.5,
+  "received": true
+}
