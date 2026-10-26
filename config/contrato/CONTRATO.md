@@ -1,7 +1,9 @@
-# Contrato de percepción A → B · v1 (borrador)
+# Contrato de percepción A → B · v1
 
-> **Estado: borrador para aceptación de ambos PM** (ticket P5-02). A1 y B3 mantienen el esquema y los
-> ejemplos; cualquier cambio lo aprueban PM A y PM B.
+> **Estado: v1 aceptado (2026-10-26).** El PM A lo acepta; el PM B lo revisó y el grupo B ya lo usa sin
+> cambios en sus tickets T01–T19. Falta el recorrido con el detector real (P5-08), que no cambia el contrato
+> salvo que encuentre una diferencia. A1 y B3 mantienen el esquema y los ejemplos; cualquier cambio sube la
+> versión y lo aprueban PM A y PM B.
 > Alcance: el evento que el detector (grupo A) entrega por cuadro a la política (grupo B).
 > El contrato B → adaptador (comando de control) es del grupo B y no está aquí.
 
@@ -82,21 +84,22 @@ Salida 0 si cumple, 1 si hay eventos inválidos, 2 si un archivo no se puede lee
 las cajas caben en la imagen, que `t_emit_ms ≥ t_capture_ms`, y entre eventos: `frame_id` único por run, `t_capture_ms`
 creciente por secuencia y un solo modelo y configuración por run. Las pruebas están en `tests/test_contrato.py`.
 
-## Decisiones abiertas para los PM
+## Decisiones
 
-Cada una tiene un valor por omisión; si nadie dice otra cosa, rige el valor por omisión.
+Cada una tenía un valor por omisión y nadie pidió otro, así que rige el valor por omisión.
+Solo DC-4 y DC-5 siguen pendientes de un dato.
 
-| ID | Decisión | Por omisión |
-|---|---|---|
-| DC-1 | Formato de caja. | `xyxy`, píxeles del cuadro original. |
-| DC-2 | Origen del reloj en vivo y en reproducción. | Reproducción: tiempo relativo del manifiesto. En vivo: reloj monotónico desde el inicio del run. |
-| DC-3 | Quién emite `stale`. | A, cuando la edad del cuadro supera `max_frame_age_ms`; el watchdog de B cubre la ausencia total de cuadros. |
-| DC-4 | `max_frame_age_ms` y plazo de inferencia (`detector_timeout`). | Los declara B antes de medir, relacionados con el ritmo de entrada (PEND-09). |
-| DC-5 | Lista de clases del dominio y su `class_id`. | Sale de `modelo/clases.json` (A1, P5-04). La lista de clases relevantes de B1 debe ser un subconjunto. |
-| DC-6 | Si A cuenta las detecciones descartadas por clase o NMS (`num_filtradas`). | No; se puede agregar como campo opcional. |
+| ID | Decisión | Valor vigente | Estado |
+|---|---|---|---|
+| DC-1 | Formato de caja. | `xyxy`, píxeles del cuadro original. La política de B (T08) también acepta `xywh`. | Resuelta |
+| DC-2 | Origen del reloj en vivo y en reproducción. | Reproducción: tiempo relativo del manifiesto. En vivo: reloj monotónico desde el inicio del run. B no usa el reloj del sistema: recibe `ahora_ms` (T03). | Resuelta |
+| DC-3 | Quién emite `stale`. | A, cuando la edad del cuadro supera `max_frame_age_ms`. Además, B rechaza por edad aunque el cuadro llegue `ok` (T05), y su watchdog cubre la ausencia total de cuadros. | Resuelta |
+| DC-4 | `max_frame_age_ms` y plazo de inferencia (`detector_timeout`). | Valores iniciales de B (T01, #21): `max_frame_age_ms` 500, `detector_timeout_ms` 500, `watchdog_ms` 600, `validez_orden_ms` 400. Ritmo de entrada ≈ 5 fps (200 ms por cuadro). | Valores iniciales; B los deja en `config/control/plazos.yaml` (T01) y A los contrasta con su p95 (P5-16) |
+| DC-5 | Lista de clases del dominio y su `class_id`. | Sale de `modelo/clases.json` (A1, P5-04). La lista de clases relevantes de B1 debe ser un subconjunto (T12). | Abierta hasta P5-04 |
+| DC-6 | Si A cuenta las detecciones descartadas por clase o NMS (`num_filtradas`). | No; se puede agregar como campo opcional. | Resuelta |
 
 ## Aceptación
 
-- [ ] PM A acepta el contrato v1.
-- [ ] PM B acepta el contrato v1.
+- [x] PM A acepta el contrato v1.
+- [x] PM B revisó el contrato v1 (confirmado por el PM A el 2026-10-26).
 - [ ] B3 reprodujo con el detector real un ejemplo y obtuvo el mismo evento (P5-08).
