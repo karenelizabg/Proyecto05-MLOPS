@@ -8,6 +8,10 @@
 >
 > **Entrega: viernes 30 de octubre de 2026.** Quedan 7 días: el 29 se reserva para reproducir desde una copia
 > limpia y el 30 para el cierre conjunto.
+>
+> **2026-10-26 — el carro está decidido:** es el kit que recomendó el profe (D-07). Se ajustaron PEND-06 y
+> PEND-12, se agregó PEND-13 y el ticket P5-19 (armar el carro) y cambiaron P5-03, P5-04, P5-09, P5-12, el plan y
+> los riesgos.
 
 ## Leyenda
 
@@ -79,13 +83,14 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | PEND-03 | **Repositorio oficial único** para los dos grupos. El `origin` de este clon es `github.com/karenelizabg/Proyecto05-MLOPS`; confirmar que es el oficial, que B tiene acceso y si será **público o se entrega ZIP** (el evaluador debe acceder sin intervención del equipo; el repo de P4 era privado). | PM A + PM B | P5-01, P5-17 | Se usa el `origin` actual, privado, hasta decidir. |
 | PEND-04 | **Dominio de obstáculos y clases** (qué objetos, qué escena, qué cámara). Lo deciden ambos PM. | PM A + PM B | P5-03, P5-04, P5-09 | El equipo A propuso (sin confirmar con B): **lata de refresco, mochila, cajas, tenis**; interior, piso plano, buena luz. **Ojo: de esas, solo "mochila" es clase COCO.** La lata podría salir como `bottle` o `cup`; "caja" y "tenis" no existen en COCO. P5-04 debe probar fotos reales de los 4 objetos antes de que los PM aprueben las clases; si el detector no los reconoce, hay que cambiar de objetos (p. ej. botella, maleta) o de detector (D-01). Lo más bajo que la llanta es *transitable* y queda fuera (ver P5-03). |
 | PEND-05 | **Máquina de evaluación y benchmark:** SO, CPU, RAM. El benchmark debe medirse en el equipo declarado. | A3 | P5-15 | La laptop que use A3; si es la ASUS de P4 (i5-7300HQ, 8 GB, Windows 10), ya hay ficha de hardware en P4. |
-| PEND-06 | **Cámara y quién filma.** El carro es el kit ESP32-CAM 4WD (TSCINBUNY ZYC0024-EN, baterías 18650, 6–7.4 V). ¿Se filma con la propia ESP32-CAM o con celular? Hay que anotar altura y ángulo de la cámara montada. El módulo suele traer un sensor OV2640 de foco fijo, con compresión JPEG y poca sensibilidad en luz baja (confirmar en el módulo). | PM A | P5-03, P5-09 | Filmar con la propia ESP32-CAM (misma óptica, resolución y compresión que vería el carro), a 640×480. Si no se puede, celular a baja altura, horizontal y reescalado a 640×480. |
+| PEND-06 | **Cámara y quién filma.** El carro es el que recomendó el profe: **Kit Carrito ESP32-CAM 4WD** (UNIT Electronics SKU AR4510, TSCINBUNY ZYC0024-EN). Trae una placa ESP32-CAM con sensor OV2640, ranura SD, puente H L298, 4 motorreductores y 4 llantas de goma, y transmite video por WiFi a una página web. La ficha **no** dice la resolución de transmisión, si el foco es fijo o ajustable, el ángulo de visión ni a qué altura queda la cámara. El OV2640 comprime en JPEG y rinde peor con poca luz (confirmar en el módulo). Hay que anotar altura y ángulo de la cámara montada. | PM A | P5-03, P5-04, P5-09 | Filmar con la propia ESP32-CAM (misma óptica, resolución y compresión que vería el carro), a 640×480. Plan B si no transmite a tiempo: celular a baja altura, horizontal y reescalado a 640×480 (D-07). |
 | PEND-07 | **Rúbrica detallada y prompt de evaluación** (la guía los enlaza como "Entregables detallados" y "Rúbrica y prompt de evaluación"; no están en el HTML). Incluye topes y detalles del criterio 1.4. | PM A | Ajustes de P5-13, P5-17 | Se trabaja con lo que dice la guía. |
 | PEND-08 | **Formato de caja y de anotación** acordado con B (`xyxy` o `xywh`, píxeles del cuadro original, origen arriba-izquierda). | PM A + PM B | P5-02, P5-10 | `xyxy` en píxeles del cuadro original (ver D-04). |
 | PEND-09 | **Ritmo de entrada** (fps de las secuencias) y plazos que B usará en el watchdog. A debe poder cumplirlos con su p95. | PM B | P5-05, P5-16 | Secuencias a ~5 fps (200 ms entre cuadros); ajustar cuando B declare plazos. |
 | PEND-10 | **Fechas internas** de cada bloque (los campos "Fecha objetivo" de la guía están vacíos). | PM A + PM B | Plan de la sección 5 | Las fechas sugeridas de la sección 5. |
 | PEND-11 | **Dónde viven los archivos grandes** (pesos, imágenes): dentro de Git o fuera con descarga automatizable + hash (la guía lo permite). | PM A + PM B | P5-07, P5-11 | Si pesan poco (< 50 MB) dentro de Git; si no, GitHub Release con SHA-256 y script de descarga. |
-| PEND-12 | **Medidas del carro:** diámetro de llanta, altura libre del chasis, ancho, y altura y ángulo de la cámara. Con eso se fija la altura mínima de un obstáculo (un borrador, más bajo que la llanta, es transitable). **Ojo:** la ficha del kit (caja de 275 × 170 × 50 mm, 795 g) no da el diámetro de llanta ni la altura libre: hay que medir el carro armado. | Quien tenga el carro | P5-03, P5-09, P5-10 | Sin valor: medirlo antes de filmar (10 minutos). Mientras tanto, objetos como un borrador, una tapa o un cable se tratan como transitables. |
+| PEND-12 | **Medidas del carro:** diámetro de llanta, altura libre del chasis, ancho, y altura y ángulo de la cámara. Con eso se fija la altura mínima de un obstáculo (un borrador, más bajo que la llanta, es transitable). **Ojo:** la ficha del kit en UNIT Electronics (acrílico, caja de 275 × 170 × 50 mm, 795 g) no da el diámetro de llanta ni la altura libre: hay que medir el carro armado. La misma tienda vende como accesorio una llanta TT de 66 × 27 mm; **si** el kit trae ese tamaño, el radio sería ≈ 3.3 cm (es una hipótesis, no un dato del kit). | Quien tenga el carro | P5-03, P5-09, P5-10 | Sin valor: medirlo antes de filmar (10 minutos). Mientras tanto, objetos como un borrador, una tapa o un cable se tratan como transitables, y se supone un obstáculo de más de ≈ 3 cm hasta tener la medida real. |
+| PEND-13 | **Baterías y quién arma el carro.** El kit **no incluye baterías** (18650, 6–7.4 V; ver cuántas en el instructivo) ni cargador. Armarlo y ponerlo a transmitir pide, según la ficha: el cable USB-C (viene en el kit), el IDE de Arduino con el soporte ESP32, el driver USB-serial CH340 y una red WiFi de **2.4 GHz**. **No es solo para Windows:** el IDE y el soporte ESP32 también existen para macOS; la ficha solo enlaza el driver de Windows, así que en Mac hay que comprobar si la placa aparece como puerto serial o instalar el driver CH340 de WCH. | PM A | P5-19 | Sin valor: decidir quién compra las baterías (los tres arman el carro en P5-19). Plan B: celular (D-07). |
 
 ### Decisiones abiertas (con default para no esperar)
 
@@ -97,6 +102,7 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | D-04 | Formato de caja. | `xyxy`, píxeles del cuadro **original** (deshacer cualquier redimensionado o *letterbox* antes de emitir). | A1 + B3 |
 | D-05 | Tamaño del conjunto. | **8 secuencias × 10 cuadros = 80** (mínimo exigido: 60 y 6), con ≥ 30 de obstáculo y ≥ 30 despejados, para tener margen si algún cuadro se descarta por duplicado. | A2 |
 | D-06 | Separación ajuste / evaluación. | 3 secuencias de ajuste (umbrales, NMS) y 5 de evaluación; **las métricas se reportan sobre todo el conjunto y por separado sobre evaluación**. Nada se afina mirando evaluación. | A2 + A3 |
+| D-07 | Carro y cámara de captura. | **Decidido (lo recomendó el profe):** Kit Carrito ESP32-CAM 4WD (UNIT Electronics SKU AR4510, TSCINBUNY ZYC0024-EN). Se filma con su propia cámara (OV2640) a 640×480; si no transmite a tiempo, plan B con celular reescalado a 640×480 (PEND-06). | PM A |
 
 ---
 
@@ -106,12 +112,12 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 
 | Rol | Responsabilidad en la guía | Tickets | Carga |
 |---|---|---|---|
-| **A1** · detector y runtime | Carga de pesos, inferencia real, clases, cajas, CPU | P5-02, 04, 05, 06, 07, 08 | 13 pts |
-| **A2** · secuencias y anotaciones | Cuadros, verdad de referencia, IDs, separación por secuencia | P5-03, 09, 10, 11, 12, 17, 18 | 13 pts |
-| **A3** · métricas y benchmark | TP/FP/FN, F1, mediciones individuales, límites | P5-01, 13, 14, 15, 16 | 12 pts |
+| **A1** · detector y runtime | Carga de pesos, inferencia real, clases, cajas, CPU | P5-02, 04, 05, 06, 07, 08 y 19 (compartido) | 15 pts |
+| **A2** · secuencias y anotaciones | Cuadros, verdad de referencia, IDs, separación por secuencia | P5-03, 09, 10, 11, 12, 17, 18 y 19 (compartido) | 15 pts |
+| **A3** · métricas y benchmark | TP/FP/FN, F1, mediciones individuales, límites | P5-01, 13, 14, 15, 16 y 19 (compartido) | 14 pts |
 
 **PM A** (no son tickets de dev): aceptar el contrato junto con el PM B, mantener el seguimiento diario,
-**validar modelo, datos y mediciones** al cierre (guía, sección 10) y conseguir las respuestas de PEND-01 a PEND-12.
+**validar modelo, datos y mediciones** al cierre (guía, sección 10) y conseguir las respuestas de PEND-01 a PEND-13.
 
 **Convenciones heredadas de P4:** un ticket = una rama = un PR; rama `p5-NN-descripcion`, commits
 `P5-NN: qué cambia`, título del PR `P5-NN: descripción`; en el PR, qué probaste y **qué no pudiste probar**;
@@ -126,12 +132,12 @@ nunca secretos. El CI de P4 **rechaza ramas `p5-`** (`check-naming.sh` solo acep
 | P5-01 | PEND-03 |
 | P5-02 | PEND-02, PEND-08 |
 | P5-03 | PEND-04, PEND-06, PEND-12 |
-| P5-04 | PEND-04 |
+| P5-04 | PEND-04 (y P5-19 para las fotos con la ESP32-CAM) |
 | P5-05 | P5-02, P5-04 |
 | P5-06 | P5-05 |
 | P5-07 | P5-05 (y P5-04 para la licencia) |
 | P5-08 | P5-05, P5-09 (primer lote) |
-| P5-09 | P5-03 |
+| P5-09 | P5-03, P5-19 |
 | P5-10 | P5-09 |
 | P5-11 | P5-10 |
 | P5-12 | P5-03, P5-09 |
@@ -141,6 +147,7 @@ nunca secretos. El CI de P4 **rechaza ramas `p5-`** (`check-naming.sh` solo acep
 | P5-16 | P5-15, declaración de plazos de B (PEND-09) |
 | P5-17 | P5-07, P5-11, P5-13, P5-15 |
 | P5-18 | P5-11 |
+| P5-19 | PEND-13 |
 
 ---
 
@@ -152,7 +159,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 | Bloque | Fechas | Qué pasa (grupo A) | Salida que se exige |
 |---|---|---|---|
 | **1** · Acordar dominio y contrato (ambos PM) | vie 23 – sáb 24 | P5-01, P5-02, P5-03, P5-04 | Contrato v1 con ejemplo válido, vacío y fallido, **aceptado por ambos PM antes de separar tareas**. |
-| **2** · Primera entrega por grupo | sáb 24 – dom 25 | P5-05 (inferir una imagen real), P5-09 (empezar a filmar), P5-13 y P5-15 con datos sintéticos | Inferencia real en CPU; primer lote de 2–3 secuencias para que B pruebe. |
+| **2** · Primera entrega por grupo | sáb 24 – dom 25 | P5-05 (inferir una imagen real), P5-19 (armar el carro y verificar el video de la ESP32-CAM; PEND-13), P5-09 (empezar a filmar), P5-13 y P5-15 con datos sintéticos | Inferencia real en CPU; primer lote de 2–3 secuencias para que B pruebe. |
 | **3** · Congelar datos | dom 25 – lun 26 | P5-09, P5-10, P5-11, P5-12 | **Datos de evaluación congelados** (hash). Los casos de B no se ajustan para aprobar. |
 | **4** · Conectar detector real y control virtual | lun 26 – mar 27 | P5-08, P5-14, P5-06 | Primer cuadro real → detecciones → comando. C1–C5 y C7 con secuencias **reales**, no solo sintéticas. |
 | **5** · Paradas y calidad de detección | mar 27 – mié 28 | P5-13 final sobre todo el conjunto, P5-06 cerrado | TP/FP/FN de todo el conjunto; B cierra C8–C10. |
@@ -206,6 +213,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
     - **Regla de obstáculo vs. objeto transitable.** Obstáculo es lo que el carro no puede cruzar. Propuesta: altura mayor que el radio de la llanta (½ diámetro) o que la altura libre del chasis, lo que sea menor; **medirla** (PEND-12). Algo más bajo, como un borrador, una tapa o un cable, es *transitable*: no se etiqueta, no está en las clases relevantes y **no debe provocar STOP** (si no, el carro "siempre se detiene", que la guía no acepta).
     - **Tabla de objetos de prueba** con su altura medida y veredicto (obstáculo / transitable), de preferencia comprobado pasando el carro por encima.
     - **Lo que el sistema no cubre:** objetos sin clase en el detector (COCO no tiene "caja", "cono" ni "borrador"); desniveles, huecos y bordes; objetos transparentes o reflejantes; poca luz o desenfoque por movimiento; objetos fuera del campo de visión o pegados a las llantas; y distancia o altura reales, que una sola cámara no mide (solo se infieren por clase, tamaño y posición de la caja).
+    - **Carro y cámara** (D-07): modelo del kit, resolución de captura, altura y ángulo de la cámara montada, tipo de foco (la ficha no lo dice) y lo que eso implica: una cámara baja deja fuera lo pegado a las llantas, y el OV2640 comprime en JPEG y rinde peor con poca luz. Los datos salen de `datos/CARRO.md` (P5-19).
   - **Matriz de secuencias × casos** (propuesta de 8 secuencias):
 
     | Seq | Escena | Casos que sirve |
@@ -224,7 +232,8 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] Cada caso C1–C7 tiene al menos una secuencia asignada.
   - [ ] El plan reparte las secuencias entre ajuste y evaluación (D-06) **antes** de filmar.
   - [ ] Los PM de A y B aprobaron las clases, y todas existen en el detector elegido.
-  - [ ] La regla obstáculo/transitable usa las medidas reales del carro (PEND-12) y la tabla tiene al menos 3 obstáculos y 3 objetos transitables con su altura.
+  - [ ] La regla obstáculo/transitable usa las medidas reales del carro (PEND-12, que salen de P5-19) y la tabla tiene al menos 3 obstáculos y 3 objetos transitables con su altura.
+  - [ ] `DOMINIO.md` declara el carro y la cámara (modelo, resolución, altura, ángulo) y sus límites.
 - **Pendientes:** PEND-04, PEND-06, PEND-12.
 
 #### P5-04 · Selección del detector
@@ -234,16 +243,39 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Alcance**
   - Elegir 2–3 candidatos (D-01); revisar **licencia del código y de los pesos**, tamaño, formato (ONNX disponible o exportable), clases COCO que cubren el dominio.
   - Prueba rápida en **CPU** con varias imágenes con el objeto en distintas posiciones (izquierda, centro, derecha, cerca, lejos) y con una imagen sin objetos. Anotar latencia aproximada y falsos positivos evidentes.
-  - **Probar con fotos reales de los objetos del dominio** (lata de refresco, mochila, caja, tenis), idealmente tomadas con la ESP32-CAM: tabla objeto → ¿lo detecta? → con qué clase y confianza. Con un detector COCO se espera que solo la mochila salga bien (PEND-04).
+  - **Probar con fotos reales de los objetos del dominio** (lata de refresco, mochila, caja, tenis), **tomadas con la ESP32-CAM del kit** (misma óptica y compresión JPEG que verá el detector; si el carro aún no transmite, con celular reescalado a 640×480 y recomprimido a JPEG, y repetirlas cuando haya video del carro, P5-19): tabla objeto → ¿lo detecta? → con qué clase y confianza. Con un detector COCO se espera que solo la mochila salga bien (PEND-04).
   - Registrar la decisión y los descartados en `modelo/DECISION.md`.
 - **Criterios de aceptación**
   - [ ] Decisión registrada con origen, versión, licencia y razón; incluye lo que se probó y lo que no.
   - [ ] El detector elegido localiza correctamente (a ojo) objetos laterales y centrales en CPU.
   - [ ] Cada objeto del dominio tiene su resultado en la tabla; los que el detector no reconoce se reemplazan por otros o se cambia de detector **antes** de filmar (P5-09).
+  - [ ] La prueba incluye fotos de la ESP32-CAM, no solo del celular (o queda dicho que faltan).
   - [ ] Se sabe si el runtime elegido corre en la máquina de PEND-05.
 - **Pendientes:** PEND-04, PEND-05.
 
 ### Bloque 2 — Primera entrega por grupo
+
+#### P5-19 · Armar el carro y poner a transmitir la ESP32-CAM
+- **Responsable:** A1 + A2 + A3 (los tres; **revisa el PM A**) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[SUGERENCIA]` (D-07)
+- **Depende de:** PEND-13 (baterías y cargador)
+- **Por qué:** P5-09 (video con la óptica real) y P5-03 (regla obstáculo/transitable) necesitan el carro armado: el video de la ESP32-CAM y las medidas de llanta, chasis y cámara. Si no se logra a tiempo, el plan B es el celular (D-07).
+- **Alcance** (según la ficha de UNIT Electronics; todavía no se probó)
+  - Armar el kit con el instructivo (las baterías 18650 y el cargador no vienen incluidos).
+  - Cargar el programa `ESP32CAM_Car` desde el IDE de Arduino: placa `ESP32 Wrover Module`, partición `Huge APP`, red WiFi de **2.4 GHz** y un puente entre GND y GPIO0 solo mientras se carga. Basta con que uno de los tres lo cargue.
+  - **Windows o Mac:** el IDE y el soporte ESP32 existen para las dos; la ficha solo enlaza el driver CH340 de Windows, así que en Mac se comprueba si la placa aparece como puerto serial o se instala el driver CH340 de WCH.
+  - Ver la IP en el Monitor Serie y abrir el video desde el navegador. La ESP32-CAM debe recibir 5 V estables; si baja, el video se corta.
+  - Que los otros dos vean el video desde su propia computadora.
+  - Medir y anotar en `datos/CARRO.md`: diámetro de llanta, altura libre del chasis, ancho, altura de la cámara sobre el piso, ángulo, y la resolución y calidad JPEG configuradas (PEND-12, PEND-06).
+  - Guardar 3 cuadros de prueba con objetos del dominio tomados con la ESP32-CAM (los usa P5-04).
+  - La contraseña del WiFi vive en el programa de la placa: **no subir ese archivo al repo** con la clave escrita. Fotos sin rostros ni pantallas con SSID o contraseña (repo público).
+- **Criterios de aceptación**
+  - [ ] **Fotos del carro armado** (vista general, cámara montada y las medidas con regla o cinta) en `docs/carro/`, reducidas (≤ 1 MB cada una).
+  - [ ] Captura de pantalla del video transmitiendo desde la ESP32-CAM.
+  - [ ] `datos/CARRO.md` con las medidas y la configuración de la cámara; PEND-06 y PEND-12 quedan resueltos.
+  - [ ] Dos de los tres ven el video desde su propia computadora.
+  - [ ] El PM A revisó las fotos y las medidas.
+- **Evidencia:** fotos en `docs/carro/`, `datos/CARRO.md` y la captura del video.
+- **Pendientes:** PEND-06, PEND-12, PEND-13.
 
 #### P5-05 · Detector ejecutable en CPU y comando `infer`
 - **Responsable:** A1 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[GUÍA]` E2
@@ -265,9 +297,12 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 
 #### P5-09 · Captura de secuencias y extracción de cuadros únicos
 - **Responsable:** A2 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2–3 · **Marca:** `[GUÍA]` E3
-- **Depende de:** P5-03
+- **Depende de:** P5-03, P5-19
 - **Por qué:** E3 pide ≥ 6 secuencias y 60 cuadros distintos extraídos como imágenes; B necesita secuencias **reales** pronto (bloque 4).
 - **Alcance**
+  - **Requiere el carro armado y el video funcionando (P5-19).** Si no está listo a tiempo, pasar al plan B del celular a 640×480 (D-07) sin esperar al último día.
+  - **Cómo se capturan los cuadros:** un script que lea el stream de la ESP32-CAM y guarde los bytes JPEG tal como llegan (sin recomprimir, para que el SHA-256 sea estable) con la marca de tiempo real de recepción. El WiFi da tiempos irregulares: **no suponer 200 ms fijos**; el contrato exige `t_capture_ms` estrictamente creciente. La URL del stream depende del programa `ESP32CAM_Car`: confirmarla en el instructivo.
+  - Fijar y anotar la configuración de captura (resolución 640×480, calidad JPEG, orientación) y **no cambiarla entre secuencias**; la altura y el ángulo salen de `datos/CARRO.md`.
   - Filmar según el plan de P5-03 (**el fin de semana**) y extraer cuadros completos como imágenes (JPG/PNG), con IDs estables (`sequence_id`, `frame_id`) y **tiempo relativo** por cuadro.
   - **Primer lote de 2–3 secuencias el domingo 25** para que B pruebe con datos reales.
   - Evitar cuadros casi idénticos: la guía pide cuadros *únicos*; calcular SHA-256 de cada imagen y revisar duplicados.
@@ -277,7 +312,9 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] ≥ 6 secuencias (objetivo 8) y ≥ 60 cuadros (objetivo 80), todos completos y sin duplicados exactos.
   - [ ] ≥ 20 cuadros con obstáculo y ≥ 20 despejados (objetivo 30 y 30).
   - [ ] Primer lote entregado a B y confirmado que lo pueden leer.
-- **Pendientes:** PEND-06.
+  - [ ] La configuración de la cámara (resolución, calidad, altura, ángulo) está anotada y es la misma en todas las secuencias.
+  - [ ] Cada cuadro tiene su marca de tiempo real de captura, no una calculada.
+- **Pendientes:** PEND-06, PEND-12.
 
 #### P5-13 · Script de métricas de detección (TP/FP/FN, P/R/F1 a IoU 0.50)
 - **Responsable:** A3 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2–5 · **Marca:** `[GUÍA]` E6
@@ -348,7 +385,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Alcance**
   - Tabla `datos/MAPA_CASOS.md`: caso → secuencia(s) → cuadros → qué se espera de la percepción.
   - **C6:** documentar qué cuadros quedan bajo y sobre el umbral de confianza y con qué score los produce el detector elegido.
-  - **C8/C9:** fixtures de entrada fallida: imagen ilegible o vacía, archivo corrupto, cuadro con dimensiones distintas, y la lista de errores que A1 define (excepción, tiempo agotado, salida inválida).
+  - **C8/C9:** fixtures de entrada fallida: imagen ilegible o vacía, archivo corrupto (si el stream de la ESP32-CAM entrega un JPEG truncado real, conservarlo), cuadro con dimensiones distintas, y la lista de errores que A1 define (excepción, tiempo agotado, salida inválida).
 - **Criterios de aceptación**
   - [ ] Cada caso C1–C7 apunta a cuadros **reales**.
   - [ ] Las fixtures de error disparan `status=error` en `infer` (con P5-06).
@@ -456,7 +493,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 |---|---|
 | E1 · repo y README | P5-01, P5-18 (con B) |
 | E2 · detector | P5-04, P5-05, P5-06, P5-07 |
-| E3 · secuencias etiquetadas | P5-03, P5-09, P5-10, P5-11 |
+| E3 · secuencias etiquetadas | P5-03, P5-19, P5-09, P5-10, P5-11 |
 | E5 · aporte de A a los casos | P5-12, P5-06, P5-08 |
 | E6 · métricas y trazabilidad | P5-13, P5-14 |
 | E7 · benchmark y límites | P5-15, P5-16 |
@@ -481,6 +518,7 @@ Con **E4** (política, adaptador) y **E5** (ejecutar C1–C10) cubiertos por el 
 | Evaluador no puede instalar o recuperar los pesos. | Reproducción fallida. | Lockfile, descarga con hash, probar en copia limpia (P5-17); repo público o ZIP (PEND-03). |
 | Rostros en repo público. | Privacidad. | Consentimiento y cuadros sin rostros identificables (P5-09). |
 | Objetos bajos (borrador, cable) tratados como obstáculo, o un obstáculo real ignorado, sin una regla escrita. | STOP innecesarios (no avanza), o choque no detectado; etiquetas inconsistentes y F1 ruidoso. | Regla con medidas reales (P5-03, PEND-12), cuadros transitables en S8 y el mismo criterio en anotación (P5-10) y en la lista de clases relevantes de B1. |
+| El carro no se arma o la ESP32-CAM no transmite a tiempo (driver CH340, WiFi de 2.4 GHz, 5 V inestables, baterías que el kit no trae). | Sin cuadros con la óptica del carro; se atrasa P5-09 y todo lo que cuelga de los datos. | Plan B del celular a 640×480 (D-07). `[SUGERENCIA]` Decidir hoy quién compra las baterías y quién arma el carro (PEND-13), y pasar al celular si el martes 27 no hay video. |
 | Poco tiempo (7 días). | Se empuja todo al final. | Filmar el fin de semana; plan por bloques de la sección 5. |
 
 ---
