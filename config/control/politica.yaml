@@ -1,0 +1,52 @@
+# Configuración de la política del grupo B (T07, #27).
+#
+# Todos los números que usa la política para decidir AVANZAR, GIRAR_IZQ, GIRAR_DER o STOP.
+# Se carga con src/control/config.py -> cargar_config_politica(ruta), que también revisa
+# que cada valor esté en su rango. Si cambias un valor, corre `pytest` antes de subirlo.
+
+# --- Zonas -----------------------------------------------------------------------------
+# Cada zona es una fracción del ANCHO de la imagen: 0 = borde izquierdo, 1 = borde derecho.
+# La política multiplica estas fracciones por `image_width` de cada evento; nunca se fija
+# un ancho en píxeles a mano (CONTRATO.md, "Coordenadas y tiempo").
+# Las tres zonas deben ir en orden, cubrir de 0 a 1 y no dejar huecos ni encimarse.
+zonas:
+  izq: [0.0, 0.33]
+  centro: [0.33, 0.67]
+  der: [0.67, 1.0]
+
+# Fracción mínima del ANCHO DE LA CAJA que debe caer dentro de una zona para que la caja
+# "ocupe" esa zona (0 < valor <= 1). Con 0.15, una caja que apenas roza la orilla de otra
+# zona (menos del 15 % de su ancho) no la ocupa; una caja ancha puede ocupar dos o tres.
+traslape_minimo: 0.15
+
+# --- Clases ----------------------------------------------------------------------------
+# class_id (según modelo/clases.json del grupo A) que cuentan como OBSTÁCULO.
+# La política decide con class_id, nunca con class_name.
+# Los objetos bajos que el carrito puede pasar por encima (transitables: borrador, cable,
+# tapa) NO van en esta lista, para que no provoquen STOP (ver TICKETS.md, P5-03).
+#
+# PROVISIONAL: [0, 1] corresponde a los ejemplos del contrato (0 = lata, 1 = mochila).
+# Se reemplaza por las clases definitivas cuando las PM aprueben modelo/clases.json
+# (P5-04, DC-5) en T12 (#32), y entonces `clases_provisionales` pasa a false.
+clases_obstaculo: [0, 1]
+clases_provisionales: true
+
+# Confianza mínima (0 a 1) para tomar en cuenta una detección. Por debajo, se ignora.
+umbral_confianza: 0.5
+
+# --- Histéresis ------------------------------------------------------------------------
+# Después de un STOP por obstáculo, cuántos cuadros `ok` SEGUIDOS sin obstáculo en el
+# camino se necesitan para volver a avanzar (entero >= 1). Evita arrancar y frenar a cada
+# cuadro cuando la detección parpadea (caso C7, T11).
+cuadros_libres_para_reanudar: 3
+
+# --- Movimiento (solo se registra en el adaptador virtual; NO mueve motores) ------------
+# Velocidad de AVANZAR, de 0 a 1 (fracción de la velocidad máxima). Debe ser > 0 (C1).
+velocidad_avance: 0.4
+
+# Magnitud del giro para GIRAR_IZQ / GIRAR_DER, de 0 a 1. El signo lo pone la política:
+# negativo = izquierda, positivo = derecha (contrato de comando).
+giro: 0.5
+
+# Si es false, la política nunca gira: con obstáculo en el camino siempre hace STOP.
+permitir_giro: true
