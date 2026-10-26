@@ -46,11 +46,12 @@ def test_los_ejemplos_cumplen_el_contrato(nombre):
     assert validar_comando(cargar(nombre)) == []
 
 
-def test_stop_lleva_velocidad_cero():
+def test_stop_lleva_velocidad_y_direccion_cero():
     for nombre in ["stop.json", "reloj.json"]:
         comando = cargar(nombre)
         assert comando["action"] == "STOP"
         assert comando["speed"] == 0
+        assert comando["steering"] == 0
 
 
 def test_reloj_no_trae_cuadro():
@@ -103,6 +104,16 @@ INVALIDOS = {
     "reason vacia": mutar("avanzar.json", {"reason": ""}),
     "stop con velocidad": mutar("stop.json", {"speed": 0.3}),
     "reloj stop con velocidad": mutar("reloj.json", {"speed": 1}),
+    "stop con direccion": mutar("stop.json", {"steering": 0.3}),
+    "avanzar con velocidad cero": mutar("avanzar.json", {"speed": 0}),
+    "girar a la izquierda hacia la derecha": mutar(
+        "avanzar.json", {"action": "GIRAR_IZQ", "steering": 0.5}
+    ),
+    "girar a la izquierda recto": mutar("avanzar.json", {"action": "GIRAR_IZQ", "steering": 0}),
+    "girar a la derecha hacia la izquierda": mutar(
+        "avanzar.json", {"action": "GIRAR_DER", "steering": -0.5}
+    ),
+    "girar a la derecha recto": mutar("avanzar.json", {"action": "GIRAR_DER", "steering": 0}),
     "frame sin frame_id": mutar("avanzar.json", {"frame_id": None}),
     "reloj con frame_id": mutar("reloj.json", {"frame_id": "S02_f0005"}),
     "velocidad negativa": mutar("avanzar.json", {"speed": -0.1}),
@@ -129,6 +140,22 @@ def test_comando_invalido_se_rechaza(nombre):
 
 def test_el_error_dice_que_campo_falla():
     errores = validar_comando(mutar("stop.json", {"speed": 0.3}))
+    assert any(e.startswith("speed:") for e in errores)
+
+
+@pytest.mark.parametrize(
+    ("accion", "direccion"), [("GIRAR_IZQ", 0.5), ("GIRAR_DER", -0.5), ("STOP", 0.3)]
+)
+def test_direccion_que_no_coincide_con_la_accion(accion, direccion):
+    """C4: el giro y su dirección deben coincidir; STOP va recto."""
+    velocidad = 0 if accion == "STOP" else 0.5
+    comando = mutar("avanzar.json", {"action": accion, "speed": velocidad, "steering": direccion})
+    assert any(e.startswith("steering:") for e in validar_comando(comando))
+
+
+def test_avanzar_sin_velocidad():
+    """C1: AVANZAR con speed=0 no mueve el auto."""
+    errores = validar_comando(mutar("avanzar.json", {"speed": 0}))
     assert any(e.startswith("speed:") for e in errores)
 
 

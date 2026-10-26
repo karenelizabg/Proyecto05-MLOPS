@@ -113,7 +113,8 @@ que lo registra **sin mover motores**.
 | [`ejemplos_comando/stop.json`](ejemplos_comando/stop.json) | Obstáculo al centro: STOP. |
 | [`ejemplos_comando/reloj.json`](ejemplos_comando/reloj.json) | Watchdog vencido sin cuadro (`event=clock`, `frame_id: null`): STOP. |
 
-- **`action=STOP` siempre lleva `speed=0`.**
+- **`action=STOP` siempre lleva `speed=0` y `steering=0`.**
+- `AVANZAR` lleva `speed > 0` (C1). `GIRAR_IZQ` lleva `steering < 0` y `GIRAR_DER` `steering > 0` (C4): negativo es izquierda.
 - `event=frame` trae el `frame_id` del cuadro; `event=clock` lleva `frame_id: null`.
 - `t_decision_ms ≤ t_command_ms ≤ valid_until_ms`, en el mismo reloj que `t_capture_ms` y `t_emit_ms`.
 
