@@ -57,12 +57,16 @@ def _buscar_bash() -> str | None:
     if sys.platform != "win32":
         return shutil.which("bash")
     # En Windows, `bash` del PATH suele ser el de WSL (System32), que no entiende rutas
-    # de Windows. Se usa el de Git for Windows: <Git>/cmd/git.exe → <Git>/bin/bash.exe.
+    # de Windows. Se usa el de Git for Windows, junto a git.exe: <Git>/cmd/git.exe o
+    # <Git>/mingw64/bin/git.exe → <Git>/bin/bash.exe.
     git = shutil.which("git")
     if git is None:
         return None
-    bash = Path(git).resolve().parents[1] / "bin" / "bash.exe"
-    return str(bash) if bash.is_file() else None
+    for carpeta in Path(git).resolve().parents[:3]:
+        bash = carpeta / "bin" / "bash.exe"
+        if bash.is_file():
+            return str(bash)
+    return None
 
 
 BASH = _buscar_bash()
