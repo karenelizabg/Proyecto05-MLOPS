@@ -14,9 +14,17 @@ from control import Supervisor
 from control.__main__ import main
 
 RAIZ = Path(__file__).resolve().parents[1]
-FLUJO = RAIZ / "config" / "contrato" / "ejemplos" / "flujo.jsonl"
-CONFIG = RAIZ / "config" / "control"
+# Relativas a la carpeta de trabajo: cada prueba corre en una copia de config/ (ver abajo).
+FLUJO = Path("config") / "contrato" / "ejemplos" / "flujo.jsonl"
+CONFIG = Path("config") / "control"
 ARCHIVOS = ("detecciones.jsonl", "decisiones.jsonl", "comandos.jsonl", "errores.jsonl")
+
+
+@pytest.fixture(autouse=True)
+def carpeta_de_trabajo(tmp_path, monkeypatch):
+    """El comando solo acepta rutas dentro de la carpeta de trabajo: se corre en tmp_path."""
+    shutil.copytree(RAIZ / "config", tmp_path / "config")
+    monkeypatch.chdir(tmp_path)
 
 
 def leer(ruta: Path) -> list[dict]:
@@ -165,7 +173,8 @@ def test_el_stop_de_reloj_queda_registrado(tmp_path, monkeypatch):
     assert correr_flujo(salida) == 0
     reloj = [d for d in leer(salida / "decisiones.jsonl") if d["event"] == "clock"]
     assert len(reloj) == 1
-    assert reloj[0]["frame_id"] is None and reloj[0]["decidio"] == "supervisor"
+    assert reloj[0]["frame_id"] is None
+    assert reloj[0]["decidio"] == "supervisor"
     assert len(leer(salida / "comandos.jsonl")) == 6
 
 
@@ -202,7 +211,7 @@ def test_entrada_que_no_es_json_sale_2(tmp_path):
     ],
 )
 def test_configuracion_mala_sale_2(tmp_path, archivo, contenido):
-    config = tmp_path / "config"
+    config = tmp_path / "config_mala"
     shutil.copytree(CONFIG, config)
     if contenido is None:
         (config / archivo).unlink()
@@ -211,6 +220,36 @@ def test_configuracion_mala_sale_2(tmp_path, archivo, contenido):
     salida = tmp_path / "s"
     assert main(["--entrada", str(FLUJO), "--config", str(config), "--salida", str(salida)]) == 2
     assert not salida.exists()
+
+
+@pytest.mark.parametrize("opcion", ["--entrada", "--config", "--salida"])
+@pytest.mark.parametrize("como", ["con_puntos", "absoluta"])
+def test_ruta_fuera_de_la_carpeta_de_trabajo_sale_2(tmp_path, opcion, como):
+    fuera = tmp_path.parent / f"fuera_{tmp_path.name}"
+    # Una copia real fuera de la carpeta de trabajo: se rechaza aunque exista y sea válida.
+    shutil.copytree(tmp_path / "config", fuera / "config")
+    destino = {
+        "--entrada": fuera / FLUJO,
+        "--config": fuera / CONFIG,
+        "--salida": fuera / "resultados",
+    }[opcion]
+    ruta = destino if como == "absoluta" else Path("..") / destino.relative_to(tmp_path.parent)
+    args = {"--entrada": str(FLUJO), "--config": str(CONFIG), "--salida": "resultados/s"}
+    args[opcion] = str(ruta)
+    try:
+        assert main([x for par in args.items() for x in par]) == 2
+        assert not (fuera / "resultados").exists()
+        assert not (tmp_path / "resultados").exists()
+    finally:
+        shutil.rmtree(fuera)
+
+
+def test_rutas_relativas_dentro_de_la_carpeta_de_trabajo(tmp_path):
+    salida = Path("resultados") / "otra" / ".." / "ejemplo-01"
+    assert correr_flujo(salida) == 0
+    run = json.loads((tmp_path / "resultados" / "ejemplo-01" / "run.json").read_text("utf-8"))
+    assert run["entrada"]["ruta"] == FLUJO.as_posix()
+    assert run["config"]["plazos.yaml"]["ruta"] == (CONFIG / "plazos.yaml").as_posix()
 
 
 def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
@@ -227,13 +266,13 @@ def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
 # --- línea de comandos real ----------------------------------------------------
 
 
-def test_python_m_control_desde_la_raiz(tmp_path):
-    salida = tmp_path / "s"
-    entorno = {**os.environ, "PYTHONPATH": "src"}
+def test_python_m_control_desde_la_carpeta_de_trabajo(tmp_path):
+    salida = Path("resultados") / "s"
+    entorno = {**os.environ, "PYTHONPATH": str(RAIZ / "src")}
     proceso = subprocess.run(
         [sys.executable, "-m", "control", "--entrada", str(FLUJO), "--config", "config/control/",
          "--salida", str(salida)],
-        cwd=RAIZ, env=entorno, capture_output=True, text=True, check=False,
+        cwd=tmp_path, env=entorno, capture_output=True, text=True, check=False,
     )
     assert proceso.returncode == 0, proceso.stderr
     assert "5 eventos, 5 comandos, 2 errores" in proceso.stdout

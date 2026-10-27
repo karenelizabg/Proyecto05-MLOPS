@@ -18,8 +18,12 @@ Todo va enlazado por `run_id` y `frame_id`. El reloj es el `t_capture_ms` de cad
 cada cuadro se llama a `tick(ahora_ms)` y al final a `cerrar(ahora_ms)`. No se lee el reloj del
 sistema, así que la misma entrada deja siempre los mismos archivos.
 
-Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si la entrada o la
-configuración no se pueden leer (en ese caso no se escribe nada).
+Se corre desde la raíz del repo, y `--entrada`, `--config` y `--salida` deben quedar dentro de
+esa carpeta: una ruta con `..` o absoluta hacia otro lado se rechaza antes de leer o escribir.
+
+Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si una ruta sale de la
+carpeta de trabajo o la entrada o la configuración no se pueden leer (en ese caso no se escribe
+nada).
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -38,11 +43,12 @@ import yaml
 from contrato import leer_eventos, validar_comando
 
 from .adaptador_virtual import NOMBRE_REGISTRO, AdaptadorVirtual
-from .config import RAIZ, ErrorConfigPolitica, cargar_config_politica
+from .config import ErrorConfigPolitica, cargar_config_politica
 from .politica import decidir
 from .supervisor import NOMBRE_ERRORES, Estado, Politica, Supervisor
 
-CARPETA_CONFIG = RAIZ / "config" / "control"
+# Relativa a la carpeta de trabajo (la raíz del repo).
+CARPETA_CONFIG = Path("config") / "control"
 NOMBRE_PLAZOS = "plazos.yaml"
 NOMBRE_POLITICA = "politica.yaml"
 NOMBRE_DETECCIONES = "detecciones.jsonl"
@@ -54,6 +60,26 @@ CAMPOS_DE_LA_POLITICA = ("action", "speed", "steering", "reason")
 
 class ErrorPlazos(ValueError):
     """plazos.yaml falta, no se puede leer o le falta un plazo."""
+
+
+class ErrorRuta(ValueError):
+    """Una ruta de la línea de comandos sale de la carpeta de trabajo."""
+
+
+def en_la_carpeta_de_trabajo(ruta: Path) -> Path:
+    """Devuelve `ruta` relativa a la carpeta de trabajo, o lanza ErrorRuta si queda fuera de ella.
+
+    Se resuelven `..` y enlaces antes de comparar, así que `resultados/../../otro` no pasa.
+    """
+    base = os.path.realpath(os.getcwd())
+    real = os.path.realpath(ruta)
+    try:
+        dentro = os.path.commonpath([base, real]) == base
+    except ValueError:  # En Windows, otra unidad (C: contra D:).
+        dentro = False
+    if not dentro:
+        raise ErrorRuta(f"{ruta}: debe quedar dentro de la carpeta de trabajo ({base})")
+    return Path(os.path.relpath(real, base))
 
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
@@ -242,23 +268,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--salida", type=Path, required=True, help="carpeta de resultados del run")
     args = parser.parse_args(argv)
 
-    # Todo se lee antes de crear la salida: si algo falla, no queda una corrida a medias.
+    # Rutas, entrada y configuración se revisan antes de crear la salida: si algo falla, no
+    # queda una corrida a medias.
     try:
-        plazos = cargar_plazos(args.config / NOMBRE_PLAZOS)
-        config_politica = cargar_config_politica(args.config / NOMBRE_POLITICA)
-        eventos = leer_eventos(args.entrada)
+        entrada = en_la_carpeta_de_trabajo(args.entrada)
+        carpeta_config = en_la_carpeta_de_trabajo(args.config)
+        salida = en_la_carpeta_de_trabajo(args.salida)
+    except ErrorRuta as exc:
+        print(f"ruta no permitida: {exc}", file=sys.stderr)
+        return 2
+    try:
+        plazos = cargar_plazos(carpeta_config / NOMBRE_PLAZOS)
+        config_politica = cargar_config_politica(carpeta_config / NOMBRE_POLITICA)
+        eventos = leer_eventos(entrada)
     except (OSError, json.JSONDecodeError, yaml.YAMLError, ErrorPlazos, ErrorConfigPolitica) as exc:
         print(f"no se pudo leer la entrada o la configuración: {exc}", file=sys.stderr)
         return 2
 
-    corrida = Corrida(args.salida, plazos, config_politica)
+    corrida = Corrida(salida, plazos, config_politica)
     for evento in eventos:
         corrida.cuadro(evento)
     corrida.cerrar()
-    conteos = corrida.escribir_run(args.entrada, args.config)["conteos"]
+    conteos = corrida.escribir_run(entrada, carpeta_config)["conteos"]
 
     print(
-        f"{args.salida}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
+        f"{salida}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
         f"{conteos['errores']} errores"
     )
     if corrida.invalidos:
