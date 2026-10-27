@@ -154,10 +154,17 @@ def test_guarda_el_estado_completo_y_se_lo_pasa_a_la_politica(tmp_path):
 
 def test_state_before_y_after_usan_el_nombre(tmp_path):
     def politica(ev, estado, config):
-        comando = {"action": "GIRAR_IZQ", "speed": 0.3, "steering": -0.5, "reason": "obstáculo a la derecha"}
+        comando = {
+            "action": "GIRAR_IZQ",
+            "speed": 0.3,
+            "steering": -0.5,
+            "reason": "obstáculo a la derecha",
+        }
         return comando, {"nombre": "GIRANDO_IZQ", "giro_desde_ms": 440.0}
 
-    comando = nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
+    comando = nuevo_supervisor(tmp_path, politica).procesar_evento(
+        evento("valido.json"), ahora_ms=440.0
+    )
 
     assert comando["state_before"] == "DETENIDO"
     assert comando["state_after"] == "GIRANDO_IZQ"
@@ -210,7 +217,9 @@ def test_evento_roto_da_stop(tmp_path):
 @pytest.mark.parametrize("version", ["2", 1, None])
 def test_schema_version_distinta_de_1_da_stop(tmp_path, version):
     supervisor = nuevo_supervisor(tmp_path)
-    comando = supervisor.procesar_evento(evento("valido.json", schema_version=version), ahora_ms=440.0)
+    comando = supervisor.procesar_evento(
+        evento("valido.json", schema_version=version), ahora_ms=440.0
+    )
 
     assert comando["action"] == "STOP"
     assert comando["reason"] == "version_no_reconocida"
@@ -265,7 +274,9 @@ def test_algo_que_no_es_evento_da_stop_con_ids_desconocidos(tmp_path, basura):
 def test_sin_run_id_valido_usa_el_del_ultimo_evento_valido(tmp_path):
     supervisor = nuevo_supervisor(tmp_path)
     supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
-    comando = supervisor.procesar_evento(evento("valido.json", run_id="con espacios"), ahora_ms=440.0)
+    comando = supervisor.procesar_evento(
+        evento("valido.json", run_id="con espacios"), ahora_ms=440.0
+    )
 
     assert comando["action"] == "STOP"
     assert comando["run_id"] == "ejemplo-01"
