@@ -103,3 +103,23 @@ Solo DC-4 y DC-5 siguen pendientes de un dato.
 - [x] PM A acepta el contrato v1.
 - [x] PM B revisó el contrato v1 (confirmado por el PM A el 2026-10-26).
 - [ ] B3 reprodujo con el detector real un ejemplo y obtuvo el mismo evento (P5-08).
+
+## Contrato de comando B → adaptador · v1
+
+Es del grupo B y aparte del contrato de percepción: el comando que la política entrega al adaptador virtual,
+que lo registra **sin mover motores**.
+
+| Archivo | Qué es |
+|---|---|
+| [`comando.v1.schema.json`](comando.v1.schema.json) | Esquema JSON del comando. |
+| [`ejemplos_comando/avanzar.json`](ejemplos_comando/avanzar.json) | Cuadro despejado: AVANZAR. |
+| [`ejemplos_comando/stop.json`](ejemplos_comando/stop.json) | Obstáculo al centro: STOP. |
+| [`ejemplos_comando/reloj.json`](ejemplos_comando/reloj.json) | Watchdog vencido sin cuadro (`event=clock`, `frame_id: null`): STOP. |
+
+- **`action=STOP` siempre lleva `speed=0` y `steering=0`.**
+- `AVANZAR` lleva `speed > 0` (C1). `GIRAR_IZQ` lleva `steering < 0` y `GIRAR_DER` `steering > 0` (C4): negativo es izquierda.
+- `event=frame` trae el `frame_id` del cuadro; `event=clock` lleva `frame_id: null`.
+- `t_decision_ms ≤ t_command_ms ≤ valid_until_ms`, en el mismo reloj que `t_capture_ms` y `t_emit_ms`.
+
+`validar_comando` (en `src/contrato/comando.py`) devuelve la lista de errores, vacía si el comando cumple.
+Las pruebas están en `tests/test_comando.py`.
