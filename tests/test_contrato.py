@@ -1,11 +1,15 @@
 import copy
 import json
+import math
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 from contrato import validar_evento, validar_flujo
 from contrato.__main__ import main
+from control.config import cargar_config_politica
+from control.politica import decidir
 
 EJEMPLOS = Path(__file__).resolve().parents[1] / "config" / "contrato" / "ejemplos"
 
@@ -126,6 +130,94 @@ def test_lo_que_no_es_un_objeto_se_rechaza():
     assert validar_evento([]) and validar_evento(None)
 
 
+RUTAS_NUMERICAS = [
+    ("t_capture_ms",),
+    ("t_emit_ms",),
+    ("image_width",),
+    ("image_height",),
+    ("detections", 0, "class_id"),
+    ("detections", 0, "confidence"),
+    *(("detections", 0, "bbox", indice) for indice in range(4)),
+]
+
+
+@pytest.mark.parametrize("ruta", RUTAS_NUMERICAS, ids=lambda ruta: "/".join(map(str, ruta)))
+@pytest.mark.parametrize(
+    "valor",
+    [
+        math.nan,
+        math.inf,
+        -math.inf,
+        Decimal("NaN"),
+        Decimal("Infinity"),
+        Decimal("-Infinity"),
+    ],
+    ids=["nan", "inf", "menos_inf", "decimal_nan", "decimal_inf", "decimal_menos_inf"],
+)
+def test_rechaza_numeros_no_finitos_en_diccionarios(ruta, valor):
+    evento = cargar("valido.json")
+    destino = evento
+    for parte in ruta[:-1]:
+        destino = destino[parte]
+    destino[ruta[-1]] = valor
+
+    assert validar_evento(evento) == [f"{'/'.join(map(str, ruta))}: debe ser un número finito"]
+
+
+def test_informa_todos_los_numeros_no_finitos_antes_de_comprobar_geometria_y_tiempo():
+    evento = cargar("valido.json")
+    evento["t_capture_ms"] = math.nan
+    evento["t_emit_ms"] = -math.inf
+    evento["detections"][0]["confidence"] = math.inf
+    evento["detections"][1]["bbox"][2] = math.nan
+
+    assert validar_evento(evento) == [
+        "t_capture_ms: debe ser un número finito",
+        "t_emit_ms: debe ser un número finito",
+        "detections/0/confidence: debe ser un número finito",
+        "detections/1/bbox/2: debe ser un número finito",
+    ]
+
+
+def test_rechaza_diccionario_que_se_referencia_a_si_mismo():
+    evento = cargar("valido.json")
+    evento["ciclo"] = evento
+
+    assert validar_evento(evento) == ["ciclo: estructura cíclica no permitida"]
+
+
+def test_rechaza_lista_que_se_referencia_a_si_misma():
+    lista = []
+    lista.append(lista)
+
+    assert validar_evento(lista) == ["0: estructura cíclica no permitida"]
+
+
+def test_rechaza_ciclo_indirecto_entre_contenedores():
+    evento = cargar("valido.json")
+    evento["ciclo"] = {"siguiente": [evento]}
+
+    assert validar_evento(evento) == ["ciclo/siguiente/0: estructura cíclica no permitida"]
+
+
+def test_referencias_compartidas_sin_ciclo_son_validas():
+    evento = cargar("valido.json")
+    evento["detections"].append(evento["detections"][0])
+
+    assert validar_evento(evento) == []
+
+
+def test_politica_detiene_evento_con_geometria_no_finita():
+    evento = cargar("valido.json")
+    evento["detections"] = [evento["detections"][0]]
+    evento["detections"][0]["bbox"][2] = math.nan
+
+    comando, _ = decidir(evento, {"nombre": "DETENIDO"}, cargar_config_politica())
+
+    assert comando["action"] == "STOP"
+    assert comando["speed"] == 0
+
+
 # --- reglas entre eventos ---------------------------------------------------
 
 
@@ -189,6 +281,23 @@ def test_cli_rechaza_un_archivo_con_eventos_invalidos(tmp_path, capsys):
     eventos[1]["status"] = "unknown"
     assert main([str(_escribir(tmp_path, eventos))]) == 1
     assert "evento 2" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("valor", "constante"),
+    [(math.nan, "NaN"), (math.inf, "Infinity"), (-math.inf, "-Infinity")],
+)
+@pytest.mark.parametrize("extension", ["json", "jsonl"])
+def test_cli_rechaza_constantes_numericas_no_estandar(
+    tmp_path, capsys, valor, constante, extension
+):
+    evento = cargar("valido.json")
+    evento["detections"][0]["confidence"] = valor
+    ruta = _escribir(tmp_path, [evento], f"no_finito.{extension}")
+    assert constante in ruta.read_text(encoding="utf-8")
+
+    assert main([str(ruta)]) == 1
+    assert "detections/0/confidence: debe ser un número finito" in capsys.readouterr().err
 
 
 def test_cli_distingue_archivo_ilegible(tmp_path):
