@@ -1,0 +1,59 @@
+# C7 · Libre → bloqueo → libre (T15). Se escribió antes de correr el caso y no se cambia para que
+# pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C7
+titulo: Libre, bloqueo y libre otra vez
+objetivo: >-
+  El carrito reacciona cuando aparece el bloqueo y reanuda cuando se despeja. Un solo cuadro
+  libre no cambia la decisión: ni en medio del bloqueo ni al primer cuadro libre del final.
+entrada: >-
+  Cuadros status=ok de la secuencia S6, en este orden: libre, bloqueo al centro, un solo cuadro
+  libre, bloqueo otra vez y libre hasta el final (al menos cinco cuadros).
+tramos:
+  - nombre: libre
+    origen: cuadros
+    cuadros: Los cuadros libres del inicio.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml), igual que C1.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+  - nombre: bloqueo
+    origen: cuadros
+    cuadros: Los cuadros con un obstáculo al centro.
+    acciones_permitidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    acciones_prohibidas: [AVANZAR]
+    # max_frame_age_ms (plazos.yaml), igual que C2.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [giro_hacia_zona_libre]
+  - nombre: un_cuadro_libre
+    origen: cuadros
+    cuadros: El único cuadro libre en medio del bloqueo.
+    acciones_permitidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    acciones_prohibidas: [AVANZAR]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    mantener_accion_cuadros: 1
+    condiciones: [giro_hacia_zona_libre]
+  - nombre: bloqueo_otra_vez
+    origen: cuadros
+    cuadros: Los cuadros con el obstáculo al centro después del cuadro libre.
+    acciones_permitidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    acciones_prohibidas: [AVANZAR]
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [giro_hacia_zona_libre]
+  - nombre: libre_otra_vez
+    origen: cuadros
+    cuadros: Los cuadros libres del final.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: []
+    # Cinco cuadros a 5 fps (200 ms cada uno): tiene que reanudar, pero no con el primer cuadro.
+    plazo_reaccion_ms: 1000
+    plazo_desde: captura
+    mantener_accion_cuadros: 1
+    condiciones: [avanzar_con_velocidad, giro_hacia_zona_libre]
+stop_con_evento: []

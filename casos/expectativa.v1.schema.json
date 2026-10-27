@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/karenelizabg/Proyecto05-MLOPS/casos/expectativa.v1.schema.json",
+  "title": "Expectativa de un caso C1–C10 · v1",
+  "description": "Qué debe pasar en un caso, escrito antes de correrlo (T15). Ver casos/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "caso", "titulo", "objetivo", "entrada", "tramos", "stop_con_evento"],
+  "properties": {
+    "version": { "const": 1 },
+    "caso": { "type": "string", "pattern": "^C([1-9]|10)$" },
+    "titulo": { "type": "string", "minLength": 1 },
+    "objetivo": { "type": "string", "minLength": 1 },
+    "entrada": {
+      "description": "Qué debe traer la entrada del caso (la arma T16 con las secuencias de A).",
+      "type": "string",
+      "minLength": 1
+    },
+    "tramos": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tramo" }
+    },
+    "stop_con_evento": {
+      "description": "Eventos sin cuadro que deben dejar al menos un STOP con ese event.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["clock", "emergency", "shutdown"] }
+    }
+  },
+  "$defs": {
+    "accion": { "enum": ["AVANZAR", "GIRAR_IZQ", "GIRAR_DER", "STOP"] },
+    "acciones": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/accion" }
+    },
+    "tramo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nombre",
+        "origen",
+        "cuadros",
+        "acciones_permitidas",
+        "acciones_prohibidas",
+        "plazo_reaccion_ms",
+        "plazo_desde"
+      ],
+      "properties": {
+        "nombre": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+        "origen": { "enum": ["cuadros", "clock", "emergency", "rearm", "shutdown"] },
+        "cuadros": { "type": "string", "minLength": 1 },
+        "acciones_permitidas": { "$ref": "#/$defs/acciones", "minItems": 1 },
+        "acciones_prohibidas": { "$ref": "#/$defs/acciones" },
+        "plazo_reaccion_ms": {
+          "oneOf": [{ "type": "null" }, { "type": "number", "minimum": 0 }]
+        },
+        "plazo_desde": {
+          "enum": [null, "captura", "llegada", "ultimo_cuadro", "evento"]
+        },
+        "mantener_accion_cuadros": { "type": "integer", "minimum": 0 },
+        "condiciones": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "avanzar_con_velocidad",
+              "giro_hacia_zona_libre",
+              "error_registrado",
+              "es_el_ultimo_comando"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "plazo_reaccion_ms": { "type": "null" } } },
+          "then": { "properties": { "plazo_desde": { "const": null } } },
+          "else": { "properties": { "plazo_desde": { "type": "string" } } }
+        }
+      ]
+    }
+  }
+}

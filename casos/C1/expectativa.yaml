@@ -1,0 +1,21 @@
+# C1 · Vía libre (T15). Se escribió antes de correr el caso y no se cambia para que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C1
+titulo: Vía libre
+objetivo: >-
+  Sin obstáculos en el camino el carrito avanza. Un sistema que siempre frena no cumple.
+entrada: >-
+  Cuadros status=ok de las secuencias S1 (vía despejada) y S8 (otra escena o luz, con objetos
+  bajos transitables en la vía: borrador, tapa, cable). Ninguna detección es un obstáculo.
+tramos:
+  - nombre: libre
+    origen: cuadros
+    cuadros: Todos los cuadros de la entrada.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml): un cuadro más viejo ya no sirve para decidir.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+stop_con_evento: []

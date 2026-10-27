@@ -1,0 +1,20 @@
+# C3 · Obstáculo izquierdo (T15). Se escribió antes de correr el caso y no se cambia para que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C3
+titulo: Obstáculo izquierdo
+objetivo: >-
+  Con un obstáculo a la izquierda, el carrito nunca gira hacia la izquierda.
+entrada: >-
+  Cuadros status=ok de la secuencia S3: un obstáculo con confianza mayor o igual al umbral
+  ocupa la zona izquierda.
+tramos:
+  - nombre: obstaculo_izq
+    origen: cuadros
+    cuadros: Los cuadros en que el obstáculo ocupa la izquierda.
+    acciones_permitidas: [AVANZAR, GIRAR_DER, STOP]
+    acciones_prohibidas: [GIRAR_IZQ]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [giro_hacia_zona_libre]
+stop_con_evento: []

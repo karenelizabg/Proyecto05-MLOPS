@@ -1,0 +1,36 @@
+# C6 · Confianza cerca del umbral (T15). Se escribió antes de correr el caso y no se cambia para
+# que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C6
+titulo: Confianza cerca del umbral
+objetivo: >-
+  Una detección con confianza debajo del umbral no frena al carrito. La misma clase, al centro y
+  con confianza mayor o igual al umbral, sí lo hace reaccionar. Poca confianza no es una falla
+  de percepción.
+entrada: >-
+  Cuadros status=ok de la secuencia S7 (objeto parcial, lejano o con poca luz). P5-12 documenta
+  qué cuadros quedan debajo y cuáles encima de umbral_confianza (config/control/politica.yaml).
+  Van primero los cuadros de abajo del umbral y después los de arriba.
+tramos:
+  - nombre: bajo_umbral
+    origen: cuadros
+    cuadros: >-
+      Cuadros cuyas detecciones de obstáculo tienen confianza menor que el umbral, aunque estén
+      al centro.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml), igual que C1.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+  - nombre: sobre_umbral
+    origen: cuadros
+    cuadros: Cuadros con un obstáculo al centro con confianza mayor o igual que el umbral.
+    acciones_permitidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    acciones_prohibidas: [AVANZAR]
+    # max_frame_age_ms (plazos.yaml), igual que C2.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [giro_hacia_zona_libre]
+stop_con_evento: []
