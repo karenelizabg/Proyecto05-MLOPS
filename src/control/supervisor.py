@@ -29,6 +29,18 @@ después de un `stale`, un error o un STOP de reloj, y el carro no reanuda antes
 `valid_until_ms` (`orden_vencida`), manda STOP con `event=clock` y `frame_id=null`. Lo manda una
 sola vez: con la orden activa ya en STOP, los siguientes ticks no repiten nada.
 
+Emergencia, rearme y cierre (C10, T06). Prioridad: cierre y emergencia > error o vencido > política.
+- `emergencia(ahora_ms)`: STOP inmediato con `event=emergency` (`emergencia`) y queda enclavado.
+  Mientras siga, cada cuadro da STOP `emergencia_activa` sin pasar por la política, aunque esté
+  libre.
+- `rearmar(ahora_ms)`: quita la emergencia solo si el último cuadro recibido **después** de la
+  emergencia es `ok`, cumple el contrato y es fresco
+  (`ahora_ms - t_capture_ms <= max_frame_age_ms`).
+  Entonces la política decide con ese cuadro y el comando sale con `event=rearm`. Si no, sigue en
+  STOP (`rearme_rechazado`, también con `event=rearm`) y el motivo queda en `errores.jsonl`.
+- `cerrar(ahora_ms)`: STOP final con `event=shutdown` (`cierre`). Después, cada cuadro da STOP
+  `supervisor_cerrado` y rearmar ya no hace nada.
+
 `valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
 queda en `<carpeta del adaptador>/errores.jsonl` con `run_id` y `frame_id`. El supervisor no lee el
 reloj del sistema: todos los métodos reciben `ahora_ms`.
@@ -89,9 +101,20 @@ class Supervisor:
         self._ultimo_run_id = ID_DESCONOCIDO
         # ahora_ms del último cuadro ok aceptado (no stale ni viejo); lo vigila el watchdog.
         self._ultimo_cuadro_ms: float | None = None
+        self._emergencia = False
+        self._cerrado = False
+        # Último evento recibido desde la emergencia, tal como llegó; con él se decide el rearme.
+        self._ultimo_recibido: Any = None
 
     def procesar_evento(self, evento: Any, ahora_ms: float) -> dict[str, Any]:
         """Decide con un evento de percepción. Devuelve el comando que quedó registrado."""
+        self._ultimo_recibido = copy.deepcopy(evento)
+        if self._cerrado or self._emergencia:
+            run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
+            frame_id = self._id_del_evento(evento, "frame_id") or ID_DESCONOCIDO
+            motivo = "supervisor_cerrado" if self._cerrado else "emergencia_activa"
+            return self._stop(run_id, frame_id, "frame", motivo, ahora_ms)
+
         version = evento.get("schema_version") if isinstance(evento, dict) else None
         if version != VERSION_RECONOCIDA:
             return self._stop_por_evento(
@@ -146,16 +169,58 @@ class Supervisor:
             return self._stop_por_reloj(ahora_ms, "orden_vencida", detalle)
         return None
 
-    def emergencia(self, ahora_ms: float) -> None:
-        """Paro de emergencia. Se llena en T06 (#26)."""
+    def emergencia(self, ahora_ms: float) -> dict[str, Any]:
+        """Paro de emergencia: STOP inmediato y enclavado hasta `rearmar`."""
+        self._emergencia = True
+        # El rearme pide un cuadro visto después de la emergencia, no uno de antes.
+        self._ultimo_recibido = None
+        return self._stop(self._ultimo_run_id, None, "emergency", "emergencia", ahora_ms)
 
-    def rearmar(self, ahora_ms: float) -> None:
-        """Rearme tras un paro. Se llena en T06 (#26)."""
+    def rearmar(self, ahora_ms: float) -> dict[str, Any] | None:
+        """Quita la emergencia si hay un cuadro fresco y válido. `None` si no había emergencia."""
+        if self._cerrado or not self._emergencia:
+            return None
 
-    def cerrar(self, ahora_ms: float) -> None:
-        """Fin del run. Se llena en T06 (#26)."""
+        evento = self._ultimo_recibido
+        motivo = self._por_que_no_rearmar(evento, ahora_ms)
+        if motivo:
+            run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
+            frame_id = self._id_del_evento(evento, "frame_id")
+            self._registrar_error(run_id, frame_id, ahora_ms, "rearme_rechazado", [motivo])
+            return self._stop(run_id, frame_id, "rearm", "rearme_rechazado", ahora_ms)
 
-    def _decidir(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
+        self._emergencia = False
+        self._ultimo_run_id = evento["run_id"]
+        self._ultimo_cuadro_ms = ahora_ms
+        return self._decidir(evento, ahora_ms, tipo="rearm")
+
+    def cerrar(self, ahora_ms: float) -> dict[str, Any]:
+        """Fin del run: STOP final. Después ningún cuadro mueve el carro."""
+        self._cerrado = True
+        return self._stop(self._ultimo_run_id, None, "shutdown", "cierre", ahora_ms)
+
+    def _por_que_no_rearmar(self, evento: Any, ahora_ms: float) -> str | None:
+        """Motivo para no rearmar con este evento; `None` si es `ok`, fresco y válido."""
+        if evento is None:
+            return "no ha llegado ningún cuadro desde la emergencia"
+        if not isinstance(evento, dict) or evento.get("schema_version") != VERSION_RECONOCIDA:
+            return "el último cuadro no trae schema_version '1'"
+        if evento.get("status") != "ok":
+            return f"el último cuadro tiene status {evento.get('status')!r}, no 'ok'"
+        errores = validar_evento(evento)
+        if errores:
+            return f"el último cuadro no cumple el contrato: {errores[0]}"
+        edad_ms = ahora_ms - evento["t_capture_ms"]
+        if edad_ms > self.plazos["max_frame_age_ms"]:
+            return (
+                f"el último cuadro tiene {edad_ms} ms > max_frame_age_ms "
+                f"{self.plazos['max_frame_age_ms']} ms"
+            )
+        return None
+
+    def _decidir(
+        self, evento: dict[str, Any], ahora_ms: float, tipo: str = "frame"
+    ) -> dict[str, Any]:
         """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado,
         STOP."""
         try:
@@ -166,17 +231,17 @@ class Supervisor:
         except Exception as exc:
             # Cualquier falla de la política termina en STOP, no tumba el programa.
             detalle = [f"{type(exc).__name__}: {exc}"]
-            return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle)
+            return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle, tipo)
 
         errores = _errores_del_estado(estado_nuevo)
         if not errores:
             comando = self._comando(
-                evento["run_id"], evento["frame_id"], estado_nuevo["nombre"], ahora_ms
+                evento["run_id"], evento["frame_id"], estado_nuevo["nombre"], ahora_ms, tipo
             )
             comando.update(accion)
             errores = validar_comando(self._como_se_enviaria(comando, ahora_ms))
         if errores:
-            return self._stop_por_evento(evento, ahora_ms, "politica_invalida", errores)
+            return self._stop_por_evento(evento, ahora_ms, "politica_invalida", errores, tipo)
         return self._enviar(comando, estado_nuevo, ahora_ms)
 
     def _como_se_enviaria(self, comando: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
@@ -200,13 +265,18 @@ class Supervisor:
         return self._stop_por_evento(evento, ahora_ms, f"error_detector:{codigo}", detalle)
 
     def _stop_por_evento(
-        self, evento: Any, ahora_ms: float, motivo: str, errores: list[str]
+        self,
+        evento: Any,
+        ahora_ms: float,
+        motivo: str,
+        errores: list[str],
+        tipo: str = "frame",
     ) -> dict[str, Any]:
         run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
         frame_id = self._id_del_evento(evento, "frame_id") or ID_DESCONOCIDO
         self._registrar_error(run_id, frame_id, ahora_ms, motivo, errores)
 
-        return self._stop(run_id, frame_id, "frame", motivo, ahora_ms)
+        return self._stop(run_id, frame_id, tipo, motivo, ahora_ms)
 
     def _stop_por_reloj(self, ahora_ms: float, motivo: str, errores: list[str]) -> dict[str, Any]:
         """STOP sin cuadro: `event=clock` y `frame_id=null`."""

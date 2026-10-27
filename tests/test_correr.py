@@ -102,7 +102,9 @@ def test_decisiones_del_flujo(salida):
         ("S02_f0003", "GIRAR_IZQ", "politica"),
         ("S02_f0004", "STOP", "supervisor"),
         ("S02_f0005", "STOP", "supervisor"),
+        (None, "STOP", "supervisor"),  # cerrar (T06)
     ]
+    assert decisiones[-1]["event"] == "shutdown"
     assert decisiones[0]["state_before"] == "DETENIDO"
     assert decisiones[0]["estado"]["nombre"] == "AVANZANDO"
     assert decisiones[3]["propuesta_politica"] is None
@@ -126,7 +128,7 @@ def test_run_json_trae_hashes_y_conteos(salida):
     assert run["detector"]["model_sha256"] == ["a" * 64]
     assert run["conteos"] == {
         "eventos": 5,
-        "comandos": 5,
+        "comandos": 6,  # 5 cuadros + el STOP de cerrar (T06)
         "comandos_fuera_de_contrato": 0,
         "errores": 2,
     }
@@ -143,7 +145,7 @@ def test_la_misma_entrada_deja_los_mismos_archivos(salida, tmp_path):
 
 def test_correr_dos_veces_en_la_misma_carpeta_no_mezcla(salida):
     assert correr_flujo(salida) == 0
-    for nombre, lineas in [("detecciones.jsonl", 5), ("comandos.jsonl", 5), ("errores.jsonl", 2)]:
+    for nombre, lineas in [("detecciones.jsonl", 5), ("comandos.jsonl", 6), ("errores.jsonl", 2)]:
         assert len(leer(salida / nombre)) == lineas, nombre
 
 
@@ -154,7 +156,7 @@ def test_entrada_y_salida_en_cualquier_carpeta(tmp_path):
     shutil.copy(FLUJO, entrada)
     salida = tmp_path / "evaluador" / "salida" / "run-01"
     assert correr_flujo(salida, entrada) == 0
-    assert len(leer(salida / "comandos.jsonl")) == 5
+    assert len(leer(salida / "comandos.jsonl")) == 6
 
 
 # --- reloj: t_emit_ms, tics cada paso_reloj_ms y cerrar al final ------------------
@@ -163,7 +165,10 @@ def test_entrada_y_salida_en_cualquier_carpeta(tmp_path):
 def test_el_reloj_es_t_emit_ms(salida):
     eventos = leer_eventos(FLUJO)
     comandos = leer(salida / "comandos.jsonl")
-    assert [c["t_command_ms"] for c in comandos] == [e["t_emit_ms"] for e in eventos]
+    # El último es el STOP de cerrar (T06), en el instante del último cuadro.
+    assert [c["t_command_ms"] for c in comandos[:-1]] == [e["t_emit_ms"] for e in eventos]
+    assert comandos[-1]["event"] == "shutdown"
+    assert comandos[-1]["t_command_ms"] == eventos[-1]["t_emit_ms"]
 
 
 def test_tics_entre_cuadros_y_cerrar_al_final(tmp_path, monkeypatch):
@@ -229,7 +234,8 @@ def test_el_stop_de_reloj_sale_a_tiempo_en_un_hueco(tmp_path, monkeypatch):
     assert reloj[0]["frame_id"] is None
     assert reloj[0]["decidio"] == "supervisor"
     comandos = leer(salida / "comandos.jsonl")
-    assert [c["action"] for c in comandos] == ["AVANZAR", "STOP", "AVANZAR"]
+    assert [c["action"] for c in comandos] == ["AVANZAR", "STOP", "AVANZAR", "STOP"]
+    assert comandos[-1]["event"] == "shutdown"
     assert all(validar_comando(c) == [] for c in comandos)
 
 
@@ -257,7 +263,7 @@ def test_comando_fuera_de_contrato_sale_1_y_queda_en_errores(tmp_path, monkeypat
     salida = tmp_path / "s"
     assert correr_flujo(salida) == 1
     motivos = [e["motivo"] for e in leer(salida / "errores.jsonl")]
-    assert motivos.count("comando_fuera_de_contrato") == 5
+    assert motivos.count("comando_fuera_de_contrato") == 6  # incluye el STOP de cerrar
 
 
 def test_entrada_que_no_existe_sale_2_sin_escribir_nada(tmp_path):
@@ -319,8 +325,9 @@ def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
     )
     salida = tmp_path / "s"
     assert correr_flujo(salida, escribir(tmp_path / "e.jsonl", eventos)) == 0
-    ultimo = leer(salida / "comandos.jsonl")[-1]
+    *_, ultimo, cierre = leer(salida / "comandos.jsonl")
     assert (ultimo["frame_id"], ultimo["action"]) == ("S02_f0002", "STOP")
+    assert cierre["event"] == "shutdown"
 
 
 # --- NaN e infinito no son JSON --------------------------------------------------
@@ -414,5 +421,5 @@ def test_python_m_control_desde_la_raiz(tmp_path):
         check=False,
     )
     assert proceso.returncode == 0, proceso.stderr
-    assert "5 eventos, 5 comandos, 2 errores" in proceso.stdout
-    assert len(leer(salida / "comandos.jsonl")) == 5
+    assert "5 eventos, 6 comandos, 2 errores" in proceso.stdout
+    assert len(leer(salida / "comandos.jsonl")) == 6

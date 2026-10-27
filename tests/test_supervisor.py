@@ -349,10 +349,3 @@ def test_errores_empieza_vacio_en_cada_corrida(tmp_path):
 
     segunda = nuevo_supervisor(tmp_path)
     assert leer(segunda.ruta_errores) == []
-
-
-def test_metodos_pendientes_existen_y_no_hacen_nada(tmp_path):
-    supervisor = nuevo_supervisor(tmp_path)
-    for metodo in (supervisor.emergencia, supervisor.rearmar, supervisor.cerrar):
-        assert metodo(ahora_ms=1000.0) is None
-    assert leer(supervisor.adaptador.ruta_registro) == []
