@@ -1,0 +1,70 @@
+# C10 · Emergencia, rearme y cierre (T15). Se escribió antes de correr el caso y no se cambia para
+# que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C10
+titulo: Emergencia, rearme y cierre
+objetivo: >-
+  El paro de emergencia frena en el acto y queda enclavado: ningún cuadro lo quita, solo el
+  rearme. Después del rearme se avanza únicamente con un cuadro fresco. Al cerrar el run, STOP.
+entrada: >-
+  Cuadros libres; un evento de emergencia; más cuadros libres; un rearme; un cuadro viejo
+  (status=stale); cuadros libres frescos y, al final, el cierre del run.
+tramos:
+  - nombre: antes_de_la_emergencia
+    origen: cuadros
+    cuadros: Los cuadros libres del inicio.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml), igual que C1.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+  - nombre: emergencia
+    origen: emergency
+    cuadros: Ninguno. Es la orden con event=emergency.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    # El reloj es virtual: el STOP sale en el mismo instante del evento.
+    plazo_reaccion_ms: 0
+    plazo_desde: evento
+  - nombre: enclavada
+    origen: cuadros
+    cuadros: Los cuadros libres entre la emergencia y el rearme.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+  - nombre: rearme
+    origen: rearm
+    cuadros: Ninguno. Es la orden con event=rearm, si el rearme deja una.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+  - nombre: rearme_con_cuadro_viejo
+    origen: cuadros
+    cuadros: El cuadro stale justo después del rearme.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+  - nombre: rearme_con_cuadro_fresco
+    origen: cuadros
+    cuadros: Los cuadros libres frescos después del cuadro viejo.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [GIRAR_IZQ, GIRAR_DER]
+    # Igual que al reanudar en C7: cinco cuadros a 5 fps.
+    plazo_reaccion_ms: 1000
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+  - nombre: cierre
+    origen: shutdown
+    cuadros: Ninguno. Es la orden con event=shutdown.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    # El reloj es virtual: el STOP sale en el mismo instante del cierre.
+    plazo_reaccion_ms: 0
+    plazo_desde: evento
+    condiciones: [es_el_ultimo_comando]
+stop_con_evento: [emergency, shutdown]

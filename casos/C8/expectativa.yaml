@@ -1,0 +1,40 @@
+# C8 · Sin cuadros y cuadro viejo (T15). Se escribió antes de correr el caso y no se cambia para
+# que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C8
+titulo: Sin cuadros y cuadro viejo
+objetivo: >-
+  Que no lleguen cuadros no es vía libre: el reloj frena al carrito aunque no llegue nada. Un
+  cuadro viejo se rechaza y no sirve para avanzar (CONTRATO.md, reglas 2 y 3).
+entrada: >-
+  Cuadros libres y, después, un hueco sin cuadros más largo que watchdog_ms
+  (config/control/plazos.yaml). Luego cuadros viejos: uno con status=stale y otro con status=ok
+  pero con t_emit_ms − t_capture_ms mayor que max_frame_age_ms.
+tramos:
+  - nombre: antes_del_hueco
+    origen: cuadros
+    cuadros: Los cuadros libres antes del hueco.
+    acciones_permitidas: [AVANZAR]
+    acciones_prohibidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml), igual que C1.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [avanzar_con_velocidad]
+  - nombre: hueco
+    origen: clock
+    cuadros: Ninguno. Son las órdenes con event=clock durante el hueco.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    # watchdog_ms (plazos.yaml): el plazo declarado sin ningún evento.
+    plazo_reaccion_ms: 600
+    plazo_desde: ultimo_cuadro
+  - nombre: cuadro_viejo
+    origen: cuadros
+    cuadros: El cuadro stale y el cuadro ok demasiado viejo.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [error_registrado]
+stop_con_evento: [clock]

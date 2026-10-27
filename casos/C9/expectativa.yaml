@@ -1,0 +1,47 @@
+# C9 · Errores del detector (T15). Se escribió antes de correr el caso y no se cambia para que
+# pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C9
+titulo: Errores del detector
+objetivo: >-
+  Cada error.code del contrato termina en STOP y deja el error registrado. Un error nunca es vía
+  libre.
+entrada: >-
+  Un cuadro status=error por cada error.code del contrato, con las fixtures de P5-12: imagen
+  ilegible, excepción, tiempo agotado y salida inválida. Antes de cada error, un cuadro libre,
+  para que haya una orden de movimiento que cancelar.
+tramos:
+  - nombre: unreadable_image
+    origen: cuadros
+    cuadros: El cuadro con error.code=unreadable_image.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [error_registrado]
+  - nombre: detector_exception
+    origen: cuadros
+    cuadros: El cuadro con error.code=detector_exception.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [error_registrado]
+  - nombre: detector_timeout
+    origen: cuadros
+    cuadros: El cuadro con error.code=detector_timeout.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [error_registrado]
+  - nombre: invalid_output
+    origen: cuadros
+    cuadros: El cuadro con error.code=invalid_output.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [error_registrado]
+stop_con_evento: []

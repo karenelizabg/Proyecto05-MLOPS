@@ -1,0 +1,22 @@
+# C2 · Obstáculo central (T15). Se escribió antes de correr el caso y no se cambia para que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C2
+titulo: Obstáculo central
+objetivo: >-
+  Con un obstáculo en la zona central, el carrito frena a tiempo o gira hacia una zona libre.
+  Nunca sigue de frente ni gira hacia una zona ocupada.
+entrada: >-
+  Cuadros status=ok de la secuencia S2: un obstáculo con confianza mayor o igual al umbral
+  ocupa la zona central.
+tramos:
+  - nombre: obstaculo
+    origen: cuadros
+    cuadros: Los cuadros en que el obstáculo ocupa el centro.
+    acciones_permitidas: [STOP, GIRAR_IZQ, GIRAR_DER]
+    acciones_prohibidas: [AVANZAR]
+    # max_frame_age_ms (plazos.yaml): reaccionar después sería decidir con un cuadro vencido.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+    condiciones: [giro_hacia_zona_libre]
+stop_con_evento: []

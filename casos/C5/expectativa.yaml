@@ -1,0 +1,21 @@
+# C5 · Varios obstáculos sin zona libre (T15). Se escribió antes de correr el caso y no se cambia
+# para que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C5
+titulo: Varios obstáculos sin zona libre
+objetivo: >-
+  Si los obstáculos ocupan el centro y los dos lados, no hay hacia dónde girar: el carrito frena.
+entrada: >-
+  Cuadros status=ok de la secuencia S5: varios obstáculos con confianza mayor o igual al umbral
+  que ocupan las tres zonas.
+tramos:
+  - nombre: sin_zona_libre
+    origen: cuadros
+    cuadros: Los cuadros en que las tres zonas están ocupadas.
+    acciones_permitidas: [STOP]
+    acciones_prohibidas: [AVANZAR, GIRAR_IZQ, GIRAR_DER]
+    # max_frame_age_ms (plazos.yaml), igual que C2.
+    plazo_reaccion_ms: 500
+    plazo_desde: captura
+stop_con_evento: []

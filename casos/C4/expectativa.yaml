@@ -1,0 +1,20 @@
+# C4 · Obstáculo derecho (T15). Se escribió antes de correr el caso y no se cambia para que pase.
+# Formato: casos/README.md · Esquema: casos/expectativa.v1.schema.json
+version: 1
+caso: C4
+titulo: Obstáculo derecho
+objetivo: >-
+  Con un obstáculo a la derecha, el carrito nunca gira hacia la derecha. Es el espejo de C3.
+entrada: >-
+  Cuadros status=ok de la secuencia S4 (espejo de S3): un obstáculo con confianza mayor o igual
+  al umbral ocupa la zona derecha.
+tramos:
+  - nombre: obstaculo_der
+    origen: cuadros
+    cuadros: Los cuadros en que el obstáculo ocupa la derecha.
+    acciones_permitidas: [AVANZAR, GIRAR_IZQ, STOP]
+    acciones_prohibidas: [GIRAR_DER]
+    plazo_reaccion_ms: null
+    plazo_desde: null
+    condiciones: [giro_hacia_zona_libre]
+stop_con_evento: []
