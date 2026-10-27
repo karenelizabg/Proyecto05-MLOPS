@@ -1,0 +1,19 @@
+# Modo de ejecución por defecto del Proyecto 5.
+#
+# La guía evalúa todo offline y en CPU, y el control es virtual: los comandos se
+# registran en archivos y nunca llegan a los motores. Estos valores son el punto de
+# partida de cualquier comando (`infer`, `bench`, `python -m control`, ...) y
+# tests/test_humo.py comprueba que no cambien sin que alguien lo note.
+
+# Dónde corre el detector. Solo "cpu": no hay GPU en la evaluación.
+dispositivo: cpu
+
+# Qué recibe los comandos. "virtual" = el adaptador de B (T02) escribe comandos.jsonl;
+# no existe otro valor en este proyecto.
+adaptador: virtual
+
+# Interruptor explícito: aunque alguien conecte el carro, nada mueve motores.
+motores_conectados: false
+
+# Sin red después de instalar: pesos y datos se recuperan en el setup (P5-07, P5-11).
+red_permitida: false

@@ -19,9 +19,10 @@ GIRANDO_DER) más lo que la política necesite guardar, p. ej. `{"nombre": "AVAN
 "libres_seguidos": 0}`. El supervisor guarda el diccionario completo, se lo pasa a la política en el
 siguiente cuadro y usa `estado["nombre"]` para `state_before` y `state_after`. Empieza en
 `{"nombre": "DETENIDO"}`, y cada STOP del supervisor lo regresa ahí: se descartan los datos de la
-política para que no reanude con una cuenta vieja. `valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
-queda en `<carpeta del adaptador>/errores.jsonl` con `run_id` y `frame_id`. El supervisor no lee el
-reloj del sistema: todos los métodos reciben `ahora_ms`.
+política para que no reanude con una cuenta vieja. `valid_until_ms` lo calcula el adaptador con el
+`ahora_ms` del envío (T02). Cada STOP por falla queda en `<carpeta del adaptador>/errores.jsonl`
+con `run_id` y `frame_id`. El supervisor no lee el reloj del sistema: todos los métodos reciben
+`ahora_ms`.
 """
 
 from __future__ import annotations
@@ -83,7 +84,9 @@ class Supervisor:
         version = evento.get("schema_version") if isinstance(evento, dict) else None
         if version != VERSION_RECONOCIDA:
             return self._stop_por_evento(
-                evento, ahora_ms, "version_no_reconocida",
+                evento,
+                ahora_ms,
+                "version_no_reconocida",
                 [f"schema_version: {version!r} no es {VERSION_RECONOCIDA!r}"],
             )
 
@@ -97,7 +100,9 @@ class Supervisor:
         self._ultimo_run_id = evento["run_id"]
         if evento["status"] == "stale":
             edad_ms = evento["t_emit_ms"] - evento["t_capture_ms"]
-            detalle = [f"status=stale: cuadro de {edad_ms} ms; se rechaza y se cancela la orden previa"]
+            detalle = [
+                f"status=stale: cuadro de {edad_ms} ms; se rechaza y se cancela la orden previa"
+            ]
             return self._stop_por_evento(evento, ahora_ms, "stale", detalle)
 
         return self._decidir(evento, ahora_ms)
@@ -115,13 +120,15 @@ class Supervisor:
         """Fin del run. Se llena en T06 (#26)."""
 
     def _decidir(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
-        """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado, STOP."""
+        """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado,
+        STOP."""
         try:
             # Una copia: si la política cambia el estado y luego falla, el guardado no se toca.
             estado = copy.deepcopy(self.estado)
             decision, estado_nuevo = self.politica(evento, estado, self.config_politica)
             accion = {campo: decision[campo] for campo in CAMPOS_DE_LA_POLITICA}
-        except Exception as exc:  # cualquier falla de la política termina en STOP, no tumba el programa
+        except Exception as exc:
+            # Cualquier falla de la política termina en STOP, no tumba el programa.
             detalle = [f"{type(exc).__name__}: {exc}"]
             return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle)
 
@@ -145,7 +152,9 @@ class Supervisor:
             "valid_until_ms": ahora_ms + self.adaptador.validez_orden_ms,
         }
 
-    def _stop_por_error_del_detector(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
+    def _stop_por_error_del_detector(
+        self, evento: dict[str, Any], ahora_ms: float
+    ) -> dict[str, Any]:
         error = evento.get("error")
         codigo = error.get("code") if isinstance(error, dict) else None
         mensaje = error.get("message") if isinstance(error, dict) else None
@@ -179,7 +188,9 @@ class Supervisor:
             "t_decision_ms": ahora_ms,
         }
 
-    def _enviar(self, comando: dict[str, Any], estado_nuevo: Estado, ahora_ms: float) -> dict[str, Any]:
+    def _enviar(
+        self, comando: dict[str, Any], estado_nuevo: Estado, ahora_ms: float
+    ) -> dict[str, Any]:
         self.estado = estado_nuevo
         return self.adaptador.enviar(comando, ahora_ms)
 
@@ -194,7 +205,7 @@ class Supervisor:
             "errores": errores,
         }
         with self.ruta_errores.open("a", encoding="utf-8") as registro:
-            registro.write(json.dumps(linea, ensure_ascii=False) + "\n")
+            registro.write(json.dumps(linea, ensure_ascii=False, allow_nan=False) + "\n")
 
     @staticmethod
     def _id_del_evento(evento: Any, campo: str) -> str | None:

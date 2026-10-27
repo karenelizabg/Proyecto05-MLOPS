@@ -1,0 +1,70 @@
+name: CI
+
+# Corre en cada PR (contra cualquier rama base, para que también se validen los PR
+# que apuntan a la rama de otro ticket) y en cada push a main.
+#
+# Ningún paso usa `continue-on-error` ni `|| true`: si una validación falla, el job
+# falla y el PR queda en rojo. `CI OK` resume todos los jobs y es el único check que
+# conviene marcar como obligatorio en la protección de la rama (ver CONTRIBUTING.md).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Python (Ruff y pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # El entregable se evalúa en CPU: que ninguna prueba encuentre una GPU por accidente.
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # Misma versión que se recomienda en el README.
+          version: "0.12.13"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Instalar dependencias (falla si uv.lock está desactualizado)
+        # --no-build: solo wheels ya publicadas, sin ejecutar scripts de compilación de
+        # terceros. La versión de Python sale de .python-version.
+        run: uv sync --locked --no-build
+      - name: Ruff (lint)
+        run: uv run --locked --no-build ruff check .
+      - name: Ruff (formato)
+        run: uv run --locked --no-build ruff format --check .
+      - name: pytest
+        run: uv run --locked --no-build pytest -q
+
+  ci-ok:
+    name: CI OK
+    # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
+    # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
+    if: always()
+    needs: [python]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Todos los jobs deben haber pasado
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Resultados: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::Un job de CI terminó en '$result'."
+              exit 1
+            fi
+          done
