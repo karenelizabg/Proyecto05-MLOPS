@@ -1,0 +1,32 @@
+# Plazos del sistema · grupo B (T01, #21)
+#
+# Valores iniciales de DC-4 en config/contrato/CONTRATO.md. A los contrasta con su p95 (P5-16);
+# si alguno cambia, se cambia aquí y en DC-4 a la vez.
+#
+# Todo en milisegundos, en el mismo reloj que t_capture_ms y t_emit_ms del contrato: reloj monotónico
+# relativo al inicio del run (en reproducción, el tiempo relativo del manifiesto). B no lee el reloj
+# del sistema; recibe ahora_ms (T03).
+#
+# Ritmo de entrada: ≈ 5 fps, es decir, un cuadro cada 200 ms.
+
+# Edad máxima de un cuadro, medida desde t_capture_ms.
+# A emite status=stale si t_emit_ms − t_capture_ms lo supera (DC-3).
+# B además rechaza un cuadro ok si ahora_ms − t_capture_ms lo supera (T05): cancela la orden previa y emite STOP (C8).
+# 500 ms = dos cuadros y medio de retraso a 5 fps.
+max_frame_age_ms: 500
+
+# Tiempo máximo de inferencia de un cuadro en el detector (grupo A).
+# Vencido, A emite status=error con error.code=detector_timeout, y B emite STOP (C9).
+# No puede ser mayor que max_frame_age_ms: un cuadro que tarda más ya llegaría viejo.
+detector_timeout_ms: 500
+
+# Tiempo sin ningún evento de percepción tras el cual B emite STOP con event=clock y frame_id: null.
+# Cubre la ausencia total de cuadros (regla 3 del contrato: no llegar nada no es vía libre).
+# 600 ms = tres cuadros perdidos seguidos a 5 fps; mayor que max_frame_age_ms para que un cuadro
+# tardío pero válido no dispare el watchdog antes de poder rechazarlo por edad.
+watchdog_ms: 600
+
+# Cuánto vale una orden entregada al adaptador: valid_until_ms = t_command_ms + validez_orden_ms.
+# Vencida sin un comando nuevo, el adaptador frena por su cuenta.
+# 400 ms = dos cuadros a 5 fps; menor que watchdog_ms, así el adaptador ya frenó cuando vence el watchdog.
+validez_orden_ms: 400
