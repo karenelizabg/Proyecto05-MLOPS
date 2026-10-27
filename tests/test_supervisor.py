@@ -113,6 +113,26 @@ def test_el_estado_inicial_es_un_diccionario_detenido(tmp_path):
     assert nuevo_supervisor(tmp_path).estado == {"nombre": "DETENIDO"}
 
 
+def test_un_estado_con_mas_datos_sale_avanzar_y_no_stop(tmp_path):
+    def politica(ev, estado, config):
+        comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "libre"}
+        return comando, {"nombre": "AVANZANDO", "libres_seguidos": 2}
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    comando = supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+
+    assert comando["action"] == "AVANZAR"
+    assert comando["state_after"] == "AVANZANDO"
+    assert supervisor.estado == {"nombre": "AVANZANDO", "libres_seguidos": 2}
+    assert leer(supervisor.ruta_errores) == []
+    assert [c["action"] for c in leer(supervisor.adaptador.ruta_registro)] == ["AVANZAR"]
+
+
+def test_politica_de_prueba_devuelve_un_estado_diccionario():
+    _, estado = politica_de_prueba(evento("vacio.json"), {"nombre": "DETENIDO"}, {})
+    assert estado == {"nombre": "AVANZANDO"}
+
+
 def test_guarda_el_estado_completo_y_se_lo_pasa_a_la_politica(tmp_path):
     vistos = []
 
