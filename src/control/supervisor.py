@@ -20,8 +20,9 @@ comando el supervisor toma `action`, `speed`, `steering` y `reason`; el resto de
 GIRANDO_DER) más lo que la política necesite guardar, p. ej. `{"nombre": "AVANZANDO",
 "libres_seguidos": 0}`. El supervisor guarda el diccionario completo, se lo pasa a la política en el
 siguiente cuadro y usa `estado["nombre"]` para `state_before` y `state_after`. Empieza en
-`{"nombre": "DETENIDO"}`, y cada STOP del supervisor lo regresa ahí: se descartan los datos de la
-política para que no reanude con una cuenta vieja.
+`{"nombre": "DETENIDO"}`. Cada STOP del supervisor solo cambia `nombre` a `DETENIDO` y conserva las
+demás claves: la histéresis de la política (T11: `esperando_libres`, `libres_seguidos`) sigue viva
+después de un `stale`, un error o un STOP de reloj, y el carro no reanuda antes de tiempo.
 
 `tick(ahora_ms)` es el watchdog (C8, T05): si la orden activa no es STOP y pasaron más de
 `watchdog_ms` desde el último cuadro aceptado (`watchdog_vencido`), o ya venció su
@@ -215,7 +216,8 @@ class Supervisor:
     def _stop(
         self, run_id: str, frame_id: str | None, evento: str, motivo: str, ahora_ms: float
     ) -> dict[str, Any]:
-        detenido = dict(ESTADO_INICIAL)
+        # Solo cambia el nombre: las demás claves (p. ej. la histéresis de T11) se conservan.
+        detenido = {**self.estado, "nombre": ESTADO_INICIAL["nombre"]}
         comando = self._comando(run_id, frame_id, detenido["nombre"], ahora_ms, evento)
         comando.update({"action": "STOP", "speed": 0, "steering": 0.0, "reason": motivo})
         return self._enviar(comando, detenido, ahora_ms)

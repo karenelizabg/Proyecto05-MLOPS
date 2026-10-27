@@ -7,6 +7,8 @@ import yaml
 
 from contrato import validar_comando
 from control import AdaptadorVirtual, Supervisor, politica_de_prueba
+from control.config import cargar_config_politica
+from control.politica import decidir
 
 RAIZ = Path(__file__).resolve().parents[1]
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
@@ -171,7 +173,7 @@ def test_state_before_y_after_usan_el_nombre(tmp_path):
     assert validar_comando(comando) == []
 
 
-def test_un_stop_regresa_al_estado_inicial_sin_los_datos_de_la_politica(tmp_path):
+def test_un_stop_solo_cambia_el_nombre_y_conserva_los_datos_de_la_politica(tmp_path):
     supervisor = nuevo_supervisor(tmp_path, politica_que_cuenta)
     supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
     assert supervisor.estado["libres_seguidos"] == 1
@@ -180,7 +182,7 @@ def test_un_stop_regresa_al_estado_inicial_sin_los_datos_de_la_politica(tmp_path
 
     assert comando["state_before"] == "AVANZANDO"
     assert comando["state_after"] == "DETENIDO"
-    assert supervisor.estado == {"nombre": "DETENIDO"}
+    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 1}
 
 
 def test_si_la_politica_cambia_el_estado_y_falla_el_guardado_no_se_toca(tmp_path):
@@ -197,7 +199,63 @@ def test_si_la_politica_cambia_el_estado_y_falla_el_guardado_no_se_toca(tmp_path
 
     assert guardado == {"nombre": "AVANZANDO", "libres_seguidos": 1}
     assert comando["action"] == "STOP"
-    assert supervisor.estado == {"nombre": "DETENIDO"}
+    # Conserva lo guardado antes de la falla (1), no lo que la política cambió a medias (99).
+    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 1}
+
+
+# --- con la política real: el STOP del supervisor no rompe la histéresis (T11) -------
+
+
+def con_politica_real(carpeta: Path) -> Supervisor:
+    adaptador = AdaptadorVirtual(carpeta, PLAZOS["validez_orden_ms"])
+    return Supervisor(decidir, adaptador, PLAZOS, cargar_config_politica())
+
+
+LIBRE, BLOQUEO, STALE = "libre", "bloqueo", "stale"
+# Obstáculos en las tres zonas de una imagen de 640 px: no hay hacia dónde girar, la política frena.
+CAJAS_BLOQUEO = [[20, 100, 120, 400], [260, 100, 380, 400], [520, 100, 620, 400]]
+
+
+def en_t(tipo: str, frame_id: str, t_capture_ms: float) -> dict:
+    """Un cuadro libre, bloqueado o stale en t_capture_ms; A lo emite 40 ms después."""
+    nombre = {LIBRE: "vacio.json", BLOQUEO: "valido.json", STALE: "stale.json"}[tipo]
+    ev = evento(nombre, frame_id=frame_id, t_capture_ms=t_capture_ms, t_emit_ms=t_capture_ms + 40)
+    if tipo == BLOQUEO:
+        ev["detections"] = [
+            {"class_id": 1, "confidence": 0.9, "bbox": caja} for caja in CAJAS_BLOQUEO
+        ]
+    return ev
+
+
+def test_libre_bloqueo_libre_stale_libre_sigue_en_stop(tmp_path):
+    assert cargar_config_politica().cuadros_libres_para_reanudar == 3
+    supervisor = con_politica_real(tmp_path)
+    secuencia = [LIBRE, BLOQUEO, LIBRE, STALE, LIBRE]
+
+    acciones = []
+    for n, nombre in enumerate(secuencia):
+        t = n * 200
+        comando = supervisor.procesar_evento(en_t(nombre, f"f{n}", t), ahora_ms=t + 45)
+        acciones.append(comando["action"])
+
+    assert acciones == ["AVANZAR", "STOP", "STOP", "STOP", "STOP"]
+    ultimo = comando
+    assert ultimo["reason"].startswith("esperando_cuadros_libres")
+    # El STOP por stale solo cambió el nombre: la espera de cuadros libres siguió viva.
+    assert supervisor.estado["nombre"] == "DETENIDO"
+    assert supervisor.estado["esperando_libres"] is True
+
+
+def test_el_stop_por_stale_conserva_la_espera_de_la_politica(tmp_path):
+    supervisor = con_politica_real(tmp_path)
+    for n, nombre in enumerate([LIBRE, BLOQUEO, LIBRE]):
+        supervisor.procesar_evento(en_t(nombre, f"f{n}", n * 200), ahora_ms=n * 200 + 45)
+    antes = dict(supervisor.estado)
+
+    supervisor.procesar_evento(en_t(STALE, "f3", 600), ahora_ms=645)
+
+    assert supervisor.estado == {**antes, "nombre": "DETENIDO"}
+    assert [c["reason"] for c in leer(tmp_path / "comandos.jsonl")][-1] == "stale"
 
 
 # --- eventos inválidos ----------------------------------------------------------

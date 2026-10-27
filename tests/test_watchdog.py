@@ -11,6 +11,8 @@ import yaml
 
 from contrato import validar_comando
 from control import AdaptadorVirtual, Supervisor, politica_de_prueba
+from control.config import cargar_config_politica
+from control.politica import decidir
 
 RAIZ = Path(__file__).resolve().parents[1]
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
@@ -90,7 +92,7 @@ def test_el_stop_de_reloj_queda_en_errores_y_deja_el_estado_detenido(tmp_path):
     assert error["run_id"] == "ejemplo-01"
     assert error["frame_id"] is None
     assert (stop["state_before"], stop["state_after"]) == ("AVANZANDO", "DETENIDO")
-    assert supervisor.estado == {"nombre": "DETENIDO"}
+    assert supervisor.estado["nombre"] == "DETENIDO"
     assert supervisor.adaptador.activo["action"] == "STOP"
 
 
@@ -142,6 +144,43 @@ def test_si_ya_esta_en_stop_el_tick_no_repite(tmp_path):
 
     assert supervisor.tick(10_000) is None
     assert [c["event"] for c in comandos(tmp_path)] == ["frame"]
+
+
+def test_tras_un_stop_de_reloj_la_politica_sigue_esperando_cuadros_libres(tmp_path):
+    # libre -> bloqueo -> libre -> (sin cuadros: STOP de reloj) -> libre: sigue en STOP.
+    adaptador = AdaptadorVirtual(tmp_path, PLAZOS["validez_orden_ms"])
+    supervisor = Supervisor(decidir, adaptador, PLAZOS, cargar_config_politica())
+    bloqueo = json.loads((EJEMPLOS / "valido.json").read_text(encoding="utf-8"))
+    bloqueo.update(frame_id="f1", t_capture_ms=200, t_emit_ms=240)
+    # Obstáculos en las tres zonas: no hay hacia dónde girar, la política frena.
+    bloqueo["detections"] = [
+        {"class_id": 1, "confidence": 0.9, "bbox": caja}
+        for caja in ([20, 100, 120, 400], [260, 100, 380, 400], [520, 100, 620, 400])
+    ]
+
+    supervisor.procesar_evento(cuadro(0, "f0"), ahora_ms=0)
+    supervisor.procesar_evento(bloqueo, ahora_ms=200)
+    supervisor.procesar_evento(cuadro(400, "f2"), ahora_ms=400)
+    # Ya está en STOP (esperando cuadros libres), así que el reloj no repite el STOP.
+    assert supervisor.tick(2000) is None
+    comando = supervisor.procesar_evento(cuadro(2000, "f3"), ahora_ms=2000)
+
+    assert comando["action"] == "STOP"
+    assert comando["reason"].startswith("esperando_cuadros_libres")
+
+
+def test_un_stop_de_reloj_conserva_las_claves_del_estado(tmp_path):
+    def politica(ev, estado, config):
+        comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "libre"}
+        return comando, {"nombre": "AVANZANDO", "esperando_libres": False, "libres_seguidos": 0}
+
+    adaptador = AdaptadorVirtual(tmp_path, PLAZOS["validez_orden_ms"])
+    supervisor = Supervisor(politica, adaptador, PLAZOS, config_politica={})
+    supervisor.procesar_evento(cuadro(0, "f0"), ahora_ms=0)
+    supervisor.tick(700)
+
+    esperado = {"nombre": "DETENIDO", "esperando_libres": False, "libres_seguidos": 0}
+    assert supervisor.estado == esperado
 
 
 # --- orden vencida -----------------------------------------------------------------
