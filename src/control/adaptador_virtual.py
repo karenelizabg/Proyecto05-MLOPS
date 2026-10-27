@@ -24,10 +24,11 @@ class AdaptadorVirtual:
     def __init__(self, carpeta_salida: Path | str, validez_orden_ms: float) -> None:
         self.carpeta_salida = Path(carpeta_salida)
         self.validez_orden_ms = validez_orden_ms
-        self.carpeta_salida.mkdir(parents=True, exist_ok=True)
+        # La carpeta la elige quien corre `python -m control --salida` (ver su docstring, S8707).
+        self.carpeta_salida.mkdir(parents=True, exist_ok=True)  # NOSONAR (S8707)
         self.ruta_registro = self.carpeta_salida / NOMBRE_REGISTRO
         # Cada adaptador es una corrida: empieza con el registro vacío para no mezclar corridas.
-        self.ruta_registro.write_text("", encoding="utf-8")
+        self.ruta_registro.write_text("", encoding="utf-8")  # NOSONAR (S8707)
         self._activo: dict[str, Any] | None = None
 
     @property

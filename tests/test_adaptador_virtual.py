@@ -124,8 +124,9 @@ def test_un_nan_falla_sin_escribir_ni_cambiar_la_orden_activa(tmp_path):
     adaptador = AdaptadorVirtual(tmp_path, VALIDEZ_MS)
     adaptador.enviar(comando("avanzar.json"), ahora_ms=43.5)
 
+    con_nan = comando("avanzar.json", speed=math.nan)
     with pytest.raises(ValueError):
-        adaptador.enviar(comando("avanzar.json", speed=math.nan), ahora_ms=80.0)
+        adaptador.enviar(con_nan, ahora_ms=80.0)
 
     assert len(leer_registro(adaptador)) == 1
     assert adaptador.activo["t_command_ms"] == 43.5
