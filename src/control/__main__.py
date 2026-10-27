@@ -161,7 +161,7 @@ class Corrida:
 
     def _registrar(self, comando: dict[str, Any] | None, propuesta: dict[str, Any] | None) -> None:
         """Valida el comando que quedó en el adaptador y escribe su decisión."""
-        # Hoy tick() y cerrar() no mandan nada; con T05 y T06 devolverán su comando.
+        # tick() devuelve None cuando no hizo falta un STOP de reloj (T05).
         if comando is None:
             return
         self.comandos += 1
