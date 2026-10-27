@@ -1,7 +1,8 @@
 """Adaptador virtual (T02): recibe los comandos de la política y los registra sin mover motores.
 
 Cada comando se escribe como una línea JSON en `<carpeta_salida>/comandos.jsonl`, con
-`received=true` y `t_command_ms` igual al `ahora_ms` con que llegó. El adaptador guarda el
+`received=true` y `t_command_ms` igual al `ahora_ms` con que llegó. Al crearse, el adaptador deja
+ese archivo vacío: una corrida nueva no se mezcla con la anterior. El adaptador guarda el
 último comando como orden activa; un STOP la reemplaza y siempre queda con `speed=0` y
 `steering=0`. No importa ni llama hardware.
 """
@@ -20,6 +21,8 @@ class AdaptadorVirtual:
         self.carpeta_salida = Path(carpeta_salida)
         self.carpeta_salida.mkdir(parents=True, exist_ok=True)
         self.ruta_registro = self.carpeta_salida / NOMBRE_REGISTRO
+        # Cada adaptador es una corrida: empieza con el registro vacío para no mezclar corridas.
+        self.ruta_registro.write_text("", encoding="utf-8")
         self._activo: dict[str, Any] | None = None
 
     @property

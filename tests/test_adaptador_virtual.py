@@ -103,6 +103,26 @@ def test_la_carpeta_de_salida_es_configurable(tmp_path):
     assert len(leer_registro(adaptador)) == 1
 
 
+def test_empieza_con_el_registro_vacio(tmp_path):
+    adaptador = AdaptadorVirtual(tmp_path)
+
+    assert adaptador.ruta_registro.exists()
+    assert leer_registro(adaptador) == []
+
+
+def test_dos_corridas_en_la_misma_carpeta_no_se_mezclan(tmp_path):
+    primera = AdaptadorVirtual(tmp_path)
+    primera.enviar(comando("avanzar.json"), ahora_ms=43.5)
+    primera.enviar(comando("stop.json"), ahora_ms=439.4)
+
+    segunda = AdaptadorVirtual(tmp_path)
+    segunda.enviar(comando("reloj.json"), ahora_ms=1100.2)
+
+    registro = leer_registro(segunda)
+    assert len(registro) == 1
+    assert registro[0]["event"] == "clock"
+
+
 def test_acepta_la_carpeta_como_texto(tmp_path):
     adaptador = AdaptadorVirtual(str(tmp_path / "salida"))
     adaptador.enviar(comando("avanzar.json"), ahora_ms=43.5)
