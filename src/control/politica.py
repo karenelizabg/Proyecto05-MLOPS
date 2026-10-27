@@ -2,6 +2,8 @@
 
 - T08 (#28): `zonas_ocupadas` dice en qué zonas (izquierda, centro, derecha) hay obstáculo.
 - T09 (#29): `decidir` convierte el evento en un comando AVANZAR / GIRAR_IZQ / GIRAR_DER / STOP.
+- T10 (#30): las detecciones con poca confianza no cuentan y quedan en `reason`.
+- T11 (#31): histéresis; tras un STOP por obstáculo reanuda solo con N cuadros libres seguidos.
 """
 
 from __future__ import annotations
@@ -116,6 +118,12 @@ ESTADO_POR_ACCION = {
 
 NOMBRE_ZONA = {"izq": "la izquierda", "centro": "el centro", "der": "la derecha"}
 
+# Histéresis (T11): claves que la política guarda en el estado.
+# - "esperando_libres": true después de un STOP por obstáculo, hasta que reanuda.
+# - "libres_seguidos": cuántos cuadros ok seguidos sin obstáculo en el camino lleva.
+ESPERANDO_LIBRES = "esperando_libres"
+LIBRES_SEGUIDOS = "libres_seguidos"
+
 
 def _nombre_de(estado: Mapping[str, Any]) -> str:
     """Nombre del estado recibido. Sin "nombre" o con uno desconocido se toma DETENIDO."""
@@ -135,10 +143,11 @@ def _comando(
     razon: str,
     speed: float,
     steering: float,
+    extra: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     # Copia: conserva lo que traiga el estado (p. ej. contadores) y nunca modifica el original.
     previo = estado if isinstance(estado, Mapping) else {}
-    nuevo = {**previo, "nombre": ESTADO_POR_ACCION[accion]}
+    nuevo = {**previo, **(extra or {}), "nombre": ESTADO_POR_ACCION[accion]}
     t = evento.get("t_capture_ms")
     comando = {
         "schema_version": "1",
@@ -175,10 +184,55 @@ def _lado_para_girar(
     return "der" if promedio < evento["image_width"] / 2 else "izq"
 
 
+def ignoradas_por_confianza(
+    evento: Mapping[str, Any], config: ConfigPolitica
+) -> list[Mapping[str, Any]]:
+    """Detecciones de una clase de obstáculo con `confidence < umbral_confianza` (T10, C6).
+
+    No cuentan para decidir, pero se mencionan en `reason`. Poca confianza NO es una falla
+    de percepción: el cuadro llegó bien (`status=ok`) y el detector no está seguro de ese
+    objeto. Una falla de percepción (`stale` o `error`) siempre es STOP.
+    """
+    return [
+        det
+        for det in evento["detections"]
+        if det["class_id"] in config.clases_obstaculo
+        and det["confidence"] < config.umbral_confianza
+    ]
+
+
+def _regla_de_zonas(
+    evento: Mapping[str, Any], config: ConfigPolitica
+) -> tuple[str, str, float, float]:
+    """Regla de T09 para un cuadro `ok` válido: `(accion, razon, speed, steering)`."""
+    por_zona = detecciones_por_zona(evento, config)
+    if not por_zona["centro"]:
+        laterales = [z for z in ("izq", "der") if por_zona[z]]
+        if laterales:
+            detalle = ", ".join(f"{NOMBRE_ZONA[z]} ({_describir(por_zona[z])})" for z in laterales)
+            razon = f"Centro libre: avanza recto; obstáculo solo en {detalle}."
+        else:
+            razon = "Centro libre: sin obstáculos en el camino, avanza recto."
+        return "AVANZAR", razon, config.velocidad_avance, 0.0
+
+    en_centro = _describir(por_zona["centro"])
+    if not config.permitir_giro:
+        return "STOP", f"Obstáculo en el centro ({en_centro}); giro desactivado: STOP.", 0, 0
+    lado = _lado_para_girar(evento, por_zona)
+    if lado is None:
+        return "STOP", f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP.", 0, 0
+    accion = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
+    steering = -config.giro if lado == "izq" else config.giro
+    razon = (
+        f"Obstáculo en el centro ({en_centro}); {NOMBRE_ZONA[lado]} está libre: gira hacia allá."
+    )
+    return accion, razon, config.velocidad_avance, steering
+
+
 def decidir(
     evento: Mapping[str, Any], estado: Mapping[str, Any], config: ConfigPolitica
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Decide el comando para un evento de percepción (casos C1 a C5). Función pura.
+    """Decide el comando para un evento de percepción (casos C1 a C7). Función pura.
 
     `estado` es un diccionario con la clave "nombre" (empieza en `ESTADO_INICIAL`).
     Devuelve `(comando, estado_nuevo)`: el estado nuevo es una copia con el "nombre" según
@@ -193,6 +247,14 @@ def decidir(
     3. Centro ocupado y `permitir_giro` con una zona lateral libre -> GIRAR hacia esa
        zona (C2). Nunca gira hacia una zona ocupada.
     4. Centro ocupado sin zona lateral libre, o sin permiso de girar -> STOP (C2, C5).
+
+    Las detecciones con confianza debajo de `umbral_confianza` no cuentan y se mencionan en
+    `reason` como `ignorada_por_confianza` (C6, T10).
+
+    Histéresis (C7, T11): después de un STOP por obstáculo sigue en STOP, con `reason`
+    `esperando_cuadros_libres k/N`, hasta ver N cuadros libres seguidos
+    (`cuadros_libres_para_reanudar`). Lo lleva en el estado: `esperando_libres` y
+    `libres_seguidos`.
 
     STOP siempre lleva speed=0 y steering=0. No lee el reloj: `t_decision_ms` es el
     `t_capture_ms` del evento.
@@ -212,34 +274,78 @@ def decidir(
     if errores:
         return _stop(evento, estado, f"Evento fuera de contrato: STOP ({errores[0]}).")
 
-    por_zona = detecciones_por_zona(evento, config)
-    if not por_zona["centro"]:
-        laterales = [z for z in ("izq", "der") if por_zona[z]]
-        if laterales:
-            detalle = ", ".join(f"{NOMBRE_ZONA[z]} ({_describir(por_zona[z])})" for z in laterales)
-            razon = f"Centro libre: avanza recto; obstáculo solo en {detalle}."
-        else:
-            razon = "Centro libre: sin obstáculos en el camino, avanza recto."
-        return _comando(evento, estado, "AVANZAR", razon, config.velocidad_avance, 0)
-
-    en_centro = _describir(por_zona["centro"])
-    if config.permitir_giro:
-        lado = _lado_para_girar(evento, por_zona)
-        if lado is not None:
-            accion = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
-            steering = -config.giro if lado == "izq" else config.giro
-            razon = (
-                f"Obstáculo en el centro ({en_centro}); {NOMBRE_ZONA[lado]} está libre: "
-                f"gira hacia allá."
-            )
-            return _comando(evento, estado, accion, razon, config.velocidad_avance, steering)
-        return _stop(
-            evento, estado, f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP."
+    accion, razon, speed, steering = _regla_de_zonas(evento, config)
+    ignoradas = ignoradas_por_confianza(evento, config)
+    if ignoradas:
+        detalle = "; ".join(
+            f"class_id {d['class_id']}, confianza {d['confidence']:g}" for d in ignoradas
         )
-    return _stop(evento, estado, f"Obstáculo en el centro ({en_centro}); giro desactivado: STOP.")
+        razon += (
+            f" ignorada_por_confianza: {detalle} (umbral {config.umbral_confianza:g};"
+            " no es falla de percepción)."
+        )
+    return _con_histeresis(evento, estado, config, accion, razon, speed, steering)
+
+
+def _con_histeresis(
+    evento: Mapping[str, Any],
+    estado: Mapping[str, Any],
+    config: ConfigPolitica,
+    accion: str,
+    razon: str,
+    speed: float,
+    steering: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Histéresis (T11, C7): tras un STOP por obstáculo, reanuda solo con N cuadros libres.
+
+    - Un STOP por obstáculo empieza la espera (`esperando_libres: true`, contador en 0).
+    - Mientras espera, la política sigue en STOP. Cada cuadro con el centro libre suma 1;
+      un cuadro con el centro ocupado regresa el contador a 0, así que un solo cuadro libre
+      en medio de un bloqueo no reanuda.
+    - Al llegar a `cuadros_libres_para_reanudar` cuadros libres seguidos, AVANZAR.
+    """
+    n = config.cuadros_libres_para_reanudar
+    if not _esperando(estado):
+        if accion == "STOP":
+            extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+            return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+        extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
+        return _comando(evento, estado, accion, razon, speed, steering, extra)
+
+    if accion != "AVANZAR":
+        # Camino bloqueado otra vez: la racha de cuadros libres se corta.
+        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+        return _comando(
+            evento, estado, "STOP", f"esperando_cuadros_libres 0/{n}: {razon}", 0, 0, extra
+        )
+
+    libres = _libres(estado) + 1
+    if libres < n:
+        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: libres}
+        return _comando(
+            evento, estado, "STOP", f"esperando_cuadros_libres {libres}/{n}: {razon}", 0, 0, extra
+        )
+    extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
+    razon = f"Reanuda tras {libres}/{n} cuadros libres seguidos. {razon}"
+    return _comando(evento, estado, "AVANZAR", razon, speed, steering, extra)
 
 
 def _stop(
     evento: Mapping[str, Any], estado: Mapping[str, Any], razon: str
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    return _comando(evento, estado, "STOP", razon, 0, 0)
+    """STOP por pérdida de percepción o evento inválido.
+
+    Si la política estaba esperando cuadros libres (T11), la racha se corta: un cuadro que
+    no se pudo ver no cuenta como libre.
+    """
+    extra = {LIBRES_SEGUIDOS: 0} if _esperando(estado) else None
+    return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+
+
+def _esperando(estado: Mapping[str, Any]) -> bool:
+    return isinstance(estado, Mapping) and estado.get(ESPERANDO_LIBRES) is True
+
+
+def _libres(estado: Mapping[str, Any]) -> int:
+    valor = estado.get(LIBRES_SEGUIDOS, 0) if isinstance(estado, Mapping) else 0
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) and valor >= 0 else 0
