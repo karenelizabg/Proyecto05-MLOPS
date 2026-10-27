@@ -7,7 +7,8 @@ cuenta desde el envío y no desde `t_decision_ms`: un comando que llega tarde no
 
 Al crearse, el adaptador deja ese archivo vacío: una corrida nueva no se mezcla con la anterior.
 Guarda el último comando como orden activa; un STOP la reemplaza y siempre queda con `speed=0`
-y `steering=0`. No importa ni llama hardware.
+y `steering=0`. Escribe con `allow_nan=False`: con un NaN o un infinito falla en vez de dejar
+una línea que no es JSON. No importa ni llama hardware.
 """
 
 from __future__ import annotations
@@ -45,6 +46,6 @@ class AdaptadorVirtual:
             registrado["steering"] = 0.0
 
         with self.ruta_registro.open("a", encoding="utf-8") as registro:
-            registro.write(json.dumps(registrado, ensure_ascii=False) + "\n")
+            registro.write(json.dumps(registrado, ensure_ascii=False, allow_nan=False) + "\n")
         self._activo = registrado
         return registrado
