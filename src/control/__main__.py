@@ -25,6 +25,10 @@ Las rutas de `--entrada`, `--config` y `--salida` las elige quien corre el coman
 en cualquier carpeta (el evaluador usa las suyas). Por eso las lecturas y escrituras con esas rutas
 llevan `NOSONAR (S8707)`: no hay una carpeta base contra la cual limitarlas.
 
+Los archivos se escriben con `allow_nan=False`: NaN e infinito no son JSON. Una entrada que los
+trae no se puede leer (salida 2). Si la política los propone, el supervisor manda STOP, y en
+`decisiones.jsonl` lo que propuso queda como texto (`"nan"`, `"inf"`).
+
 Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si la entrada o la
 configuración no se pueden leer (en ese caso no se escribe nada).
 """
@@ -32,9 +36,9 @@ configuración no se pueden leer (en ese caso no se escribe nada).
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
+import math
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -67,6 +71,10 @@ CAMPOS_DE_LA_POLITICA = ("action", "speed", "steering", "reason")
 
 class ErrorPlazos(ValueError):
     """plazos.yaml falta, no se puede leer o le falta un plazo."""
+
+
+class ErrorEntrada(ValueError):
+    """La entrada trae NaN o Infinity, que no son JSON."""
 
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
@@ -188,8 +196,8 @@ class Corrida:
                 "action": comando.get("action"),
                 "reason": comando.get("reason"),
                 "decidio": "politica" if de_la_politica else "supervisor",
-                "propuesta_politica": propuesta,
-                "estado": copy.deepcopy(self.supervisor.estado),
+                "propuesta_politica": _texto_si_no_finito(propuesta),
+                "estado": _texto_si_no_finito(self.supervisor.estado),
             },
         )
 
@@ -225,7 +233,7 @@ class Corrida:
                 NOMBRE_ERRORES,
             ],
         }
-        texto = json.dumps(resumen, ensure_ascii=False, indent=2) + "\n"
+        texto = json.dumps(resumen, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
         (self.salida / NOMBRE_RUN).write_text(texto, encoding="utf-8")
         return resumen
 
@@ -240,7 +248,25 @@ def _reloj(evento: Any, anterior_ms: float) -> float:
 
 def _anexar(ruta: Path, linea: Any) -> None:
     with ruta.open("a", encoding="utf-8") as registro:
-        registro.write(json.dumps(linea, ensure_ascii=False) + "\n")
+        registro.write(json.dumps(linea, ensure_ascii=False, allow_nan=False) + "\n")
+
+
+def _texto_si_no_finito(valor: Any) -> Any:
+    """Copia de `valor` con NaN e infinito como texto ("nan", "inf"), para poder escribirla."""
+    if isinstance(valor, float) and not math.isfinite(valor):
+        return repr(valor)
+    if isinstance(valor, dict):
+        return {clave: _texto_si_no_finito(hijo) for clave, hijo in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [_texto_si_no_finito(hijo) for hijo in valor]
+    return valor
+
+
+def _revisar_entrada(eventos: list[Any]) -> None:
+    try:
+        json.dumps(eventos, allow_nan=False)
+    except ValueError as exc:
+        raise ErrorEntrada("la entrada trae NaN o Infinity, que no son JSON") from exc
 
 
 def _leer_jsonl(ruta: Path) -> list[Any]:
@@ -279,7 +305,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         plazos = cargar_plazos(carpeta_config / NOMBRE_PLAZOS)
         config_politica = cargar_config_politica(carpeta_config / NOMBRE_POLITICA)
         eventos = leer_eventos(entrada)
-    except (OSError, json.JSONDecodeError, yaml.YAMLError, ErrorPlazos, ErrorConfigPolitica) as exc:
+        _revisar_entrada(eventos)
+    except (
+        OSError,
+        json.JSONDecodeError,
+        yaml.YAMLError,
+        ErrorPlazos,
+        ErrorConfigPolitica,
+        ErrorEntrada,
+    ) as exc:
         print(f"no se pudo leer la entrada o la configuración: {exc}", file=sys.stderr)
         return 2
 

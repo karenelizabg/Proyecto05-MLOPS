@@ -1,6 +1,7 @@
 import hashlib
 import itertools
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -320,6 +321,72 @@ def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
     assert correr_flujo(salida, escribir(tmp_path / "e.jsonl", eventos)) == 0
     ultimo = leer(salida / "comandos.jsonl")[-1]
     assert (ultimo["frame_id"], ultimo["action"]) == ("S02_f0002", "STOP")
+
+
+# --- NaN e infinito no son JSON --------------------------------------------------
+
+
+def no_es_json(constante):
+    raise ValueError(f"{constante} no es JSON")
+
+
+def leer_estricto(ruta: Path) -> list[dict]:
+    """Como `leer`, pero falla si una línea trae NaN o Infinity."""
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    return [json.loads(linea, parse_constant=no_es_json) for linea in lineas]
+
+
+def correr_con(salida: Path, politica) -> correr.Corrida:
+    corrida = correr.Corrida(salida, correr.cargar_plazos(CONFIG / "plazos.yaml"), {}, politica)
+    for evento in leer_eventos(FLUJO):
+        corrida.cuadro(evento)
+    corrida.cerrar()
+    corrida.escribir_run(FLUJO, CONFIG)
+    return corrida
+
+
+@pytest.mark.parametrize(
+    "valor", [math.nan, math.inf, -math.inf], ids=["NaN", "Infinity", "-Infinity"]
+)
+def test_entrada_con_nan_o_infinity_sale_2_sin_escribir_nada(tmp_path, valor):
+    """`json.loads` los acepta, pero no son JSON: la entrada no se puede leer."""
+    eventos = leer_eventos(FLUJO)
+    eventos[1]["t_emit_ms"] = valor
+    salida = tmp_path / "s"
+    assert correr_flujo(salida, escribir(tmp_path / "e.jsonl", eventos)) == 2
+    assert not salida.exists()
+
+
+@pytest.mark.parametrize("campo", ["speed", "steering"])
+def test_politica_que_propone_nan_da_stop_y_todo_queda_en_json(tmp_path, campo):
+    def politica(evento, estado, config):
+        propuesta = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}
+        propuesta[campo] = math.nan
+        return propuesta, {"nombre": "AVANZANDO"}
+
+    corrida = correr_con(tmp_path, politica)
+
+    for nombre in ARCHIVOS:
+        leer_estricto(tmp_path / nombre)
+    json.loads((tmp_path / "run.json").read_text(encoding="utf-8"), parse_constant=no_es_json)
+    comandos = leer(tmp_path / "comandos.jsonl")
+    assert all(c["action"] == "STOP" and c["speed"] == 0 for c in comandos)
+    assert corrida.invalidos == 0
+    primera = leer(tmp_path / "decisiones.jsonl")[0]
+    assert (primera["decidio"], primera["reason"]) == ("supervisor", "politica_invalida")
+    assert primera["propuesta_politica"][campo] == "nan"
+
+
+def test_un_estado_con_infinito_queda_como_texto_en_decisiones(tmp_path):
+    def politica(evento, estado, config):
+        comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}
+        return comando, {"nombre": "AVANZANDO", "distancia": math.inf}
+
+    correr_con(tmp_path, politica)
+
+    primera = leer_estricto(tmp_path / "decisiones.jsonl")[0]
+    assert (primera["decidio"], primera["action"]) == ("politica", "AVANZAR")
+    assert primera["estado"] == {"nombre": "AVANZANDO", "distancia": "inf"}
 
 
 # --- línea de comandos real ----------------------------------------------------
