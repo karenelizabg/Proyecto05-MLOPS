@@ -78,8 +78,8 @@ def test_la_politica_recibe_evento_estado_y_config(tmp_path):
     supervisor.procesar_evento(evento("valido.json"), ahora_ms=440.0)
 
     assert llamadas == [
-        ("S01_f0001", "DETENIDO", {"umbral": 0.5}),
-        ("S02_f0003", "AVANZANDO", {"umbral": 0.5}),
+        ("S01_f0001", {"nombre": "DETENIDO"}, {"umbral": 0.5}),
+        ("S02_f0003", {"nombre": "AVANZANDO"}, {"umbral": 0.5}),
     ]
 
 
@@ -89,7 +89,7 @@ def test_el_estado_avanza_con_la_politica(tmp_path):
 
     assert comando["state_before"] == "DETENIDO"
     assert comando["state_after"] == "AVANZANDO"
-    assert supervisor.estado == "AVANZANDO"
+    assert supervisor.estado == {"nombre": "AVANZANDO"}
 
 
 def test_un_evento_valido_no_deja_errores(tmp_path):
@@ -97,6 +97,100 @@ def test_un_evento_valido_no_deja_errores(tmp_path):
     supervisor.procesar_evento(evento("valido.json"), ahora_ms=440.0)
 
     assert leer(supervisor.ruta_errores) == []
+
+
+# --- estado como diccionario (acuerdo con T09/T11) --------------------------------
+
+
+def politica_que_cuenta(ev, estado, config):
+    """Guarda en el estado cuántos cuadros libres lleva, además del nombre."""
+    libres = estado.get("libres_seguidos", 0) + 1
+    comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "libre"}
+    return comando, {"nombre": "AVANZANDO", "libres_seguidos": libres}
+
+
+def test_el_estado_inicial_es_un_diccionario_detenido(tmp_path):
+    assert nuevo_supervisor(tmp_path).estado == {"nombre": "DETENIDO"}
+
+
+def test_un_estado_con_mas_datos_sale_avanzar_y_no_stop(tmp_path):
+    def politica(ev, estado, config):
+        comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "libre"}
+        return comando, {"nombre": "AVANZANDO", "libres_seguidos": 2}
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    comando = supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+
+    assert comando["action"] == "AVANZAR"
+    assert comando["state_after"] == "AVANZANDO"
+    assert supervisor.estado == {"nombre": "AVANZANDO", "libres_seguidos": 2}
+    assert leer(supervisor.ruta_errores) == []
+    assert [c["action"] for c in leer(supervisor.adaptador.ruta_registro)] == ["AVANZAR"]
+
+
+def test_politica_de_prueba_devuelve_un_estado_diccionario():
+    _, estado = politica_de_prueba(evento("vacio.json"), {"nombre": "DETENIDO"}, {})
+    assert estado == {"nombre": "AVANZANDO"}
+
+
+def test_guarda_el_estado_completo_y_se_lo_pasa_a_la_politica(tmp_path):
+    vistos = []
+
+    def politica(ev, estado, config):
+        vistos.append(copy.deepcopy(estado))
+        return politica_que_cuenta(ev, estado, config)
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    primero = supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+    segundo = supervisor.procesar_evento(evento("valido.json"), ahora_ms=440.0)
+
+    assert vistos == [{"nombre": "DETENIDO"}, {"nombre": "AVANZANDO", "libres_seguidos": 1}]
+    assert supervisor.estado == {"nombre": "AVANZANDO", "libres_seguidos": 2}
+    assert (primero["state_before"], primero["state_after"]) == ("DETENIDO", "AVANZANDO")
+    assert (segundo["state_before"], segundo["state_after"]) == ("AVANZANDO", "AVANZANDO")
+    assert validar_comando(primero) == []
+    assert validar_comando(segundo) == []
+
+
+def test_state_before_y_after_usan_el_nombre(tmp_path):
+    def politica(ev, estado, config):
+        comando = {"action": "GIRAR_IZQ", "speed": 0.3, "steering": -0.5, "reason": "obstáculo a la derecha"}
+        return comando, {"nombre": "GIRANDO_IZQ", "giro_desde_ms": 440.0}
+
+    comando = nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
+
+    assert comando["state_before"] == "DETENIDO"
+    assert comando["state_after"] == "GIRANDO_IZQ"
+    assert validar_comando(comando) == []
+
+
+def test_un_stop_regresa_al_estado_inicial_sin_los_datos_de_la_politica(tmp_path):
+    supervisor = nuevo_supervisor(tmp_path, politica_que_cuenta)
+    supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+    assert supervisor.estado["libres_seguidos"] == 1
+
+    comando = supervisor.procesar_evento(roto(), ahora_ms=440.0)
+
+    assert comando["state_before"] == "AVANZANDO"
+    assert comando["state_after"] == "DETENIDO"
+    assert supervisor.estado == {"nombre": "DETENIDO"}
+
+
+def test_si_la_politica_cambia_el_estado_y_falla_el_guardado_no_se_toca(tmp_path):
+    def politica(ev, estado, config):
+        if ev["frame_id"] == "S02_f0003":
+            estado["libres_seguidos"] = 99
+            raise RuntimeError("falla a medias")
+        return politica_que_cuenta(ev, estado, config)
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+    guardado = copy.deepcopy(supervisor.estado)
+    comando = supervisor.procesar_evento(evento("valido.json"), ahora_ms=440.0)
+
+    assert guardado == {"nombre": "AVANZANDO", "libres_seguidos": 1}
+    assert comando["action"] == "STOP"
+    assert supervisor.estado == {"nombre": "DETENIDO"}
 
 
 # --- eventos inválidos ----------------------------------------------------------
@@ -139,7 +233,7 @@ def test_stop_cancela_el_avanzar_previo(tmp_path):
 
     supervisor.procesar_evento(roto(), ahora_ms=440.0)
     assert supervisor.adaptador.activo["action"] == "STOP"
-    assert supervisor.estado == "DETENIDO"
+    assert supervisor.estado == {"nombre": "DETENIDO"}
 
 
 def test_errores_quedan_registrados_con_run_id_y_frame_id(tmp_path):
