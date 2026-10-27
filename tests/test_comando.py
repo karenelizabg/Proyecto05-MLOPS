@@ -1,5 +1,6 @@
 import copy
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -167,3 +168,21 @@ def test_un_evento_de_percepcion_no_es_un_comando():
     percepcion = Path(__file__).resolve().parents[1] / "config" / "contrato" / "ejemplos"
     evento = json.loads((percepcion / "valido.json").read_text(encoding="utf-8"))
     assert validar_comando(evento)
+
+
+# --- números no finitos ------------------------------------------------------
+
+
+@pytest.mark.parametrize("valor", [math.nan, math.inf, -math.inf], ids=["nan", "inf", "-inf"])
+@pytest.mark.parametrize(
+    "campo", ["speed", "steering", "t_decision_ms", "t_command_ms", "valid_until_ms"]
+)
+def test_nan_e_infinito_se_rechazan(campo, valor):
+    """NaN pasa los rangos del esquema (toda comparación con NaN es falsa); se revisa aparte."""
+    errores = validar_comando(mutar("avanzar.json", {campo: valor}))
+    assert f"{campo}: debe ser un número finito" in errores
+
+
+def test_nan_se_rechaza_tambien_en_un_stop():
+    errores = validar_comando(mutar("stop.json", {"steering": math.nan}))
+    assert errores == ["steering: debe ser un número finito"]

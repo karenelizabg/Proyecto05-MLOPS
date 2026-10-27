@@ -4,6 +4,7 @@ Las pruebas revisan lo que queda en comandos.jsonl y errores.jsonl, no lo que se
 """
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -237,6 +238,36 @@ def test_el_programa_sigue_despues_de_una_falla(tmp_path):
 
     assert [c["action"] for c in comandos(tmp_path)] == ["STOP", "AVANZAR"]
     assert len(errores(tmp_path)) == 1
+
+
+def json_estricto(ruta: Path) -> list[dict]:
+    """Como `leer`, pero falla si una línea trae NaN o Infinity, que no son JSON."""
+
+    def no_es_json(constante):
+        raise ValueError(f"{constante} no es JSON")
+
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    return [json.loads(linea, parse_constant=no_es_json) for linea in lineas]
+
+
+@pytest.mark.parametrize("campo", ["speed", "steering"])
+def test_politica_que_devuelve_nan_da_stop_con_velocidad_cero(tmp_path, campo):
+    def politica(ev, estado, config):
+        decision = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}
+        decision[campo] = math.nan
+        return decision, {"nombre": "AVANZANDO"}
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    supervisor.procesar_evento(evento("valido.json"), ahora_ms=440.0)
+
+    assert_stop_registrado(tmp_path, "politica_invalida", "S02_f0003")
+    [comando] = json_estricto(tmp_path / "comandos.jsonl")
+    assert comando["speed"] == 0
+    assert comando["steering"] == 0
+    assert json_estricto(tmp_path / "errores.jsonl")[0]["errores"] == [
+        f"{campo}: debe ser un número finito"
+    ]
+    assert supervisor.estado == {"nombre": "DETENIDO"}
 
 
 # --- lo que NO es error -----------------------------------------------------------
