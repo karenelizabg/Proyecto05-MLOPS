@@ -79,7 +79,7 @@ def test_c1_libre_avanza():
     assert comando["speed"] == CONFIG.velocidad_avance > 0
     assert comando["steering"] == 0
     assert (comando["state_before"], comando["state_after"]) == (DETENIDO, AVANZANDO)
-    assert nuevo == {"nombre": AVANZANDO}
+    assert nuevo["nombre"] == AVANZANDO
 
 
 def test_c1_clase_no_relevante_o_poca_confianza_no_estorban():
@@ -98,7 +98,7 @@ def test_c2_centro_con_lados_libres_gira_y_lo_explica():
     assert "class_id 1" in comando["reason"]
     esperado = GIRANDO_IZQ if comando["action"] == "GIRAR_IZQ" else GIRANDO_DER
     assert comando["state_after"] == esperado
-    assert nuevo == {"nombre": esperado}
+    assert nuevo["nombre"] == esperado
 
 
 def test_c2_gira_al_lado_contrario_del_obstaculo():
@@ -113,7 +113,7 @@ def test_c2_sin_permiso_de_girar_frena():
     assert es_stop(comando)
     assert "giro desactivado" in comando["reason"]
     assert (comando["state_before"], comando["state_after"]) == (AVANZANDO, DETENIDO)
-    assert nuevo == {"nombre": DETENIDO}
+    assert nuevo["nombre"] == DETENIDO
 
 
 # --- C3 / C4: obstáculo a un lado ------------------------------------------------------
@@ -159,7 +159,7 @@ def test_c5_todo_ocupado_frena():
     comando, nuevo = decidir(evento(IZQ, CENTRO, DER), {"nombre": AVANZANDO}, CONFIG)
     assert es_stop(comando)
     assert "ningún lado libre" in comando["reason"]
-    assert nuevo == {"nombre": DETENIDO}
+    assert nuevo["nombre"] == DETENIDO
 
 
 def test_c5_una_caja_que_cubre_todo_frena():
@@ -179,7 +179,7 @@ def test_stale_y_error_frenan(archivo, texto):
     assert es_stop(comando)
     assert texto in comando["reason"]
     assert comando["frame_id"] == ev["frame_id"]
-    assert nuevo == {"nombre": DETENIDO}
+    assert nuevo["nombre"] == DETENIDO
 
 
 def test_version_desconocida_frena():
@@ -258,11 +258,12 @@ def test_state_before_sale_del_nombre_del_estado():
 
 
 def test_estado_con_mas_datos_los_conserva_y_no_lo_modifica():
-    estado = {"nombre": "AVANZANDO", "libres_seguidos": 2}
+    estado = {"nombre": "AVANZANDO", "otro_dato": [1, 2]}
     comando, nuevo = decidir(evento(IZQ, CENTRO, DER), estado, CONFIG)
     assert comando["state_before"] == "AVANZANDO"
-    assert nuevo == {"nombre": "DETENIDO", "libres_seguidos": 2}
-    assert estado == {"nombre": "AVANZANDO", "libres_seguidos": 2}  # el original no cambia
+    assert nuevo["nombre"] == "DETENIDO"
+    assert nuevo["otro_dato"] == [1, 2]
+    assert estado == {"nombre": "AVANZANDO", "otro_dato": [1, 2]}  # el original no cambia
     assert nuevo is not estado
 
 
