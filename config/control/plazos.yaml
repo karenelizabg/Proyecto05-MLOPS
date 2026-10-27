@@ -30,3 +30,9 @@ watchdog_ms: 600
 # Vencida sin un comando nuevo, el adaptador frena por su cuenta.
 # 400 ms = dos cuadros a 5 fps; menor que watchdog_ms, así el adaptador ya frenó cuando vence el watchdog.
 validez_orden_ms: 400
+
+# Cada cuánto llama el comando para correr una secuencia (T14) a tick() mientras no llega un cuadro.
+# Sin tics intermedios, un hueco de 200 a 1800 ms daría el STOP del watchdog hasta los 1800 (C8);
+# con 100 ms sale a lo más 100 ms después de vencer la orden o el watchdog.
+# Menor que validez_orden_ms y que watchdog_ms, para que ningún vencimiento se salte un tic.
+paso_reloj_ms: 100

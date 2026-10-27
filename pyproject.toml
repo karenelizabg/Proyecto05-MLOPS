@@ -1,0 +1,44 @@
+[project]
+name = "mini-tesla-p5"
+version = "0.1.0"
+description = "Proyecto 5 (ITESO MLOps): detector de obstáculos en CPU, política temporal y control virtual sin motores."
+readme = "README.md"
+# Una sola versión menor para todo el equipo; uv descarga 3.12 si no está instalada.
+requires-python = "==3.12.*"
+# Solo lo que ya se usa. Cada ticket agrega lo suyo con `uv add` y sube uv.lock en el
+# mismo PR (p. ej. el runtime del detector en P5-05). Nada de paquetes de GPU: el
+# entregable se evalúa en CPU (ver tests/test_humo.py).
+dependencies = [
+    "jsonschema>=4.23,<5",
+    "pyyaml>=6.0,<7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7,<1",
+    "pytest>=8.3,<9",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+# Los paquetes viven en src/ (contrato, control, ...). `uv sync` instala el proyecto en
+# modo editable, así que `uv run python -m contrato` funciona sin PYTHONPATH y un paquete
+# nuevo dentro de src/ queda disponible sin tocar este archivo.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/F: errores y pyflakes. I: orden de imports. B: bugbear (bugs probables).
+# SIM: simplificaciones. C4: comprensiones y literales. RUF: reglas propias de Ruff.
+select = ["E", "F", "I", "B", "SIM", "C4", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Respaldo para quien corra pytest sin `uv sync` (p. ej. con un venv propio).
+pythonpath = ["src"]

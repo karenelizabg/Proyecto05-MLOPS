@@ -8,7 +8,7 @@
    desconocidos y la razón perdería el código.
 3. Si `contrato.validar_evento` devuelve errores, STOP (`evento_invalido`).
 4. Si `status` es `stale`, STOP (`stale`): rechaza la entrada vieja y cancela la orden previa (C8).
-5. Si el cuadro `ok` es más viejo que `max_frame_age_ms` (`ahora_ms − t_capture_ms`), STOP
+5. Si el cuadro `ok` es más viejo que `max_frame_age_ms` (`ahora_ms - t_capture_ms`), STOP
    (`cuadro_viejo`): B lo rechaza por edad aunque A no lo haya marcado `stale` (DC-3, T05).
 6. Si el evento es `ok`, llama a la política y manda su decisión al adaptador. Si la política lanza
    una excepción (`politica_excepcion`) o su comando no cumple el contrato (`politica_invalida`),
@@ -94,7 +94,9 @@ class Supervisor:
         version = evento.get("schema_version") if isinstance(evento, dict) else None
         if version != VERSION_RECONOCIDA:
             return self._stop_por_evento(
-                evento, ahora_ms, "version_no_reconocida",
+                evento,
+                ahora_ms,
+                "version_no_reconocida",
                 [f"schema_version: {version!r} no es {VERSION_RECONOCIDA!r}"],
             )
 
@@ -108,13 +110,15 @@ class Supervisor:
         self._ultimo_run_id = evento["run_id"]
         if evento["status"] == "stale":
             edad_ms = evento["t_emit_ms"] - evento["t_capture_ms"]
-            detalle = [f"status=stale: cuadro de {edad_ms} ms; se rechaza y se cancela la orden previa"]
+            detalle = [
+                f"status=stale: cuadro de {edad_ms} ms; se rechaza y se cancela la orden previa"
+            ]
             return self._stop_por_evento(evento, ahora_ms, "stale", detalle)
 
         edad_ms = ahora_ms - evento["t_capture_ms"]
         if edad_ms > self.plazos["max_frame_age_ms"]:
             detalle = [
-                f"edad del cuadro {edad_ms} ms (ahora_ms − t_capture_ms) > "
+                f"edad del cuadro {edad_ms} ms (ahora_ms - t_capture_ms) > "
                 f"max_frame_age_ms {self.plazos['max_frame_age_ms']} ms"
             ]
             return self._stop_por_evento(evento, ahora_ms, "cuadro_viejo", detalle)
@@ -151,13 +155,15 @@ class Supervisor:
         """Fin del run. Se llena en T06 (#26)."""
 
     def _decidir(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
-        """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado, STOP."""
+        """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado,
+        STOP."""
         try:
             # Una copia: si la política cambia el estado y luego falla, el guardado no se toca.
             estado = copy.deepcopy(self.estado)
             decision, estado_nuevo = self.politica(evento, estado, self.config_politica)
             accion = {campo: decision[campo] for campo in CAMPOS_DE_LA_POLITICA}
-        except Exception as exc:  # cualquier falla de la política termina en STOP, no tumba el programa
+        except Exception as exc:
+            # Cualquier falla de la política termina en STOP, no tumba el programa.
             detalle = [f"{type(exc).__name__}: {exc}"]
             return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle)
 
@@ -181,7 +187,9 @@ class Supervisor:
             "valid_until_ms": ahora_ms + self.adaptador.validez_orden_ms,
         }
 
-    def _stop_por_error_del_detector(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
+    def _stop_por_error_del_detector(
+        self, evento: dict[str, Any], ahora_ms: float
+    ) -> dict[str, Any]:
         error = evento.get("error")
         codigo = error.get("code") if isinstance(error, dict) else None
         mensaje = error.get("message") if isinstance(error, dict) else None
@@ -230,7 +238,9 @@ class Supervisor:
             "t_decision_ms": ahora_ms,
         }
 
-    def _enviar(self, comando: dict[str, Any], estado_nuevo: Estado, ahora_ms: float) -> dict[str, Any]:
+    def _enviar(
+        self, comando: dict[str, Any], estado_nuevo: Estado, ahora_ms: float
+    ) -> dict[str, Any]:
         self.estado = estado_nuevo
         return self.adaptador.enviar(comando, ahora_ms)
 
@@ -245,7 +255,7 @@ class Supervisor:
             "errores": errores,
         }
         with self.ruta_errores.open("a", encoding="utf-8") as registro:
-            registro.write(json.dumps(linea, ensure_ascii=False) + "\n")
+            registro.write(json.dumps(linea, ensure_ascii=False, allow_nan=False) + "\n")
 
     @staticmethod
     def _id_del_evento(evento: Any, campo: str) -> str | None:

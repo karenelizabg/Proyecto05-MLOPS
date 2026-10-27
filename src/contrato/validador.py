@@ -9,7 +9,9 @@ monótono por secuencia y un solo modelo y configuración por run.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -34,8 +36,47 @@ def _donde(error: Any) -> str:
     return "/".join(str(p) for p in error.absolute_path) or "(evento)"
 
 
+def _numeros_no_finitos(valor: Any, ruta: str = "", activos: set[int] | None = None) -> list[str]:
+    """Encuentra números no finitos y ciclos antes de comparar rangos, cajas o tiempos."""
+    if (isinstance(valor, float) and not math.isfinite(valor)) or (
+        isinstance(valor, Decimal) and not valor.is_finite()
+    ):
+        return [f"{ruta or '(evento)'}: debe ser un número finito"]
+    if not isinstance(valor, (dict, list)):
+        return []
+
+    if activos is None:
+        activos = set()
+    identidad = id(valor)
+    if identidad in activos:
+        return [f"{ruta or '(evento)'}: estructura cíclica no permitida"]
+
+    activos.add(identidad)
+    try:
+        if isinstance(valor, dict):
+            return [
+                error
+                for clave, hijo in valor.items()
+                for error in _numeros_no_finitos(
+                    hijo, f"{ruta}/{clave}" if ruta else str(clave), activos
+                )
+            ]
+        return [
+            error
+            for indice, hijo in enumerate(valor)
+            for error in _numeros_no_finitos(
+                hijo, f"{ruta}/{indice}" if ruta else str(indice), activos
+            )
+        ]
+    finally:
+        activos.remove(identidad)
+
+
 def validar_evento(evento: Any, ruta_esquema: Path = RUTA_ESQUEMA) -> list[str]:
     """Devuelve los errores del evento; lista vacía si cumple el contrato."""
+    errores_numericos = _numeros_no_finitos(evento)
+    if errores_numericos:
+        return errores_numericos
     fallos = sorted(
         _validador(ruta_esquema).iter_errors(evento),
         key=lambda e: [str(p) for p in e.absolute_path],
