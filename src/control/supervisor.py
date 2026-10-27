@@ -8,7 +8,9 @@
    desconocidos y la razón perdería el código.
 3. Si `contrato.validar_evento` devuelve errores, STOP (`evento_invalido`).
 4. Si `status` es `stale`, STOP (`stale`): rechaza la entrada vieja y cancela la orden previa (C8).
-5. Si el evento es `ok`, llama a la política y manda su decisión al adaptador. Si la política lanza
+5. Si el cuadro `ok` es más viejo que `max_frame_age_ms` (`ahora_ms − t_capture_ms`), STOP
+   (`cuadro_viejo`): B lo rechaza por edad aunque A no lo haya marcado `stale` (DC-3, T05).
+6. Si el evento es `ok`, llama a la política y manda su decisión al adaptador. Si la política lanza
    una excepción (`politica_excepcion`) o su comando no cumple el contrato (`politica_invalida`),
    STOP. Un `ok` con `detections: []` no es error: sigue a la política.
 
@@ -19,7 +21,14 @@ GIRANDO_DER) más lo que la política necesite guardar, p. ej. `{"nombre": "AVAN
 "libres_seguidos": 0}`. El supervisor guarda el diccionario completo, se lo pasa a la política en el
 siguiente cuadro y usa `estado["nombre"]` para `state_before` y `state_after`. Empieza en
 `{"nombre": "DETENIDO"}`, y cada STOP del supervisor lo regresa ahí: se descartan los datos de la
-política para que no reanude con una cuenta vieja. `valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
+política para que no reanude con una cuenta vieja.
+
+`tick(ahora_ms)` es el watchdog (C8, T05): si la orden activa no es STOP y pasaron más de
+`watchdog_ms` desde el último cuadro aceptado (`watchdog_vencido`), o ya venció su
+`valid_until_ms` (`orden_vencida`), manda STOP con `event=clock` y `frame_id=null`. Lo manda una
+sola vez: con la orden activa ya en STOP, los siguientes ticks no repiten nada.
+
+`valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
 queda en `<carpeta del adaptador>/errores.jsonl` con `run_id` y `frame_id`. El supervisor no lee el
 reloj del sistema: todos los métodos reciben `ahora_ms`.
 """
@@ -77,6 +86,8 @@ class Supervisor:
         # Igual que comandos.jsonl: cada supervisor es una corrida y empieza sin errores.
         self.ruta_errores.write_text("", encoding="utf-8")
         self._ultimo_run_id = ID_DESCONOCIDO
+        # ahora_ms del último cuadro ok aceptado (no stale ni viejo); lo vigila el watchdog.
+        self._ultimo_cuadro_ms: float | None = None
 
     def procesar_evento(self, evento: Any, ahora_ms: float) -> dict[str, Any]:
         """Decide con un evento de percepción. Devuelve el comando que quedó registrado."""
@@ -100,10 +111,35 @@ class Supervisor:
             detalle = [f"status=stale: cuadro de {edad_ms} ms; se rechaza y se cancela la orden previa"]
             return self._stop_por_evento(evento, ahora_ms, "stale", detalle)
 
+        edad_ms = ahora_ms - evento["t_capture_ms"]
+        if edad_ms > self.plazos["max_frame_age_ms"]:
+            detalle = [
+                f"edad del cuadro {edad_ms} ms (ahora_ms − t_capture_ms) > "
+                f"max_frame_age_ms {self.plazos['max_frame_age_ms']} ms"
+            ]
+            return self._stop_por_evento(evento, ahora_ms, "cuadro_viejo", detalle)
+
+        self._ultimo_cuadro_ms = ahora_ms
         return self._decidir(evento, ahora_ms)
 
-    def tick(self, ahora_ms: float) -> None:
-        """Reloj y watchdog. Se llena en T05 (#25)."""
+    def tick(self, ahora_ms: float) -> dict[str, Any] | None:
+        """Watchdog. Devuelve el STOP de reloj si lo mandó; `None` si no hizo falta."""
+        activo = self.adaptador.activo
+        if activo is None or activo["action"] == "STOP":
+            return None
+
+        # Una orden activa sin cuadro registrado no debería pasar; si pasa, frena.
+        ultimo = self._ultimo_cuadro_ms if self._ultimo_cuadro_ms is not None else float("-inf")
+        sin_cuadro_ms = ahora_ms - ultimo
+        if sin_cuadro_ms > self.plazos["watchdog_ms"]:
+            detalle = [
+                f"{sin_cuadro_ms} ms sin cuadro nuevo > watchdog_ms {self.plazos['watchdog_ms']} ms"
+            ]
+            return self._stop_por_reloj(ahora_ms, "watchdog_vencido", detalle)
+        if ahora_ms > activo["valid_until_ms"]:
+            detalle = [f"la orden {activo['action']} valía hasta {activo['valid_until_ms']} ms"]
+            return self._stop_por_reloj(ahora_ms, "orden_vencida", detalle)
+        return None
 
     def emergencia(self, ahora_ms: float) -> None:
         """Paro de emergencia. Se llena en T06 (#26)."""
@@ -161,19 +197,34 @@ class Supervisor:
         frame_id = self._id_del_evento(evento, "frame_id") or ID_DESCONOCIDO
         self._registrar_error(run_id, frame_id, ahora_ms, motivo, errores)
 
+        return self._stop(run_id, frame_id, "frame", motivo, ahora_ms)
+
+    def _stop_por_reloj(self, ahora_ms: float, motivo: str, errores: list[str]) -> dict[str, Any]:
+        """STOP sin cuadro: `event=clock` y `frame_id=null`."""
+        self._registrar_error(self._ultimo_run_id, None, ahora_ms, motivo, errores)
+        return self._stop(self._ultimo_run_id, None, "clock", motivo, ahora_ms)
+
+    def _stop(
+        self, run_id: str, frame_id: str | None, evento: str, motivo: str, ahora_ms: float
+    ) -> dict[str, Any]:
         detenido = dict(ESTADO_INICIAL)
-        comando = self._comando(run_id, frame_id, detenido["nombre"], ahora_ms)
+        comando = self._comando(run_id, frame_id, detenido["nombre"], ahora_ms, evento)
         comando.update({"action": "STOP", "speed": 0, "steering": 0.0, "reason": motivo})
         return self._enviar(comando, detenido, ahora_ms)
 
     def _comando(
-        self, run_id: str, frame_id: str, nombre_nuevo: str, ahora_ms: float
+        self,
+        run_id: str,
+        frame_id: str | None,
+        nombre_nuevo: str,
+        ahora_ms: float,
+        evento: str = "frame",
     ) -> dict[str, Any]:
         return {
             "schema_version": VERSION_RECONOCIDA,
             "run_id": run_id,
             "frame_id": frame_id,
-            "event": "frame",
+            "event": evento,
             "state_before": self.estado["nombre"],
             "state_after": nombre_nuevo,
             "t_decision_ms": ahora_ms,
@@ -184,7 +235,7 @@ class Supervisor:
         return self.adaptador.enviar(comando, ahora_ms)
 
     def _registrar_error(
-        self, run_id: str, frame_id: str, ahora_ms: float, motivo: str, errores: list[str]
+        self, run_id: str, frame_id: str | None, ahora_ms: float, motivo: str, errores: list[str]
     ) -> None:
         linea = {
             "run_id": run_id,
