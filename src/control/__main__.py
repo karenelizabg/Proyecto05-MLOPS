@@ -14,16 +14,15 @@ política (`politica.decidir`) y el AdaptadorVirtual, y deja en la carpeta de sa
   contrato de comando (`comando_fuera_de_contrato`).
 - `run.json`: SHA-256 de la entrada y de la configuración, hashes del detector, versiones y conteos.
 
-Todo va enlazado por `run_id` y `frame_id`. El reloj es el `t_capture_ms` de cada evento: antes de
-cada cuadro se llama a `tick(ahora_ms)` y al final a `cerrar(ahora_ms)`. No se lee el reloj del
-sistema, así que la misma entrada deja siempre los mismos archivos.
+Todo va enlazado por `run_id` y `frame_id`. El reloj es el `t_emit_ms` de cada evento (cuando B
+recibe el cuadro), así funciona el rechazo por edad (`ahora_ms - t_capture_ms`, T05). Entre un
+cuadro y el siguiente se llama a `tick(ahora_ms)` cada `paso_reloj_ms` (plazos.yaml), para que el
+watchdog frene a tiempo aunque haya un hueco (C8); también justo antes de cada cuadro, y al final
+`cerrar(ahora_ms)`. No se lee el reloj del sistema, así que la misma entrada deja siempre los
+mismos archivos.
 
-Se corre desde la raíz del repo, y `--entrada`, `--config` y `--salida` deben quedar dentro de
-esa carpeta: una ruta con `..` o absoluta hacia otro lado se rechaza antes de leer o escribir.
-
-Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si una ruta sale de la
-carpeta de trabajo o la entrada o la configuración no se pueden leer (en ese caso no se escribe
-nada).
+Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si la entrada o la
+configuración no se pueden leer (en ese caso no se escribe nada).
 """
 
 from __future__ import annotations
@@ -32,7 +31,6 @@ import argparse
 import copy
 import hashlib
 import json
-import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -43,40 +41,28 @@ import yaml
 from contrato import leer_eventos, validar_comando
 
 from .adaptador_virtual import NOMBRE_REGISTRO, AdaptadorVirtual
-from .config import ErrorConfigPolitica, cargar_config_politica
+from .config import RAIZ, ErrorConfigPolitica, cargar_config_politica
 from .politica import decidir
 from .supervisor import NOMBRE_ERRORES, Estado, Politica, Supervisor
 
-# Relativa a la carpeta de trabajo (la raíz del repo).
-CARPETA_CONFIG = Path("config") / "control"
+CARPETA_CONFIG = RAIZ / "config" / "control"
 NOMBRE_PLAZOS = "plazos.yaml"
 NOMBRE_POLITICA = "politica.yaml"
 NOMBRE_DETECCIONES = "detecciones.jsonl"
 NOMBRE_DECISIONES = "decisiones.jsonl"
 NOMBRE_RUN = "run.json"
-PLAZOS = ("max_frame_age_ms", "detector_timeout_ms", "watchdog_ms", "validez_orden_ms")
+PLAZOS = (
+    "max_frame_age_ms",
+    "detector_timeout_ms",
+    "watchdog_ms",
+    "validez_orden_ms",
+    "paso_reloj_ms",
+)
 CAMPOS_DE_LA_POLITICA = ("action", "speed", "steering", "reason")
 
 
 class ErrorPlazos(ValueError):
     """plazos.yaml falta, no se puede leer o le falta un plazo."""
-
-
-class ErrorRuta(ValueError):
-    """Una ruta de la línea de comandos sale de la carpeta de trabajo."""
-
-
-def en_la_carpeta_de_trabajo(ruta: Path) -> Path:
-    """Devuelve `ruta` absoluta y resuelta, o lanza ErrorRuta si queda fuera de la carpeta de trabajo.
-
-    Se resuelven `..` y enlaces antes de comparar, así que `resultados/../../otro` no pasa. El
-    separador final evita aceptar una carpeta hermana con el mismo prefijo (`repo-otro`).
-    """
-    base = os.path.realpath(os.getcwd())
-    real = os.path.realpath(ruta)
-    if real != base and not real.startswith(base + os.sep):
-        raise ErrorRuta(f"{ruta}: debe quedar dentro de la carpeta de trabajo ({base})")
-    return Path(real)
 
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
@@ -121,6 +107,7 @@ class Corrida:
         politica: Politica = decidir,
     ) -> None:
         self.salida = Path(salida)
+        self.paso_reloj_ms = plazos["paso_reloj_ms"]
         self.adaptador = AdaptadorVirtual(self.salida, plazos["validez_orden_ms"])
         self.politica = PoliticaRegistrada(politica)
         self.supervisor = Supervisor(self.politica, self.adaptador, plazos, config_politica)
@@ -135,10 +122,13 @@ class Corrida:
         self.ahora_ms = 0.0
 
     def cuadro(self, evento: Any) -> None:
-        """Un evento del detector: tic de reloj y luego el supervisor decide con el cuadro."""
+        """Un evento del detector: tics de reloj hasta su llegada y luego el supervisor decide."""
         self.eventos += 1
-        self.ahora_ms = _reloj(evento, self.ahora_ms)
         _anexar(self.ruta_detecciones, evento)
+        llegada_ms = _reloj(evento, self.ahora_ms)
+        if self.eventos > 1:
+            self._tics_hasta(llegada_ms)
+        self.ahora_ms = llegada_ms
         self._registrar(self.supervisor.tick(self.ahora_ms), None)
         self.politica.propuesta = None
         comando = self.supervisor.procesar_evento(evento, self.ahora_ms)
@@ -146,6 +136,16 @@ class Corrida:
 
     def cerrar(self) -> None:
         self._registrar(self.supervisor.cerrar(self.ahora_ms), None)
+
+    def _tics_hasta(self, llegada_ms: float) -> None:
+        """Un tic cada `paso_reloj_ms` desde el cuadro anterior, sin llegar al siguiente."""
+        inicio_ms = self.ahora_ms
+        # Se multiplica en vez de sumar para no acumular error de coma flotante.
+        n = 1
+        while inicio_ms + n * self.paso_reloj_ms < llegada_ms:
+            self.ahora_ms = inicio_ms + n * self.paso_reloj_ms
+            self._registrar(self.supervisor.tick(self.ahora_ms), None)
+            n += 1
 
     def _registrar(self, comando: dict[str, Any] | None, propuesta: dict[str, Any] | None) -> None:
         """Valida el comando que quedó en el adaptador y escribe su decisión."""
@@ -195,10 +195,10 @@ class Corrida:
         eventos = [e for e in detecciones if isinstance(e, dict)]
         resumen = {
             "run_ids": _distintos(eventos, "run_id"),
-            "entrada": {"ruta": _relativa(entrada), "sha256": _sha256(entrada)},
+            "entrada": {"ruta": entrada.as_posix(), "sha256": _sha256(entrada)},
             "config": {
                 nombre: {
-                    "ruta": _relativa(carpeta_config / nombre),
+                    "ruta": (carpeta_config / nombre).as_posix(),
                     "sha256": _sha256(carpeta_config / nombre),
                 }
                 for nombre in (NOMBRE_PLAZOS, NOMBRE_POLITICA)
@@ -227,8 +227,8 @@ class Corrida:
 
 
 def _reloj(evento: Any, anterior_ms: float) -> float:
-    """`t_capture_ms` del evento; si no trae uno válido, se queda el instante anterior."""
-    t = evento.get("t_capture_ms") if isinstance(evento, dict) else None
+    """`t_emit_ms` del evento; si no trae uno válido, se queda el instante anterior."""
+    t = evento.get("t_emit_ms") if isinstance(evento, dict) else None
     if isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 0:
         return float(t)
     return anterior_ms
@@ -242,11 +242,6 @@ def _anexar(ruta: Path, linea: Any) -> None:
 def _leer_jsonl(ruta: Path) -> list[Any]:
     texto = ruta.read_text(encoding="utf-8")
     return [json.loads(linea) for linea in texto.splitlines() if linea.strip()]
-
-
-def _relativa(ruta: Path) -> str:
-    """Para run.json: la ruta vista desde la carpeta de trabajo, igual en cualquier máquina."""
-    return Path(os.path.relpath(ruta)).as_posix()
 
 
 def _sha256(ruta: Path) -> str:
@@ -265,20 +260,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--entrada", type=Path, required=True, help="eventos .json o .jsonl")
     parser.add_argument(
-        "--config", type=Path, default=CARPETA_CONFIG, help="carpeta con plazos.yaml y politica.yaml"
+        "--config",
+        type=Path,
+        default=CARPETA_CONFIG,
+        help="carpeta con plazos.yaml y politica.yaml",
     )
     parser.add_argument("--salida", type=Path, required=True, help="carpeta de resultados del run")
     args = parser.parse_args(argv)
 
-    # Rutas, entrada y configuración se revisan antes de crear la salida: si algo falla, no
-    # queda una corrida a medias.
-    try:
-        entrada = en_la_carpeta_de_trabajo(args.entrada)
-        carpeta_config = en_la_carpeta_de_trabajo(args.config)
-        salida = en_la_carpeta_de_trabajo(args.salida)
-    except ErrorRuta as exc:
-        print(f"ruta no permitida: {exc}", file=sys.stderr)
-        return 2
+    entrada, carpeta_config, salida = args.entrada, args.config, args.salida
+    # Entrada y configuración se leen antes de crear la salida: si algo falla, no queda una
+    # corrida a medias.
     try:
         plazos = cargar_plazos(carpeta_config / NOMBRE_PLAZOS)
         config_politica = cargar_config_politica(carpeta_config / NOMBRE_POLITICA)
@@ -294,7 +286,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     conteos = corrida.escribir_run(entrada, carpeta_config)["conteos"]
 
     print(
-        f"{_relativa(salida)}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
+        f"{salida}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
         f"{conteos['errores']} errores"
     )
     if corrida.invalidos:

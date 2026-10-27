@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import json
 import os
 import shutil
@@ -7,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 import control.__main__ as correr
 from contrato import leer_eventos, validar_comando
@@ -14,17 +16,10 @@ from control import Supervisor
 from control.__main__ import main
 
 RAIZ = Path(__file__).resolve().parents[1]
-# Relativas a la carpeta de trabajo: cada prueba corre en una copia de config/ (ver abajo).
-FLUJO = Path("config") / "contrato" / "ejemplos" / "flujo.jsonl"
-CONFIG = Path("config") / "control"
+FLUJO = RAIZ / "config" / "contrato" / "ejemplos" / "flujo.jsonl"
+CONFIG = RAIZ / "config" / "control"
+PASO_MS = yaml.safe_load((CONFIG / "plazos.yaml").read_text(encoding="utf-8"))["paso_reloj_ms"]
 ARCHIVOS = ("detecciones.jsonl", "decisiones.jsonl", "comandos.jsonl", "errores.jsonl")
-
-
-@pytest.fixture(autouse=True)
-def carpeta_de_trabajo(tmp_path, monkeypatch):
-    """El comando solo acepta rutas dentro de la carpeta de trabajo: se corre en tmp_path."""
-    shutil.copytree(RAIZ / "config", tmp_path / "config")
-    monkeypatch.chdir(tmp_path)
 
 
 def leer(ruta: Path) -> list[dict]:
@@ -33,6 +28,28 @@ def leer(ruta: Path) -> list[dict]:
 
 def correr_flujo(salida: Path, entrada: Path = FLUJO) -> int:
     return main(["--entrada", str(entrada), "--config", str(CONFIG), "--salida", str(salida)])
+
+
+def escribir(ruta: Path, eventos: list[dict]) -> Path:
+    ruta.write_text("".join(json.dumps(e) + "\n" for e in eventos), encoding="utf-8")
+    return ruta
+
+
+def con_hueco(tmp_path: Path) -> Path:
+    """Dos cuadros despejados que B recibe a los 200 y a los 1800 ms: un hueco de 1600 ms."""
+    base = leer_eventos(FLUJO)[0]
+    eventos = [
+        {**base, "frame_id": "S02_f0001", "t_capture_ms": 160, "t_emit_ms": 200},
+        {**base, "frame_id": "S02_f0002", "t_capture_ms": 1760, "t_emit_ms": 1800},
+    ]
+    return escribir(tmp_path / "hueco.jsonl", eventos)
+
+
+def espiar_reloj(monkeypatch) -> list[tuple[str, float]]:
+    llamadas: list[tuple[str, float]] = []
+    monkeypatch.setattr(Supervisor, "tick", lambda self, t: llamadas.append(("tick", t)))
+    monkeypatch.setattr(Supervisor, "cerrar", lambda self, t: llamadas.append(("cerrar", t)))
+    return llamadas
 
 
 @pytest.fixture
@@ -90,12 +107,6 @@ def test_decisiones_del_flujo(salida):
     assert decisiones[3]["propuesta_politica"] is None
 
 
-def test_el_reloj_es_t_capture_ms(salida):
-    eventos = leer_eventos(FLUJO)
-    comandos = leer(salida / "comandos.jsonl")
-    assert [c["t_command_ms"] for c in comandos] == [e["t_capture_ms"] for e in eventos]
-
-
 def test_errores_del_flujo(salida):
     errores = leer(salida / "errores.jsonl")
     assert [(e["frame_id"], e["motivo"]) for e in errores] == [
@@ -135,22 +146,61 @@ def test_correr_dos_veces_en_la_misma_carpeta_no_mezcla(salida):
         assert len(leer(salida / nombre)) == lineas, nombre
 
 
-# --- reloj: tick entre cuadros y cerrar al final -----------------------------
+def test_entrada_y_salida_en_cualquier_carpeta(tmp_path):
+    """El evaluador puede usar sus propias carpetas, fuera del repo."""
+    entrada = tmp_path / "evaluador" / "entrada" / "eventos.jsonl"
+    entrada.parent.mkdir(parents=True)
+    shutil.copy(FLUJO, entrada)
+    salida = tmp_path / "evaluador" / "salida" / "run-01"
+    assert correr_flujo(salida, entrada) == 0
+    assert len(leer(salida / "comandos.jsonl")) == 5
 
 
-def test_tick_antes_de_cada_cuadro_y_cerrar_al_final(tmp_path, monkeypatch):
-    llamadas = []
-    monkeypatch.setattr(Supervisor, "tick", lambda self, t: llamadas.append(("tick", t)))
-    monkeypatch.setattr(Supervisor, "cerrar", lambda self, t: llamadas.append(("cerrar", t)))
+# --- reloj: t_emit_ms, tics cada paso_reloj_ms y cerrar al final ------------------
+
+
+def test_el_reloj_es_t_emit_ms(salida):
+    eventos = leer_eventos(FLUJO)
+    comandos = leer(salida / "comandos.jsonl")
+    assert [c["t_command_ms"] for c in comandos] == [e["t_emit_ms"] for e in eventos]
+
+
+def test_tics_entre_cuadros_y_cerrar_al_final(tmp_path, monkeypatch):
+    llamadas = espiar_reloj(monkeypatch)
     assert correr_flujo(tmp_path / "s") == 0
-    assert llamadas == [("tick", t) for t in (0, 200, 400, 600, 800)] + [("cerrar", 800)]
+    tics = [t for nombre, t in llamadas if nombre == "tick"]
+    llegadas = [e["t_emit_ms"] for e in leer_eventos(FLUJO)]
+
+    assert tics == sorted(tics)
+    assert set(llegadas) <= set(tics)  # un tic justo antes de cada cuadro
+    assert all(b - a <= PASO_MS + 1e-9 for a, b in itertools.pairwise(tics))
+    assert llamadas[-1] == ("cerrar", llegadas[-1])
+    assert [n for n, _ in llamadas].count("cerrar") == 1
 
 
-def test_el_stop_de_reloj_queda_registrado(tmp_path, monkeypatch):
-    """Cuando tick() mande su STOP (T05), queda en comandos y decisiones con frame_id null."""
+def test_hueco_de_200_a_1800_tiene_tics_cada_paso(tmp_path, monkeypatch):
+    llamadas = espiar_reloj(monkeypatch)
+    assert correr_flujo(tmp_path / "s", con_hueco(tmp_path)) == 0
+    tics = [t for nombre, t in llamadas if nombre == "tick"]
+    assert tics == pytest.approx([200.0 + PASO_MS * n for n in range(int(1600 / PASO_MS) + 1)])
+
+
+def test_sin_tics_si_el_reloj_no_avanza(tmp_path, monkeypatch):
+    base = leer_eventos(FLUJO)[0]
+    eventos = [
+        {**base, "frame_id": "S02_f0001", "t_emit_ms": 500},
+        {**base, "frame_id": "S02_f0002", "t_emit_ms": 100},  # otra secuencia: reloj atrás
+    ]
+    llamadas = espiar_reloj(monkeypatch)
+    assert correr_flujo(tmp_path / "s", escribir(tmp_path / "e.jsonl", eventos)) == 0
+    assert llamadas == [("tick", 500.0), ("tick", 100.0), ("cerrar", 100.0)]
+
+
+def test_el_stop_de_reloj_sale_a_tiempo_en_un_hueco(tmp_path, monkeypatch):
+    """Con un watchdog que vence a los 800 ms (como T05), el STOP sale a los 800, no a los 1800."""
 
     def tick(self, ahora_ms):
-        if ahora_ms != 400:
+        if ahora_ms < 800 or self.estado["nombre"] == "DETENIDO":
             return None
         comando = {
             "schema_version": "1",
@@ -170,12 +220,32 @@ def test_el_stop_de_reloj_queda_registrado(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Supervisor, "tick", tick)
     salida = tmp_path / "s"
-    assert correr_flujo(salida) == 0
+    assert correr_flujo(salida, con_hueco(tmp_path)) == 0
+
     reloj = [d for d in leer(salida / "decisiones.jsonl") if d["event"] == "clock"]
     assert len(reloj) == 1
+    assert reloj[0]["t_ms"] == pytest.approx(800.0)
     assert reloj[0]["frame_id"] is None
     assert reloj[0]["decidio"] == "supervisor"
-    assert len(leer(salida / "comandos.jsonl")) == 6
+    comandos = leer(salida / "comandos.jsonl")
+    assert [c["action"] for c in comandos] == ["AVANZAR", "STOP", "AVANZAR"]
+    assert all(validar_comando(c) == [] for c in comandos)
+
+
+def test_rechazo_por_edad_usa_t_emit_ms(tmp_path, monkeypatch):
+    """El supervisor recibe ahora_ms = t_emit_ms, así puede medir la edad del cuadro (T05)."""
+    edades = []
+    original = Supervisor.procesar_evento
+
+    def procesar(self, evento, ahora_ms):
+        edades.append(ahora_ms - evento["t_capture_ms"])
+        return original(self, evento, ahora_ms)
+
+    monkeypatch.setattr(Supervisor, "procesar_evento", procesar)
+    assert correr_flujo(tmp_path / "s") == 0
+    assert edades == pytest.approx(
+        [e["t_emit_ms"] - e["t_capture_ms"] for e in leer_eventos(FLUJO)]
+    )
 
 
 # --- fallas --------------------------------------------------------------------
@@ -211,7 +281,7 @@ def test_entrada_que_no_es_json_sale_2(tmp_path):
     ],
 )
 def test_configuracion_mala_sale_2(tmp_path, archivo, contenido):
-    config = tmp_path / "config_mala"
+    config = tmp_path / "config"
     shutil.copytree(CONFIG, config)
     if contenido is None:
         (config / archivo).unlink()
@@ -222,44 +292,32 @@ def test_configuracion_mala_sale_2(tmp_path, archivo, contenido):
     assert not salida.exists()
 
 
-@pytest.mark.parametrize("opcion", ["--entrada", "--config", "--salida"])
-@pytest.mark.parametrize("como", ["con_puntos", "absoluta"])
-def test_ruta_fuera_de_la_carpeta_de_trabajo_sale_2(tmp_path, opcion, como):
-    # Hermana con el mismo prefijo: "<carpeta>-otro" empieza igual que "<carpeta>".
-    fuera = tmp_path.parent / f"{tmp_path.name}-otro"
-    # Una copia real fuera de la carpeta de trabajo: se rechaza aunque exista y sea válida.
-    shutil.copytree(tmp_path / "config", fuera / "config")
-    destino = {
-        "--entrada": fuera / FLUJO,
-        "--config": fuera / CONFIG,
-        "--salida": fuera / "resultados",
-    }[opcion]
-    ruta = destino if como == "absoluta" else Path("..") / destino.relative_to(tmp_path.parent)
-    args = {"--entrada": str(FLUJO), "--config": str(CONFIG), "--salida": "resultados/s"}
-    args[opcion] = str(ruta)
-    try:
-        assert main([x for par in args.items() for x in par]) == 2
-        assert not (fuera / "resultados").exists()
-        assert not (tmp_path / "resultados").exists()
-    finally:
-        shutil.rmtree(fuera)
-
-
-def test_rutas_relativas_dentro_de_la_carpeta_de_trabajo(tmp_path):
-    salida = Path("resultados") / "otra" / ".." / "ejemplo-01"
-    assert correr_flujo(salida) == 0
-    run = json.loads((tmp_path / "resultados" / "ejemplo-01" / "run.json").read_text("utf-8"))
-    assert run["entrada"]["ruta"] == FLUJO.as_posix()
-    assert run["config"]["plazos.yaml"]["ruta"] == (CONFIG / "plazos.yaml").as_posix()
+@pytest.mark.parametrize("valor", [0, -100, "100", True])
+def test_paso_reloj_invalido_sale_2(tmp_path, valor):
+    config = tmp_path / "config"
+    shutil.copytree(CONFIG, config)
+    plazos = yaml.safe_load((config / "plazos.yaml").read_text(encoding="utf-8"))
+    plazos["paso_reloj_ms"] = valor
+    (config / "plazos.yaml").write_text(yaml.safe_dump(plazos), encoding="utf-8")
+    assert (
+        main(["--entrada", str(FLUJO), "--config", str(config), "--salida", str(tmp_path / "s")])
+        == 2
+    )
 
 
 def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
     eventos = leer_eventos(FLUJO)[:1]
-    eventos.append({**eventos[0], "frame_id": "S02_f0002", "t_capture_ms": 200, "status": "raro"})
-    entrada = tmp_path / "e.jsonl"
-    entrada.write_text("".join(json.dumps(e) + "\n" for e in eventos), encoding="utf-8")
+    eventos.append(
+        {
+            **eventos[0],
+            "frame_id": "S02_f0002",
+            "t_capture_ms": 200,
+            "t_emit_ms": 230,
+            "status": "raro",
+        }
+    )
     salida = tmp_path / "s"
-    assert correr_flujo(salida, entrada) == 0
+    assert correr_flujo(salida, escribir(tmp_path / "e.jsonl", eventos)) == 0
     ultimo = leer(salida / "comandos.jsonl")[-1]
     assert (ultimo["frame_id"], ultimo["action"]) == ("S02_f0002", "STOP")
 
@@ -267,13 +325,26 @@ def test_un_evento_invalido_tambien_llega_a_un_stop(tmp_path):
 # --- línea de comandos real ----------------------------------------------------
 
 
-def test_python_m_control_desde_la_carpeta_de_trabajo(tmp_path):
-    salida = Path("resultados") / "s"
-    entorno = {**os.environ, "PYTHONPATH": str(RAIZ / "src")}
+def test_python_m_control_desde_la_raiz(tmp_path):
+    salida = tmp_path / "s"
+    entorno = {**os.environ, "PYTHONPATH": "src"}
     proceso = subprocess.run(
-        [sys.executable, "-m", "control", "--entrada", str(FLUJO), "--config", "config/control/",
-         "--salida", str(salida)],
-        cwd=tmp_path, env=entorno, capture_output=True, text=True, check=False,
+        [
+            sys.executable,
+            "-m",
+            "control",
+            "--entrada",
+            str(FLUJO),
+            "--config",
+            "config/control/",
+            "--salida",
+            str(salida),
+        ],
+        cwd=RAIZ,
+        env=entorno,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert proceso.returncode == 0, proceso.stderr
     assert "5 eventos, 5 comandos, 2 errores" in proceso.stdout
