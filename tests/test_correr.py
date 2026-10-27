@@ -225,7 +225,8 @@ def test_configuracion_mala_sale_2(tmp_path, archivo, contenido):
 @pytest.mark.parametrize("opcion", ["--entrada", "--config", "--salida"])
 @pytest.mark.parametrize("como", ["con_puntos", "absoluta"])
 def test_ruta_fuera_de_la_carpeta_de_trabajo_sale_2(tmp_path, opcion, como):
-    fuera = tmp_path.parent / f"fuera_{tmp_path.name}"
+    # Hermana con el mismo prefijo: "<carpeta>-otro" empieza igual que "<carpeta>".
+    fuera = tmp_path.parent / f"{tmp_path.name}-otro"
     # Una copia real fuera de la carpeta de trabajo: se rechaza aunque exista y sea válida.
     shutil.copytree(tmp_path / "config", fuera / "config")
     destino = {

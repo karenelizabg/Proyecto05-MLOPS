@@ -67,19 +67,16 @@ class ErrorRuta(ValueError):
 
 
 def en_la_carpeta_de_trabajo(ruta: Path) -> Path:
-    """Devuelve `ruta` relativa a la carpeta de trabajo, o lanza ErrorRuta si queda fuera de ella.
+    """Devuelve `ruta` absoluta y resuelta, o lanza ErrorRuta si queda fuera de la carpeta de trabajo.
 
-    Se resuelven `..` y enlaces antes de comparar, así que `resultados/../../otro` no pasa.
+    Se resuelven `..` y enlaces antes de comparar, así que `resultados/../../otro` no pasa. El
+    separador final evita aceptar una carpeta hermana con el mismo prefijo (`repo-otro`).
     """
     base = os.path.realpath(os.getcwd())
     real = os.path.realpath(ruta)
-    try:
-        dentro = os.path.commonpath([base, real]) == base
-    except ValueError:  # En Windows, otra unidad (C: contra D:).
-        dentro = False
-    if not dentro:
+    if real != base and not real.startswith(base + os.sep):
         raise ErrorRuta(f"{ruta}: debe quedar dentro de la carpeta de trabajo ({base})")
-    return Path(os.path.relpath(real, base))
+    return Path(real)
 
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
@@ -198,10 +195,10 @@ class Corrida:
         eventos = [e for e in detecciones if isinstance(e, dict)]
         resumen = {
             "run_ids": _distintos(eventos, "run_id"),
-            "entrada": {"ruta": entrada.as_posix(), "sha256": _sha256(entrada)},
+            "entrada": {"ruta": _relativa(entrada), "sha256": _sha256(entrada)},
             "config": {
                 nombre: {
-                    "ruta": (carpeta_config / nombre).as_posix(),
+                    "ruta": _relativa(carpeta_config / nombre),
                     "sha256": _sha256(carpeta_config / nombre),
                 }
                 for nombre in (NOMBRE_PLAZOS, NOMBRE_POLITICA)
@@ -245,6 +242,11 @@ def _anexar(ruta: Path, linea: Any) -> None:
 def _leer_jsonl(ruta: Path) -> list[Any]:
     texto = ruta.read_text(encoding="utf-8")
     return [json.loads(linea) for linea in texto.splitlines() if linea.strip()]
+
+
+def _relativa(ruta: Path) -> str:
+    """Para run.json: la ruta vista desde la carpeta de trabajo, igual en cualquier máquina."""
+    return Path(os.path.relpath(ruta)).as_posix()
 
 
 def _sha256(ruta: Path) -> str:
@@ -292,7 +294,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     conteos = corrida.escribir_run(entrada, carpeta_config)["conteos"]
 
     print(
-        f"{salida}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
+        f"{_relativa(salida)}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "
         f"{conteos['errores']} errores"
     )
     if corrida.invalidos:
