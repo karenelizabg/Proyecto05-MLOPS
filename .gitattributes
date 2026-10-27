@@ -1,0 +1,10 @@
+# Texto en LF dentro del repo y en la carpeta de trabajo, también en Windows:
+# un .sh con CRLF no corre en bash, y los hashes de JSON/CSV/YAML deben coincidir entre máquinas.
+* text=auto eol=lf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.onnx binary
+*.pt binary
+*.pth binary

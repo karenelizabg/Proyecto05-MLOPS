@@ -7,8 +7,28 @@
 __pycache__/
 *.pyc
 .venv/
+*.egg-info/
+build/
+dist/
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
-# Sistema
+# Datos pesados. Los cuadros extraídos, anotaciones, resultados y mediciones SÍ se suben
+# (son entregables); el video crudo no: la guía pide imágenes y el video no las sustituye.
+*.mp4
+*.mov
+*.avi
+*.mkv
+datos/crudo/
+# Pesos descargados por script (P5-07); si los pesos van en Git, se suben sin esta carpeta.
+modelo/descargas/
+# Corridas locales de prueba que no forman parte de la entrega.
+tmp/
+
+# Sistema y editores
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/

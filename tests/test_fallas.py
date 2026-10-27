@@ -16,7 +16,12 @@ RAIZ = Path(__file__).resolve().parents[1]
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 PLAZOS = yaml.safe_load((RAIZ / "config" / "control" / "plazos.yaml").read_text(encoding="utf-8"))
 
-CODIGOS_DEL_CONTRATO = ["unreadable_image", "detector_exception", "detector_timeout", "invalid_output"]
+CODIGOS_DEL_CONTRATO = [
+    "unreadable_image",
+    "detector_exception",
+    "detector_timeout",
+    "invalid_output",
+]
 
 
 def evento(nombre: str, **cambios) -> dict:
@@ -77,8 +82,9 @@ def test_el_ejemplo_fallido_del_contrato_da_stop(tmp_path):
     nuevo_supervisor(tmp_path).procesar_evento(evento("fallido.json"), ahora_ms=610.0)
 
     assert_stop_registrado(tmp_path, "error_detector:unreadable_image", "S02_f0004")
-    assert "error.message: 'No se pudo decodificar el cuadro (JPEG truncado).'" in (
-        errores(tmp_path)[0]["errores"]
+    assert (
+        "error.message: 'No se pudo decodificar el cuadro (JPEG truncado).'"
+        in (errores(tmp_path)[0]["errores"])
     )
 
 
@@ -102,7 +108,7 @@ def test_los_errores_del_detector_no_llegan_a_la_politica(tmp_path):
         raise AssertionError("la política no debe ver errores del detector")
 
     supervisor = nuevo_supervisor(tmp_path, politica)
-    for codigo in CODIGOS_DEL_CONTRATO + ["camara_en_llamas"]:
+    for codigo in [*CODIGOS_DEL_CONTRATO, "camara_en_llamas"]:
         supervisor.procesar_evento(fallido(codigo), ahora_ms=610.0)
 
     assert [c["action"] for c in comandos(tmp_path)] == ["STOP"] * 5
@@ -146,12 +152,30 @@ def test_politica_que_lanza_excepcion_da_stop(tmp_path):
 
 RESPUESTAS_INVALIDAS = {
     "sin action": ({"speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
-    "action inventada": ({"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
-    "avanzar sin velocidad": ({"action": "AVANZAR", "speed": 0, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
-    "velocidad fuera de rango": ({"action": "AVANZAR", "speed": 3, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
-    "estado como texto": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
-    "estado sin nombre": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"libres_seguidos": 1}),
-    "nombre inventado": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "VOLANDO"}),
+    "action inventada": (
+        {"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"},
+        {"nombre": "AVANZANDO"},
+    ),
+    "avanzar sin velocidad": (
+        {"action": "AVANZAR", "speed": 0, "steering": 0.0, "reason": "x"},
+        {"nombre": "AVANZANDO"},
+    ),
+    "velocidad fuera de rango": (
+        {"action": "AVANZAR", "speed": 3, "steering": 0.0, "reason": "x"},
+        {"nombre": "AVANZANDO"},
+    ),
+    "estado como texto": (
+        {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"},
+        "AVANZANDO",
+    ),
+    "estado sin nombre": (
+        {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"},
+        {"libres_seguidos": 1},
+    ),
+    "nombre inventado": (
+        {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"},
+        {"nombre": "VOLANDO"},
+    ),
     "no es una tupla": ("AVANZAR", None),
     "None": None,
 }
@@ -176,7 +200,9 @@ def test_politica_que_devuelve_algo_invalido_da_stop(tmp_path, respuesta):
 
 def test_politica_invalida_registra_el_detalle(tmp_path):
     def politica(ev, estado, config):
-        return {"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}
+        return {"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {
+            "nombre": "AVANZANDO"
+        }
 
     nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
 
@@ -186,7 +212,9 @@ def test_politica_invalida_registra_el_detalle(tmp_path):
 
 def test_un_estado_fuera_de_lo_acordado_registra_el_detalle(tmp_path):
     def politica(ev, estado, config):
-        return {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "VOLANDO"}
+        return {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {
+            "nombre": "VOLANDO"
+        }
 
     nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
 
