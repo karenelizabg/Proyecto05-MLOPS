@@ -21,6 +21,10 @@ watchdog frene a tiempo aunque haya un hueco (C8); también justo antes de cada 
 `cerrar(ahora_ms)`. No se lee el reloj del sistema, así que la misma entrada deja siempre los
 mismos archivos.
 
+Las rutas de `--entrada`, `--config` y `--salida` las elige quien corre el comando y pueden estar
+en cualquier carpeta (el evaluador usa las suyas). Por eso las lecturas y escrituras con esas rutas
+llevan `NOSONAR (S8707)`: no hay una carpeta base contra la cual limitarlas.
+
 Salida: 0 si todos los comandos cumplen el contrato, 1 si alguno no, 2 si la entrada o la
 configuración no se pueden leer (en ese caso no se escribe nada).
 """
@@ -67,7 +71,7 @@ class ErrorPlazos(ValueError):
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
     """Lee plazos.yaml y revisa que cada plazo sea un número > 0."""
-    datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))  # NOSONAR (S8707)
     if not isinstance(datos, dict):
         raise ErrorPlazos(f"{ruta}: debe ser un mapa clave: valor")
     malos = [
@@ -114,8 +118,8 @@ class Corrida:
         # Igual que comandos.jsonl y errores.jsonl: cada corrida empieza con los registros vacíos.
         self.ruta_detecciones = self.salida / NOMBRE_DETECCIONES
         self.ruta_decisiones = self.salida / NOMBRE_DECISIONES
-        self.ruta_detecciones.write_text("", encoding="utf-8")
-        self.ruta_decisiones.write_text("", encoding="utf-8")
+        self.ruta_detecciones.write_text("", encoding="utf-8")  # NOSONAR (S8707)
+        self.ruta_decisiones.write_text("", encoding="utf-8")  # NOSONAR (S8707)
         self.eventos = 0
         self.comandos = 0
         self.invalidos = 0
@@ -245,7 +249,7 @@ def _leer_jsonl(ruta: Path) -> list[Any]:
 
 
 def _sha256(ruta: Path) -> str:
-    return hashlib.sha256(ruta.read_bytes()).hexdigest()
+    return hashlib.sha256(ruta.read_bytes()).hexdigest()  # NOSONAR (S8707)
 
 
 def _distintos(eventos: list[dict[str, Any]], campo: str) -> list[str]:
