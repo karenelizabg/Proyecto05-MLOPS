@@ -3,6 +3,7 @@
 - T08 (#28): `zonas_ocupadas` dice en qué zonas (izquierda, centro, derecha) hay obstáculo.
 - T09 (#29): `decidir` convierte el evento en un comando AVANZAR / GIRAR_IZQ / GIRAR_DER / STOP.
 - T10 (#30): las detecciones con poca confianza no cuentan y quedan en `reason`.
+- T11 (#31): histéresis; tras un STOP por obstáculo reanuda solo con N cuadros libres seguidos.
 """
 
 from __future__ import annotations
@@ -117,6 +118,12 @@ ESTADO_POR_ACCION = {
 
 NOMBRE_ZONA = {"izq": "la izquierda", "centro": "el centro", "der": "la derecha"}
 
+# Histéresis (T11): claves que la política guarda en el estado.
+# - "esperando_libres": true después de un STOP por obstáculo, hasta que reanuda.
+# - "libres_seguidos": cuántos cuadros ok seguidos sin obstáculo en el camino lleva.
+ESPERANDO_LIBRES = "esperando_libres"
+LIBRES_SEGUIDOS = "libres_seguidos"
+
 
 def _nombre_de(estado: Mapping[str, Any]) -> str:
     """Nombre del estado recibido. Sin "nombre" o con uno desconocido se toma DETENIDO."""
@@ -136,10 +143,11 @@ def _comando(
     razon: str,
     speed: float,
     steering: float,
+    extra: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     # Copia: conserva lo que traiga el estado (p. ej. contadores) y nunca modifica el original.
     previo = estado if isinstance(estado, Mapping) else {}
-    nuevo = {**previo, "nombre": ESTADO_POR_ACCION[accion]}
+    nuevo = {**previo, **(extra or {}), "nombre": ESTADO_POR_ACCION[accion]}
     t = evento.get("t_capture_ms")
     comando = {
         "schema_version": "1",
@@ -224,7 +232,7 @@ def _regla_de_zonas(
 def decidir(
     evento: Mapping[str, Any], estado: Mapping[str, Any], config: ConfigPolitica
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Decide el comando para un evento de percepción (casos C1 a C6). Función pura.
+    """Decide el comando para un evento de percepción (casos C1 a C7). Función pura.
 
     `estado` es un diccionario con la clave "nombre" (empieza en `ESTADO_INICIAL`).
     Devuelve `(comando, estado_nuevo)`: el estado nuevo es una copia con el "nombre" según
@@ -242,6 +250,11 @@ def decidir(
 
     Las detecciones con confianza debajo de `umbral_confianza` no cuentan y se mencionan en
     `reason` como `ignorada_por_confianza` (C6, T10).
+
+    Histéresis (C7, T11): después de un STOP por obstáculo sigue en STOP, con `reason`
+    `esperando_cuadros_libres k/N`, hasta ver N cuadros libres seguidos
+    (`cuadros_libres_para_reanudar`). Lo lleva en el estado: `esperando_libres` y
+    `libres_seguidos`.
 
     STOP siempre lleva speed=0 y steering=0. No lee el reloj: `t_decision_ms` es el
     `t_capture_ms` del evento.
@@ -271,10 +284,68 @@ def decidir(
             f" ignorada_por_confianza: {detalle} (umbral {config.umbral_confianza:g};"
             " no es falla de percepción)."
         )
-    return _comando(evento, estado, accion, razon, speed, steering)
+    return _con_histeresis(evento, estado, config, accion, razon, speed, steering)
+
+
+def _con_histeresis(
+    evento: Mapping[str, Any],
+    estado: Mapping[str, Any],
+    config: ConfigPolitica,
+    accion: str,
+    razon: str,
+    speed: float,
+    steering: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Histéresis (T11, C7): tras un STOP por obstáculo, reanuda solo con N cuadros libres.
+
+    - Un STOP por obstáculo empieza la espera (`esperando_libres: true`, contador en 0).
+    - Mientras espera, la política sigue en STOP. Cada cuadro con el centro libre suma 1;
+      un cuadro con el centro ocupado regresa el contador a 0, así que un solo cuadro libre
+      en medio de un bloqueo no reanuda.
+    - Al llegar a `cuadros_libres_para_reanudar` cuadros libres seguidos, AVANZAR.
+    """
+    n = config.cuadros_libres_para_reanudar
+    if not _esperando(estado):
+        if accion == "STOP":
+            extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+            return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+        extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
+        return _comando(evento, estado, accion, razon, speed, steering, extra)
+
+    if accion != "AVANZAR":
+        # Camino bloqueado otra vez: la racha de cuadros libres se corta.
+        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+        return _comando(
+            evento, estado, "STOP", f"esperando_cuadros_libres 0/{n}: {razon}", 0, 0, extra
+        )
+
+    libres = _libres(estado) + 1
+    if libres < n:
+        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: libres}
+        return _comando(
+            evento, estado, "STOP", f"esperando_cuadros_libres {libres}/{n}: {razon}", 0, 0, extra
+        )
+    extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
+    razon = f"Reanuda tras {libres}/{n} cuadros libres seguidos. {razon}"
+    return _comando(evento, estado, "AVANZAR", razon, speed, steering, extra)
 
 
 def _stop(
     evento: Mapping[str, Any], estado: Mapping[str, Any], razon: str
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    return _comando(evento, estado, "STOP", razon, 0, 0)
+    """STOP por pérdida de percepción o evento inválido.
+
+    Si la política estaba esperando cuadros libres (T11), la racha se corta: un cuadro que
+    no se pudo ver no cuenta como libre.
+    """
+    extra = {LIBRES_SEGUIDOS: 0} if _esperando(estado) else None
+    return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+
+
+def _esperando(estado: Mapping[str, Any]) -> bool:
+    return isinstance(estado, Mapping) and estado.get(ESPERANDO_LIBRES) is True
+
+
+def _libres(estado: Mapping[str, Any]) -> int:
+    valor = estado.get(LIBRES_SEGUIDOS, 0) if isinstance(estado, Mapping) else 0
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) and valor >= 0 else 0
