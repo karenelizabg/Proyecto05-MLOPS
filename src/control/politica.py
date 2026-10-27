@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
 from contrato import validar_evento
@@ -96,19 +95,32 @@ def zonas_ocupadas(evento: Mapping[str, Any], config: ConfigPolitica) -> set[str
 
 # --- T09: decisión ---------------------------------------------------------------------
 
-# Nombres de estado acordados con Luis (contrato de comando). Girar también es moverse,
-# así que GIRAR_IZQ / GIRAR_DER dejan el estado en AVANZANDO.
+# Estado de la política: un diccionario con la clave "nombre" (acuerdo del grupo B) más lo
+# que la política necesite guardar entre cuadros (p. ej. "libres_seguidos" en T11).
+# El supervisor (T04) guarda el diccionario completo y usa estado["nombre"] para
+# state_before y state_after.
 DETENIDO = "DETENIDO"
 AVANZANDO = "AVANZANDO"
+GIRANDO_IZQ = "GIRANDO_IZQ"
+GIRANDO_DER = "GIRANDO_DER"
+NOMBRES_DE_ESTADO = (DETENIDO, AVANZANDO, GIRANDO_IZQ, GIRANDO_DER)
+ESTADO_INICIAL: dict[str, Any] = {"nombre": DETENIDO}
+
+# Estado al que lleva cada acción.
+ESTADO_POR_ACCION = {
+    "STOP": DETENIDO,
+    "AVANZAR": AVANZANDO,
+    "GIRAR_IZQ": GIRANDO_IZQ,
+    "GIRAR_DER": GIRANDO_DER,
+}
 
 NOMBRE_ZONA = {"izq": "la izquierda", "centro": "el centro", "der": "la derecha"}
 
 
-@dataclass(frozen=True)
-class EstadoPolitica:
-    """Estado de la política entre cuadros. Empieza DETENIDO: no avanza sin un cuadro ok."""
-
-    nombre: str = DETENIDO
+def _nombre_de(estado: Mapping[str, Any]) -> str:
+    """Nombre del estado recibido. Sin "nombre" o con uno desconocido se toma DETENIDO."""
+    nombre = estado.get("nombre") if isinstance(estado, Mapping) else None
+    return nombre if nombre in NOMBRES_DE_ESTADO else DETENIDO
 
 
 def _describir(dets: Sequence[Mapping[str, Any]]) -> str:
@@ -118,21 +130,23 @@ def _describir(dets: Sequence[Mapping[str, Any]]) -> str:
 
 def _comando(
     evento: Mapping[str, Any],
-    estado: EstadoPolitica,
+    estado: Mapping[str, Any],
     accion: str,
     razon: str,
     speed: float,
     steering: float,
-) -> tuple[dict[str, Any], EstadoPolitica]:
-    nuevo = EstadoPolitica(DETENIDO if accion == "STOP" else AVANZANDO)
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    # Copia: conserva lo que traiga el estado (p. ej. contadores) y nunca modifica el original.
+    previo = estado if isinstance(estado, Mapping) else {}
+    nuevo = {**previo, "nombre": ESTADO_POR_ACCION[accion]}
     t = evento.get("t_capture_ms")
     comando = {
         "schema_version": "1",
         "run_id": evento.get("run_id") or "desconocido",
         "frame_id": evento.get("frame_id") or "desconocido",
         "event": "frame",
-        "state_before": estado.nombre,
-        "state_after": nuevo.nombre,
+        "state_before": _nombre_de(estado),
+        "state_after": nuevo["nombre"],
         "action": accion,
         "reason": razon,
         "speed": float(speed),
@@ -162,11 +176,13 @@ def _lado_para_girar(
 
 
 def decidir(
-    evento: Mapping[str, Any], estado: EstadoPolitica, config: ConfigPolitica
-) -> tuple[dict[str, Any], EstadoPolitica]:
+    evento: Mapping[str, Any], estado: Mapping[str, Any], config: ConfigPolitica
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Decide el comando para un evento de percepción (casos C1 a C5). Función pura.
 
-    Devuelve `(comando, estado_nuevo)`. El comando trae los campos de la política; el
+    `estado` es un diccionario con la clave "nombre" (empieza en `ESTADO_INICIAL`).
+    Devuelve `(comando, estado_nuevo)`: el estado nuevo es una copia con el "nombre" según
+    la acción y conserva las demás claves. El comando trae los campos de la política; el
     adaptador (T02) completa `t_command_ms`, `valid_until_ms` y `received`.
 
     Reglas, en orden:
@@ -224,6 +240,6 @@ def decidir(
 
 
 def _stop(
-    evento: Mapping[str, Any], estado: EstadoPolitica, razon: str
-) -> tuple[dict[str, Any], EstadoPolitica]:
+    evento: Mapping[str, Any], estado: Mapping[str, Any], razon: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
     return _comando(evento, estado, "STOP", razon, 0, 0)
