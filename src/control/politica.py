@@ -2,6 +2,7 @@
 
 - T08 (#28): `zonas_ocupadas` dice en qué zonas (izquierda, centro, derecha) hay obstáculo.
 - T09 (#29): `decidir` convierte el evento en un comando AVANZAR / GIRAR_IZQ / GIRAR_DER / STOP.
+- T10 (#30): las detecciones con poca confianza no cuentan y quedan en `reason`.
 """
 
 from __future__ import annotations
@@ -175,10 +176,55 @@ def _lado_para_girar(
     return "der" if promedio < evento["image_width"] / 2 else "izq"
 
 
+def ignoradas_por_confianza(
+    evento: Mapping[str, Any], config: ConfigPolitica
+) -> list[Mapping[str, Any]]:
+    """Detecciones de una clase de obstáculo con `confidence < umbral_confianza` (T10, C6).
+
+    No cuentan para decidir, pero se mencionan en `reason`. Poca confianza NO es una falla
+    de percepción: el cuadro llegó bien (`status=ok`) y el detector no está seguro de ese
+    objeto. Una falla de percepción (`stale` o `error`) siempre es STOP.
+    """
+    return [
+        det
+        for det in evento["detections"]
+        if det["class_id"] in config.clases_obstaculo
+        and det["confidence"] < config.umbral_confianza
+    ]
+
+
+def _regla_de_zonas(
+    evento: Mapping[str, Any], config: ConfigPolitica
+) -> tuple[str, str, float, float]:
+    """Regla de T09 para un cuadro `ok` válido: `(accion, razon, speed, steering)`."""
+    por_zona = detecciones_por_zona(evento, config)
+    if not por_zona["centro"]:
+        laterales = [z for z in ("izq", "der") if por_zona[z]]
+        if laterales:
+            detalle = ", ".join(f"{NOMBRE_ZONA[z]} ({_describir(por_zona[z])})" for z in laterales)
+            razon = f"Centro libre: avanza recto; obstáculo solo en {detalle}."
+        else:
+            razon = "Centro libre: sin obstáculos en el camino, avanza recto."
+        return "AVANZAR", razon, config.velocidad_avance, 0.0
+
+    en_centro = _describir(por_zona["centro"])
+    if not config.permitir_giro:
+        return "STOP", f"Obstáculo en el centro ({en_centro}); giro desactivado: STOP.", 0, 0
+    lado = _lado_para_girar(evento, por_zona)
+    if lado is None:
+        return "STOP", f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP.", 0, 0
+    accion = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
+    steering = -config.giro if lado == "izq" else config.giro
+    razon = (
+        f"Obstáculo en el centro ({en_centro}); {NOMBRE_ZONA[lado]} está libre: gira hacia allá."
+    )
+    return accion, razon, config.velocidad_avance, steering
+
+
 def decidir(
     evento: Mapping[str, Any], estado: Mapping[str, Any], config: ConfigPolitica
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Decide el comando para un evento de percepción (casos C1 a C5). Función pura.
+    """Decide el comando para un evento de percepción (casos C1 a C6). Función pura.
 
     `estado` es un diccionario con la clave "nombre" (empieza en `ESTADO_INICIAL`).
     Devuelve `(comando, estado_nuevo)`: el estado nuevo es una copia con el "nombre" según
@@ -193,6 +239,9 @@ def decidir(
     3. Centro ocupado y `permitir_giro` con una zona lateral libre -> GIRAR hacia esa
        zona (C2). Nunca gira hacia una zona ocupada.
     4. Centro ocupado sin zona lateral libre, o sin permiso de girar -> STOP (C2, C5).
+
+    Las detecciones con confianza debajo de `umbral_confianza` no cuentan y se mencionan en
+    `reason` como `ignorada_por_confianza` (C6, T10).
 
     STOP siempre lleva speed=0 y steering=0. No lee el reloj: `t_decision_ms` es el
     `t_capture_ms` del evento.
@@ -212,31 +261,17 @@ def decidir(
     if errores:
         return _stop(evento, estado, f"Evento fuera de contrato: STOP ({errores[0]}).")
 
-    por_zona = detecciones_por_zona(evento, config)
-    if not por_zona["centro"]:
-        laterales = [z for z in ("izq", "der") if por_zona[z]]
-        if laterales:
-            detalle = ", ".join(f"{NOMBRE_ZONA[z]} ({_describir(por_zona[z])})" for z in laterales)
-            razon = f"Centro libre: avanza recto; obstáculo solo en {detalle}."
-        else:
-            razon = "Centro libre: sin obstáculos en el camino, avanza recto."
-        return _comando(evento, estado, "AVANZAR", razon, config.velocidad_avance, 0)
-
-    en_centro = _describir(por_zona["centro"])
-    if config.permitir_giro:
-        lado = _lado_para_girar(evento, por_zona)
-        if lado is not None:
-            accion = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
-            steering = -config.giro if lado == "izq" else config.giro
-            razon = (
-                f"Obstáculo en el centro ({en_centro}); {NOMBRE_ZONA[lado]} está libre: "
-                f"gira hacia allá."
-            )
-            return _comando(evento, estado, accion, razon, config.velocidad_avance, steering)
-        return _stop(
-            evento, estado, f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP."
+    accion, razon, speed, steering = _regla_de_zonas(evento, config)
+    ignoradas = ignoradas_por_confianza(evento, config)
+    if ignoradas:
+        detalle = "; ".join(
+            f"class_id {d['class_id']}, confianza {d['confidence']:g}" for d in ignoradas
         )
-    return _stop(evento, estado, f"Obstáculo en el centro ({en_centro}); giro desactivado: STOP.")
+        razon += (
+            f" ignorada_por_confianza: {detalle} (umbral {config.umbral_confianza:g};"
+            " no es falla de percepción)."
+        )
+    return _comando(evento, estado, accion, razon, speed, steering)
 
 
 def _stop(
