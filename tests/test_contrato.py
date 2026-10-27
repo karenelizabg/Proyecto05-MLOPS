@@ -5,9 +5,11 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+import yaml
 
 from contrato import validar_evento, validar_flujo
 from contrato.__main__ import main
+from control import AdaptadorVirtual, Supervisor
 from control.config import cargar_config_politica
 from control.politica import decidir
 
@@ -216,6 +218,46 @@ def test_politica_detiene_evento_con_geometria_no_finita():
 
     assert comando["action"] == "STOP"
     assert comando["speed"] == 0
+
+
+@pytest.mark.parametrize(
+    "ruta",
+    [
+        ("detections", 0, "confidence"),
+        ("detections", 0, "bbox", 0),
+        ("detections", 0, "bbox", 1),
+        ("detections", 0, "bbox", 2),
+        ("detections", 0, "bbox", 3),
+        ("t_capture_ms",),
+        ("t_emit_ms",),
+    ],
+    ids=["confidence", "x1", "y1", "mochila_central_x2", "y2", "captura", "emision"],
+)
+def test_supervisor_registra_stop_ante_nan(tmp_path, ruta):
+    evento = cargar("valido.json")
+    evento["detections"] = [evento["detections"][0]]  # Mochila central; sin otros objetos.
+    destino = evento
+    for parte in ruta[:-1]:
+        destino = destino[parte]
+    destino[ruta[-1]] = math.nan
+
+    raiz = EJEMPLOS.parents[2]
+    plazos = yaml.safe_load((raiz / "config/control/plazos.yaml").read_text(encoding="utf-8"))
+    adaptador = AdaptadorVirtual(tmp_path, plazos["validez_orden_ms"])
+    supervisor = Supervisor(decidir, adaptador, plazos, cargar_config_politica())
+
+    comando = supervisor.procesar_evento(evento, ahora_ms=440.0)
+    registro = [json.loads(linea) for linea in adaptador.ruta_registro.read_text().splitlines()]
+    errores = [json.loads(linea) for linea in supervisor.ruta_errores.read_text().splitlines()]
+
+    assert comando["reason"] == "evento_invalido"
+    assert comando["action"] == "STOP"
+    assert len(registro) == 1
+    assert registro[0]["action"] == "STOP"
+    assert registro[0]["speed"] == 0
+    assert all(orden["action"] != "AVANZAR" for orden in registro)
+    assert len(errores) == 1
+    assert f"{'/'.join(map(str, ruta))}: debe ser un número finito" in errores[0]["errores"]
 
 
 # --- reglas entre eventos ---------------------------------------------------
