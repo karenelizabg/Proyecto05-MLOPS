@@ -128,7 +128,7 @@ def test_stale_cancela_la_orden_previa(tmp_path):
 
     assert [c["action"] for c in comandos(tmp_path)] == ["AVANZAR", "STOP"]
     assert supervisor.adaptador.activo["action"] == "STOP"
-    assert supervisor.estado == "DETENIDO"
+    assert supervisor.estado == {"nombre": "DETENIDO"}
 
 
 # --- fallas de la política --------------------------------------------------------
@@ -145,11 +145,13 @@ def test_politica_que_lanza_excepcion_da_stop(tmp_path):
 
 
 RESPUESTAS_INVALIDAS = {
-    "sin action": ({"speed": 0.5, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
-    "action inventada": ({"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
-    "avanzar sin velocidad": ({"action": "AVANZAR", "speed": 0, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
-    "velocidad fuera de rango": ({"action": "AVANZAR", "speed": 3, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
-    "estado nuevo vacío": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, ""),
+    "sin action": ({"speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
+    "action inventada": ({"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
+    "avanzar sin velocidad": ({"action": "AVANZAR", "speed": 0, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
+    "velocidad fuera de rango": ({"action": "AVANZAR", "speed": 3, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}),
+    "estado como texto": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, "AVANZANDO"),
+    "estado sin nombre": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"libres_seguidos": 1}),
+    "nombre inventado": ({"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "VOLANDO"}),
     "no es una tupla": ("AVANZAR", None),
     "None": None,
 }
@@ -169,17 +171,27 @@ def test_politica_que_devuelve_algo_invalido_da_stop(tmp_path, respuesta):
     assert validar_comando(comando) == []
     [error] = errores(tmp_path)
     assert error["motivo"] == comando["reason"]
-    assert supervisor.estado == "DETENIDO"
+    assert supervisor.estado == {"nombre": "DETENIDO"}
 
 
 def test_politica_invalida_registra_el_detalle(tmp_path):
     def politica(ev, estado, config):
-        return {"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, "AVANZANDO"
+        return {"action": "VOLAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "AVANZANDO"}
 
     nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
 
     assert_stop_registrado(tmp_path, "politica_invalida", "S02_f0003")
     assert any(e.startswith("action:") for e in errores(tmp_path)[0]["errores"])
+
+
+def test_un_estado_fuera_de_lo_acordado_registra_el_detalle(tmp_path):
+    def politica(ev, estado, config):
+        return {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "x"}, {"nombre": "VOLANDO"}
+
+    nuevo_supervisor(tmp_path, politica).procesar_evento(evento("valido.json"), ahora_ms=440.0)
+
+    assert_stop_registrado(tmp_path, "politica_invalida", "S02_f0003")
+    assert errores(tmp_path)[0]["errores"][0].startswith("estado.nombre: 'VOLANDO'")
 
 
 def test_el_programa_sigue_despues_de_una_falla(tmp_path):

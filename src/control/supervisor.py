@@ -14,13 +14,19 @@
 
 La política es una función `decidir(evento, estado, config) -> (comando, estado_nuevo)`. De su
 comando el supervisor toma `action`, `speed`, `steering` y `reason`; el resto de los campos lo pone
-él. `valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
+él. El estado es un diccionario con la clave `nombre` (DETENIDO, AVANZANDO, GIRANDO_IZQ o
+GIRANDO_DER) más lo que la política necesite guardar, p. ej. `{"nombre": "AVANZANDO",
+"libres_seguidos": 0}`. El supervisor guarda el diccionario completo, se lo pasa a la política en el
+siguiente cuadro y usa `estado["nombre"]` para `state_before` y `state_after`. Empieza en
+`{"nombre": "DETENIDO"}`, y cada STOP del supervisor lo regresa ahí: se descartan los datos de la
+política para que no reanude con una cuenta vieja. `valid_until_ms` lo calcula el adaptador con el `ahora_ms` del envío (T02). Cada STOP por falla
 queda en `<carpeta del adaptador>/errores.jsonl` con `run_id` y `frame_id`. El supervisor no lee el
 reloj del sistema: todos los métodos reciben `ahora_ms`.
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections.abc import Callable
@@ -30,11 +36,13 @@ from contrato import validar_comando, validar_evento
 
 from .adaptador_virtual import AdaptadorVirtual
 
-Politica = Callable[[dict[str, Any], str, Any], tuple[dict[str, Any], str]]
+Estado = dict[str, Any]
+Politica = Callable[[dict[str, Any], Estado, Any], tuple[dict[str, Any], Estado]]
 
 NOMBRE_ERRORES = "errores.jsonl"
 VERSION_RECONOCIDA = "1"
-ESTADO_INICIAL = "DETENIDO"
+NOMBRES_DE_ESTADO = ("DETENIDO", "AVANZANDO", "GIRANDO_IZQ", "GIRANDO_DER")
+ESTADO_INICIAL: Estado = {"nombre": "DETENIDO"}
 # Cuando el evento no trae un run_id o frame_id que cumpla el contrato.
 ID_DESCONOCIDO = "desconocido"
 CAMPOS_DE_LA_POLITICA = ("action", "speed", "steering", "reason")
@@ -45,11 +53,11 @@ _ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 def politica_de_prueba(
-    _evento: dict[str, Any], _estado: str, _config: Any
-) -> tuple[dict[str, Any], str]:
+    _evento: dict[str, Any], _estado: Estado, _config: Any
+) -> tuple[dict[str, Any], Estado]:
     """Mientras no exista la política real (T09): siempre AVANZAR a velocidad 0.5."""
     comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "politica_de_prueba"}
-    return comando, "AVANZANDO"
+    return comando, {"nombre": "AVANZANDO"}
 
 
 class Supervisor:
@@ -64,7 +72,7 @@ class Supervisor:
         self.adaptador = adaptador
         self.plazos = plazos
         self.config_politica = config_politica
-        self.estado = ESTADO_INICIAL
+        self.estado: Estado = dict(ESTADO_INICIAL)
         self.ruta_errores = adaptador.carpeta_salida / NOMBRE_ERRORES
         # Igual que comandos.jsonl: cada supervisor es una corrida y empieza sin errores.
         self.ruta_errores.write_text("", encoding="utf-8")
@@ -107,16 +115,23 @@ class Supervisor:
         """Fin del run. Se llena en T06 (#26)."""
 
     def _decidir(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
-        """Llama a la política. Si falla o devuelve un comando fuera del contrato, STOP."""
+        """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado, STOP."""
         try:
-            decision, estado_nuevo = self.politica(evento, self.estado, self.config_politica)
-            comando = self._comando(evento["run_id"], evento["frame_id"], estado_nuevo, ahora_ms)
-            comando.update({campo: decision[campo] for campo in CAMPOS_DE_LA_POLITICA})
+            # Una copia: si la política cambia el estado y luego falla, el guardado no se toca.
+            estado = copy.deepcopy(self.estado)
+            decision, estado_nuevo = self.politica(evento, estado, self.config_politica)
+            accion = {campo: decision[campo] for campo in CAMPOS_DE_LA_POLITICA}
         except Exception as exc:  # cualquier falla de la política termina en STOP, no tumba el programa
             detalle = [f"{type(exc).__name__}: {exc}"]
             return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle)
 
-        errores = validar_comando(self._como_se_enviaria(comando, ahora_ms))
+        errores = _errores_del_estado(estado_nuevo)
+        if not errores:
+            comando = self._comando(
+                evento["run_id"], evento["frame_id"], estado_nuevo["nombre"], ahora_ms
+            )
+            comando.update(accion)
+            errores = validar_comando(self._como_se_enviaria(comando, ahora_ms))
         if errores:
             return self._stop_por_evento(evento, ahora_ms, "politica_invalida", errores)
         return self._enviar(comando, estado_nuevo, ahora_ms)
@@ -146,24 +161,25 @@ class Supervisor:
         frame_id = self._id_del_evento(evento, "frame_id") or ID_DESCONOCIDO
         self._registrar_error(run_id, frame_id, ahora_ms, motivo, errores)
 
-        comando = self._comando(run_id, frame_id, "DETENIDO", ahora_ms)
+        detenido = dict(ESTADO_INICIAL)
+        comando = self._comando(run_id, frame_id, detenido["nombre"], ahora_ms)
         comando.update({"action": "STOP", "speed": 0, "steering": 0.0, "reason": motivo})
-        return self._enviar(comando, "DETENIDO", ahora_ms)
+        return self._enviar(comando, detenido, ahora_ms)
 
     def _comando(
-        self, run_id: str, frame_id: str, estado_nuevo: str, ahora_ms: float
+        self, run_id: str, frame_id: str, nombre_nuevo: str, ahora_ms: float
     ) -> dict[str, Any]:
         return {
             "schema_version": VERSION_RECONOCIDA,
             "run_id": run_id,
             "frame_id": frame_id,
             "event": "frame",
-            "state_before": self.estado,
-            "state_after": estado_nuevo,
+            "state_before": self.estado["nombre"],
+            "state_after": nombre_nuevo,
             "t_decision_ms": ahora_ms,
         }
 
-    def _enviar(self, comando: dict[str, Any], estado_nuevo: str, ahora_ms: float) -> dict[str, Any]:
+    def _enviar(self, comando: dict[str, Any], estado_nuevo: Estado, ahora_ms: float) -> dict[str, Any]:
         self.estado = estado_nuevo
         return self.adaptador.enviar(comando, ahora_ms)
 
@@ -186,3 +202,12 @@ class Supervisor:
             return None
         valor = evento.get(campo)
         return valor if isinstance(valor, str) and _ID.match(valor) else None
+
+
+def _errores_del_estado(estado: Any) -> list[str]:
+    """El estado que devuelve la política: un diccionario con un `nombre` acordado."""
+    if not isinstance(estado, dict) or "nombre" not in estado:
+        return [f"estado: debe ser un diccionario con la clave 'nombre', llegó {estado!r}"]
+    if estado["nombre"] not in NOMBRES_DE_ESTADO:
+        return [f"estado.nombre: {estado['nombre']!r} no es uno de {', '.join(NOMBRES_DE_ESTADO)}"]
+    return []
