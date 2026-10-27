@@ -247,8 +247,14 @@ def test_supervisor_registra_stop_ante_nan(tmp_path, ruta):
     supervisor = Supervisor(decidir, adaptador, plazos, cargar_config_politica())
 
     comando = supervisor.procesar_evento(evento, ahora_ms=440.0)
-    registro = [json.loads(linea) for linea in adaptador.ruta_registro.read_text().splitlines()]
-    errores = [json.loads(linea) for linea in supervisor.ruta_errores.read_text().splitlines()]
+    registro = [
+        json.loads(linea)
+        for linea in adaptador.ruta_registro.read_text(encoding="utf-8").splitlines()
+    ]
+    errores = [
+        json.loads(linea)
+        for linea in supervisor.ruta_errores.read_text(encoding="utf-8").splitlines()
+    ]
 
     assert comando["reason"] == "evento_invalido"
     assert comando["action"] == "STOP"
