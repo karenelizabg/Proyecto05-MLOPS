@@ -67,6 +67,8 @@ Los hashes de los ejemplos (`aaaa…`, `bbbb…`) y las clases (`lata`, `mochila
 ## Versionado
 
 - `schema_version` cambia (`"2"`) ante cualquier cambio de significado, unidad o campo obligatorio, o al quitar un valor de un enum.
+- Una corrección del validador que no cambia el esquema ni el significado del contrato puede conservar la versión con aprobación de ambos PM.
+- Todos los valores numéricos del contrato deben ser finitos: se rechazan `NaN`, `Infinity` y `-Infinity`.
 - Se puede agregar un campo **opcional** o un `error.code` nuevo sin subir la versión, avisando a B por escrito.
 - B rechaza (STOP) los eventos con una versión que no reconoce.
 - A1 y B3 mantienen los ejemplos válidos y los de error en este directorio; el PR de un cambio lo aprueban ambos PM.
