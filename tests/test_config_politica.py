@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 import pytest
 import yaml
 
 from control.config import (
+    RAIZ,
     RUTA_CONFIG_POLITICA,
     ErrorConfigPolitica,
     cargar_config_politica,
     validar_config_politica,
 )
+
+RUTA_CLASES = RAIZ / "modelo" / "clases.json"
 
 
 @pytest.fixture
@@ -33,11 +37,28 @@ def test_carga_el_archivo_del_repo():
     assert isinstance(config.permitir_giro, bool)
 
 
-def test_clases_provisionales_estan_marcadas():
-    # Hasta que las PM aprueben modelo/clases.json (T12, #32) las clases siguen provisionales.
+def test_clases_definitivas():
+    # Aprobadas por las PM A y B (P5-04, DC-5): mochila, botella y taza con YOLO11n (T12, #32).
     config = cargar_config_politica()
-    assert config.clases_obstaculo == frozenset({0, 1})
-    assert config.clases_provisionales is True
+    assert config.clases_obstaculo == frozenset({24, 39, 41})
+    assert config.clases_provisionales is False
+
+
+def _ids_de_clases_json(datos) -> set[int]:
+    """class_id de modelo/clases.json, sea lista de objetos o diccionario id -> nombre."""
+    if isinstance(datos, dict):
+        datos = datos.get("clases", datos)
+    if isinstance(datos, dict):
+        return {int(k) for k in datos}
+    return {int(c["class_id"]) for c in datos}
+
+
+@pytest.mark.skipif(not RUTA_CLASES.exists(), reason="modelo/clases.json aún no existe (P5-04)")
+def test_clases_obstaculo_son_subconjunto_de_clases_json():
+    # DC-5: la lista de B debe ser un subconjunto de las clases que emite el detector de A.
+    ids = _ids_de_clases_json(json.loads(RUTA_CLASES.read_text(encoding="utf-8")))
+    faltan = cargar_config_politica().clases_obstaculo - ids
+    assert not faltan, f"class_id en politica.yaml que no están en modelo/clases.json: {faltan}"
 
 
 def test_acepta_ruta_como_texto():

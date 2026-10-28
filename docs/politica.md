@@ -51,11 +51,27 @@ Una detección cuenta solo si cumple **las dos** condiciones:
 tapa) **no son obstáculos**. No van en `clases_obstaculo`, para que no provoquen STOP; si no,
 el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 (`datos/DOMINIO.md`).
 
-> **Clases provisionales.** Hoy `clases_obstaculo: [0, 1]` (lata y mochila de los ejemplos del
-> contrato) y `clases_provisionales: true`. Las clases reales salen de `modelo/clases.json`,
-> que publica el grupo A en P5-04 (decisión DC-5 del contrato). Cuando exista, se ponen aquí
-> sus `class_id` de obstáculo y `clases_provisionales` pasa a `false`. La lista debe ser un
-> subconjunto de las clases de ese archivo.
+### Clases definitivas
+
+Las PM A y B aprobaron tres objetos con el detector **YOLO11n** (P5-04, decisión DC-5 del
+contrato). Los `class_id` son los de COCO de 80 clases que usa YOLO11n, los mismos que publica
+el grupo A en `modelo/clases.json`:
+
+| Objeto | Clase | `class_id` |
+|---|---|---|
+| Mochila | `backpack` | 24 |
+| Botella | `bottle` | 39 |
+| Taza | `cup` | 41 |
+
+En `politica.yaml`: `clases_obstaculo: [24, 39, 41]` y `clases_provisionales: false`.
+
+- **Cualquier otra clase que dé el detector no es obstáculo** para la política. Por ejemplo,
+  el cuaderno de la secuencia S8 puede salir como `book`: se ignora y el carrito avanza.
+- La lista debe ser un **subconjunto** de `modelo/clases.json`. La prueba
+  `test_clases_obstaculo_son_subconjunto_de_clases_json` lo revisa en cuanto ese archivo existe.
+- Los ejemplos del contrato (`config/contrato/ejemplos/`) siguen con lata = 0 y mochila = 1,
+  que eran solo de ejemplo. Con las clases definitivas esos ids ya no frenan; las pruebas que
+  usan esos archivos cambian la clase por una real o lo dicen explícitamente.
 
 ## 3. Umbral de confianza (C6)
 
@@ -65,6 +81,9 @@ el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 
 - **Poca confianza no es lo mismo que una falla de percepción.** Con poca confianza el cuadro
   llegó bien (`status=ok`) y el detector solo duda de un objeto: se decide normal. Una falla de
   percepción (`stale` o `error`) significa que no hay cuadro confiable, y siempre es STOP.
+- El umbral del **detector** (grupo A) va más bajo que este 0.5. Así llegan detecciones con poca
+  confianza y el C6 se puede probar con datos reales: el detector las deja pasar y la política
+  las ignora.
 
 ## 4. Cuándo gira y cuándo frena
 
@@ -113,12 +132,11 @@ El **supervisor** (`src/control/supervisor.py`, T03/T04) revisa estos casos **an
 a la política, frena por su cuenta y registra la falla en `errores.jsonl`. La política repite
 los mismos chequeos por seguridad, por si alguien la llama sin supervisor.
 
-> **Punto abierto (supervisor y histéresis).** Cuando el supervisor hace su propio STOP,
-> regresa el estado a `{"nombre": "DETENIDO"}` y se pierden los datos de la histéresis. Por
-> eso, tras un bloqueo seguido de un `stale` o `error`, **un solo cuadro libre reanuda** en lugar
-> de esperar N. Se puede corregir de dos maneras: que el supervisor conserve las claves de la
-> política y solo cambie `nombre`, o que la política pida N cuadros libres siempre que salga de
-> `DETENIDO`. Pendiente de decidir con la PM.
+**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error` o
+STOP de reloj), **solo cambia `nombre` a `DETENIDO`** y conserva las demás claves de la
+política (`esperando_libres`, `libres_seguidos`). Así, tras un bloqueo seguido de un `stale`, el
+carrito sigue esperando N cuadros libres y no reanuda con uno solo
+(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop`).
 
 ## 7. Estado entre cuadros
 
@@ -147,8 +165,8 @@ cargar y, si algo no cumple, falla con un mensaje que dice qué valor corregir.
 |---|---|---|---|
 | `zonas` | 0–0.33 / 0.33–0.67 / 0.67–1 | contiguas, de 0 a 1 | Franjas izquierda, centro y derecha. |
 | `traslape_minimo` | 0.15 | 0 < x ≤ 1 | Fracción de la caja que debe caer en una zona para ocuparla. |
-| `clases_obstaculo` | `[0, 1]` (provisional) | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo. |
-| `clases_provisionales` | `true` | true/false | Marca que las clases aún no son las definitivas. |
+| `clases_obstaculo` | `[24, 39, 41]` | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo (mochila, botella, taza). |
+| `clases_provisionales` | `false` | true/false | `true` solo mientras las clases no estén aprobadas. |
 | `umbral_confianza` | 0.5 | 0 ≤ x ≤ 1 | Confianza mínima para que una detección cuente. |
 | `cuadros_libres_para_reanudar` | 3 | entero ≥ 1 | N de la histéresis. |
 | `velocidad_avance` | 0.4 | 0 < x ≤ 1 | Velocidad de AVANZAR y de los giros. |
@@ -167,7 +185,7 @@ uv run pytest -q tests/test_config_politica.py tests/test_zonas.py \
 
 | Archivo | Qué cubre |
 |---|---|
-| `test_config_politica.py` | Carga del YAML y rangos (T07). |
+| `test_config_politica.py` | Carga del YAML, rangos (T07) y clases definitivas contra `modelo/clases.json` (T12). |
 | `test_zonas.py` | Zonas con distintos anchos, `xyxy`/`xywh` y filtros de clase y confianza (T08). |
 | `test_decision.py` | C1–C5, stale/error y forma del comando (T09). |
 | `test_umbral.py` | C6, y que poca confianza no es falla de percepción (T10). |

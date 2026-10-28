@@ -25,11 +25,12 @@ traslape_minimo: 0.15
 # Los objetos bajos que el carrito puede pasar por encima (transitables: borrador, cable,
 # tapa) NO van en esta lista, para que no provoquen STOP (ver TICKETS.md, P5-03).
 #
-# PROVISIONAL: [0, 1] corresponde a los ejemplos del contrato (0 = lata, 1 = mochila).
-# Se reemplaza por las clases definitivas cuando las PM aprueben modelo/clases.json
-# (P5-04, DC-5) en T12 (#32), y entonces `clases_provisionales` pasa a false.
-clases_obstaculo: [0, 1]
-clases_provisionales: true
+# Clases aprobadas por las PM A y B (P5-04, DC-5): mochila, botella y taza, con YOLO11n.
+# Los class_id son los de COCO de 80 clases que usa YOLO11n y los mismos de modelo/clases.json:
+#   24 = backpack (mochila), 39 = bottle (botella), 41 = cup (taza).
+# Deben ser un subconjunto de modelo/clases.json; tests/test_config_politica.py lo revisa.
+clases_obstaculo: [24, 39, 41]
+clases_provisionales: false
 
 # Confianza mínima (0 a 1) para tomar en cuenta una detección. Por debajo, se ignora.
 umbral_confianza: 0.5
