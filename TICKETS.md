@@ -12,6 +12,11 @@
 > **2026-10-26 — el carro está decidido:** es el kit que recomendó el profe (D-07). Se ajustaron PEND-06 y
 > PEND-12, se agregó PEND-13 y el ticket P5-19 (armar el carro) y cambiaron P5-03, P5-04, P5-09, P5-12, el plan y
 > los riesgos. Los PR de los tickets los revisan entre sí los tres devs (sección 3).
+>
+> **2026-10-26 — ya está la rúbrica detallada** (PEND-07 cerrado): `entregables-proyecto-5.md` y
+> `prompt-evaluacion-proyecto-5.md`, en `~/Downloads`, que tampoco están en el repo. Cambiaron D-05 y D-06
+> (sin ajuste: las 8 secuencias son evaluación), PEND-04 (objetos que el detector sí reconoce) y los tickets
+> P5-03, P5-04, P5-05, P5-10, P5-11 y P5-13.
 
 ## Leyenda
 
@@ -45,7 +50,7 @@ pérdida de percepción o emergencia, la nota se topa en 60.
 |---|---|---|
 | ◐ | E1 · Repositorio y README | Ocho nombres, dos grupos, responsabilidades, versión; instalación fijada y comandos para inferir, reproducir, probar y medir. |
 | ● | E2 · Detector ejecutable | Pesos, origen, **licencia**, SHA-256, clases, pre y posprocesamiento; cajas, clases y confianza. Se permite uno preentrenado. |
-| ● | E3 · Secuencias etiquetadas | **60 cuadros distintos, ≥ 6 secuencias, ≥ 20 con obstáculo y ≥ 20 despejados.** IDs, tiempo relativo, cajas, estado esperado y separación de ajuste. Imágenes extraídas: el video no sustituye. |
+| ● | E3 · Secuencias etiquetadas | **60 cuadros distintos, ≥ 6 secuencias, ≥ 20 con obstáculo y ≥ 20 despejados.** IDs, tiempo relativo, cajas, estado esperado y separación de ajuste y evaluación (o la declaración de que no hubo ajuste, D-06). Imágenes extraídas: el video no sustituye. |
 | ○ | E4 · Política y control virtual | (Grupo B.) |
 | ○ | E5 · Diez casos C1–C10 | (Grupo B ejecuta; **A aporta las secuencias** de C1–C5 y C7, aclara scores para C6 y define los errores de C9.) |
 | ● | E6 · Resultados y métricas | Detecciones, decisiones y comandos por cuadro; TP/FP/FN, precisión, recall y F1 a IoU 0.50 con **script de recálculo**. Las cifras resumidas no bastan. |
@@ -64,7 +69,11 @@ Un cuadro sin objetos es `status=ok` con lista vacía; **un error o la falta de 
 
 Pasar de F1 0.90 a 1.00 vale 1 punto de 100. **No conviene invertir días en mejorar el modelo**: un detector
 preentrenado razonable y mucho cuidado en datos, trazabilidad, errores y reproducción rinde más.
-`[PENDIENTE]` PEND-07: los topes exactos están en el prompt de evaluación, que no tengo.
+**Topes de la rúbrica (PEND-07, cerrado):** el F1 es **micro**, a IoU 0.50 y con el umbral de confianza
+**congelado**. Las predicciones deben cubrir todo el conjunto entregado y salir de los pesos verificados; si no se
+puede acreditar de dónde salen, el crédito queda pendiente, y sin verdad de referencia o con fuga demostrada es 0.
+Si no se cumplen los mínimos de E3 (60 cuadros, 6 secuencias, 20 con obstáculo y 20 despejados), 1.3 pierde puntos
+y 1.4 se limita a 3 de 6.
 
 **Fuera de alcance (la guía lo dice):** entrenar un modelo nuevo, GPU, API de pago, nuevo portal, AWS, video,
 SLAM, simulación física. No hay que convertir el clasificador cat/dog de P3/P4 en detector, y su 85 % de
@@ -81,10 +90,10 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | PEND-01 | **Quién es A1, A2 y A3** (y su usuario de GitHub) y quién es el PM A. En P4 el equipo era Karen, Ale y Heri, pero P5 son 8 personas en dos grupos y no sé si repiten. | PM A | Asignación de todos los tickets | Roles A1/A2/A3 sin nombres. *Sugerencia:* quien llevó modelo, conversión y benchmark en P4 (Karen) encaja en A1 o A3. |
 | PEND-02 | **PM B y su grupo:** contacto, rango de numeración de tickets y quién cierra el contrato. | PM A | P5-02, P5-08 | Numeración: grupo A usa `P5-01…49`, grupo B `P5-50…`. |
 | PEND-03 | **Repositorio oficial único** para los dos grupos. El `origin` de este clon es `github.com/karenelizabg/Proyecto05-MLOPS`; confirmar que es el oficial, que B tiene acceso y si será **público o se entrega ZIP** (el evaluador debe acceder sin intervención del equipo; el repo de P4 era privado). | PM A + PM B | P5-01, P5-17 | Se usa el `origin` actual, privado, hasta decidir. |
-| PEND-04 | **Dominio de obstáculos y clases** (qué objetos, qué escena, qué cámara). Lo deciden ambos PM. | PM A + PM B | P5-03, P5-04, P5-09 | El equipo A propuso (sin confirmar con B): **lata de refresco, mochila, cajas, tenis**; interior, piso plano, buena luz. **Ojo: de esas, solo "mochila" es clase COCO.** La lata podría salir como `bottle` o `cup`; "caja" y "tenis" no existen en COCO. P5-04 debe probar fotos reales de los 4 objetos antes de que los PM aprueben las clases; si el detector no los reconoce, hay que cambiar de objetos (p. ej. botella, maleta) o de detector (D-01). Lo más bajo que la llanta es *transitable* y queda fuera (ver P5-03). |
+| PEND-04 | **Dominio de obstáculos y clases** (qué objetos, qué escena, qué cámara). Lo deciden ambos PM. | PM A + PM B | P5-03, P5-04, P5-09 | El equipo A propuso primero **lata de refresco, mochila, cajas, tenis**, pero de esas solo "mochila" es clase COCO. El 2026-10-26 A2 propuso cambiar a objetos que el detector sí reconoce: **mochila, botella, taza, silla o maleta** (`backpack`, `bottle`, `cup`, `chair`, `suitcase`); interior, piso plano, buena luz. **Sujeto a la prueba de A1 en P5-04**, con fotos a 640×480 y JPEG: se eligen 3 o 4 de los de mejor detección y los PM A y B los aprueban (DC-5) **antes de filmar**; sin confirmar con B todavía. La rúbrica pide que los objetos laterales (C3, C4) estén anotados **y detectados**, así que un objeto que el detector no reconoce no sirve. La silla puede dar cajas inestables por las patas, y la taza debe ser más alta que el radio de la llanta (PEND-12) o es transitable. Si ninguno funciona, se cambia de detector (D-01). Lo más bajo que la llanta es *transitable* y queda fuera (ver P5-03). |
 | PEND-05 | **Máquina de evaluación y benchmark:** SO, CPU, RAM. El benchmark debe medirse en el equipo declarado. | A3 | P5-15 | La laptop que use A3; si es la ASUS de P4 (i5-7300HQ, 8 GB, Windows 10), ya hay ficha de hardware en P4. |
 | PEND-06 | **Cámara y quién filma.** El carro es el que recomendó el profe: **Kit Carrito ESP32-CAM 4WD** (UNIT Electronics SKU AR4510, TSCINBUNY ZYC0024-EN). Trae una placa ESP32-CAM con sensor OV2640, ranura SD, puente H L298, 4 motorreductores y 4 llantas de goma, y transmite video por WiFi a una página web. La ficha **no** dice la resolución de transmisión, si el foco es fijo o ajustable, el ángulo de visión ni a qué altura queda la cámara. El OV2640 comprime en JPEG y rinde peor con poca luz (confirmar en el módulo). Hay que anotar altura y ángulo de la cámara montada. | PM A | P5-03, P5-04, P5-09 | Filmar con la propia ESP32-CAM (misma óptica, resolución y compresión que vería el carro), a 640×480. Plan B si no transmite a tiempo: celular a baja altura, horizontal y reescalado a 640×480 (D-07). |
-| PEND-07 | **Rúbrica detallada y prompt de evaluación** (la guía los enlaza como "Entregables detallados" y "Rúbrica y prompt de evaluación"; no están en el HTML). Incluye topes y detalles del criterio 1.4. | PM A | Ajustes de P5-13, P5-17 | Se trabaja con lo que dice la guía. |
+| PEND-07 | **Rúbrica detallada y prompt de evaluación** (la guía los enlaza como "Entregables detallados" y "Rúbrica y prompt de evaluación"; no están en el HTML). Incluye topes y detalles del criterio 1.4. | PM A | — (cerrado) | **Cerrado 2026-10-26:** Karen consiguió los dos documentos (`entregables-proyecto-5.md` y `prompt-evaluacion-proyecto-5.md`, en `~/Downloads`, no están en el repo). Cambiaron D-05, D-06, PEND-04, P5-03, P5-04, P5-05, P5-10, P5-11 y P5-13. |
 | PEND-08 | **Formato de caja y de anotación** acordado con B (`xyxy` o `xywh`, píxeles del cuadro original, origen arriba-izquierda). | PM A + PM B | P5-02, P5-10 | `xyxy` en píxeles del cuadro original (ver D-04). |
 | PEND-09 | **Ritmo de entrada** (fps de las secuencias) y plazos que B usará en el watchdog. A debe poder cumplirlos con su p95. | PM B | P5-05, P5-16 | Secuencias a ~5 fps (200 ms entre cuadros); ajustar cuando B declare plazos. |
 | PEND-10 | **Fechas internas** de cada bloque (los campos "Fecha objetivo" de la guía están vacíos). | PM A + PM B | Plan de la sección 5 | Las fechas sugeridas de la sección 5. |
@@ -100,8 +109,8 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | D-02 | Runtime: ONNX Runtime o PyTorch. | ONNX Runtime en CPU: instalación más liviana y el equipo ya lo usó en P4 (fijó `onnxruntime==1.30.0`, que exige Python ≥ 3.11). El NMS y el posprocesamiento hay que escribirlos y documentarlos. | A1 |
 | D-03 | Herramienta de anotación. | La que el equipo pueda levantar en menos de una hora y exporte COCO (el portal de P1/P2 de `Proyecto04-MLOps` exporta COCO, pero exige Docker, MariaDB y MinIO). Luego un script convierte a manifiesto. | A2 |
 | D-04 | Formato de caja. | `xyxy`, píxeles del cuadro **original** (deshacer cualquier redimensionado o *letterbox* antes de emitir). | A1 + B3 |
-| D-05 | Tamaño del conjunto. | **8 secuencias × 10 cuadros = 80** (mínimo exigido: 60 y 6), con ≥ 30 de obstáculo y ≥ 30 despejados, para tener margen si algún cuadro se descarta por duplicado. | A2 |
-| D-06 | Separación ajuste / evaluación. | 3 secuencias de ajuste (umbrales, NMS) y 5 de evaluación; **las métricas se reportan sobre todo el conjunto y por separado sobre evaluación**. Nada se afina mirando evaluación. | A2 + A3 |
+| D-05 | Tamaño del conjunto. | **8 secuencias, unos 80 a 90 cuadros**: 10 por secuencia y más en la de C7, que necesita varios cuadros libres, el bloqueo y varios libres otra vez. Mínimo exigido: 60 cuadros y 6 secuencias **en el conjunto de evaluación**, con ≥ 20 de obstáculo y ≥ 20 despejados; el objetivo es ≥ 30 y ≥ 30 para tener margen si algún cuadro se descarta por duplicado. | A2 |
+| D-06 | Separación ajuste / evaluación. | **Sin ajuste** (propuesta de A2 del 2026-10-26, aceptada por el PM A). Los 60 cuadros mínimos son el conjunto de evaluación, así que con 3 secuencias de ajuste y 5 de evaluación (50 cuadros, 5 secuencias) no se llegaba al mínimo. Se usa un detector preentrenado con umbral de confianza y NMS fijados **antes** de correr sobre los cuadros (en `config/`, con su hash), y las 8 secuencias son evaluación. Las fotos que sirvan para escoger detector y objetos (P5-04, P5-19) quedan **fuera** de las 8 secuencias. Se declara por escrito en `datos/README.md`. Las métricas se reportan sobre todo el conjunto, que es la evaluación. Si luego se quisiera ajustar, hay que filmar secuencias aparte. | A2 + A3 |
 | D-07 | Carro y cámara de captura. | **Decidido (lo recomendó el profe):** Kit Carrito ESP32-CAM 4WD (UNIT Electronics SKU AR4510, TSCINBUNY ZYC0024-EN). Se filma con su propia cámara (OV2640) a 640×480; si no transmite a tiempo, plan B con celular reescalado a 640×480 (PEND-06). | PM A |
 
 ---
@@ -243,7 +252,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - Para cada secuencia: número de cuadros, ritmo y quién la filma.
 - **Criterios de aceptación**
   - [ ] Cada caso C1–C7 tiene al menos una secuencia asignada.
-  - [ ] El plan reparte las secuencias entre ajuste y evaluación (D-06) **antes** de filmar.
+  - [ ] El plan declara que no hay ajuste y que las 8 secuencias son evaluación (D-06) **antes** de filmar.
   - [ ] Los PM de A y B aprobaron las clases, y todas existen en el detector elegido.
   - [ ] La regla obstáculo/transitable usa las medidas reales del carro (PEND-12, que salen de P5-19) y la tabla tiene al menos 3 obstáculos y 3 objetos transitables con su altura.
   - [ ] `DOMINIO.md` declara el carro y la cámara (modelo, resolución, altura, ángulo) y sus límites.
@@ -257,12 +266,13 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Alcance**
   - Elegir 2–3 candidatos (D-01); revisar **licencia del código y de los pesos**, tamaño, formato (ONNX disponible o exportable), clases COCO que cubren el dominio.
   - Prueba rápida en **CPU** con varias imágenes con el objeto en distintas posiciones (izquierda, centro, derecha, cerca, lejos) y con una imagen sin objetos. Anotar latencia aproximada y falsos positivos evidentes.
-  - **Probar con fotos reales de los objetos del dominio** (lata de refresco, mochila, caja, tenis), **tomadas con la ESP32-CAM del kit** (misma óptica y compresión JPEG que verá el detector; si el carro aún no transmite, con celular reescalado a 640×480 y recomprimido a JPEG, y repetirlas cuando haya video del carro, P5-19): tabla objeto → ¿lo detecta? → con qué clase y confianza. Con un detector COCO se espera que solo la mochila salga bien (PEND-04).
+  - **Probar con fotos reales de los objetos candidatos de PEND-04** (mochila, botella, taza, silla, maleta), **tomadas con la ESP32-CAM del kit** (misma óptica y compresión JPEG que verá el detector; si el carro aún no transmite, con celular reescalado a 640×480 y recomprimido a JPEG, y repetirlas cuando haya video del carro, P5-19): tabla objeto → ¿lo detecta? → con qué clase y confianza. Se eligen 3 o 4 objetos con la mejor detección, de modo que alguno pueda ir a un lado de la vía (C3, C4). Estas fotos son de **selección** y no entran a las 8 secuencias de evaluación (D-06).
   - Registrar la decisión y los descartados en `modelo/DECISION.md`.
 - **Criterios de aceptación**
   - [ ] Decisión registrada con origen, versión, licencia y razón; incluye lo que se probó y lo que no.
   - [ ] El detector elegido localiza correctamente (a ojo) objetos laterales y centrales en CPU.
-  - [ ] Cada objeto del dominio tiene su resultado en la tabla; los que el detector no reconoce se reemplazan por otros o se cambia de detector **antes** de filmar (P5-09).
+  - [ ] Cada objeto candidato tiene su resultado en la tabla; los que el detector no reconoce se reemplazan por otros o se cambia de detector **antes** de filmar (P5-09).
+  - [ ] Quedan elegidos 3 o 4 objetos que el detector reconoce y los PM A y B los aprobaron antes de filmar (PEND-04).
   - [ ] La prueba incluye fotos de la ESP32-CAM, no solo del celular (o queda dicho que faltan).
   - [ ] Se sabe si el runtime elegido corre en la máquina de PEND-05.
 - **Pendientes:** PEND-04, PEND-05.
@@ -303,11 +313,15 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - Posprocesamiento: umbral de confianza, **NMS**, filtro de clases relevantes y **vuelta de las cajas a píxeles del cuadro original** (si no, izquierda/derecha salen mal en C3/C4).
   - Comando `infer` con entrada, configuración y carpeta de salida configurables que emite un evento del contrato v1 por cuadro (JSONL), con `model_sha256` y `config_sha256`.
   - **No usa etiquetas, nombres de archivo ni el manifiesto para predecir** (la guía lo comprueba): solo píxeles.
+  - La salida es JSON estricto (`allow_nan=False`): una confianza o una caja no finita (NaN, infinito) o una clase fuera de rango no se emite como detección, sino como `status=error` con `invalid_output` (criterio 3.2; el tratamiento del error es de P5-06). El umbral de confianza y el NMS efectivos quedan en la configuración y en `config_sha256`, y un cuadro sin objetos sale como `ok` con lista vacía.
 - **Criterios de aceptación**
   - [ ] Una imagen real → caja, clase y confianza correctas, en CPU, sin red.
   - [ ] Pruebas de unidad del posprocesamiento (NMS, conversión de coordenadas con una imagen de tamaño distinto al de entrada).
   - [ ] Pesos alterados → falla por hash.
   - [ ] Dos corridas con la misma entrada y configuración dan el mismo resultado (o la diferencia se documenta).
+  - [ ] Con imágenes que elija otra persona (una con el objeto al centro, una lateral, una con varios objetos y una sin objetos) las cajas coinciden con los píxeles de entrada y la imagen vacía da `ok` con lista vacía.
+  - [ ] Una copia de la imagen con otro nombre da la misma salida, y una prueba comprueba que `infer` no abre anotaciones ni el manifiesto.
+  - [ ] Ninguna línea de la salida contiene `NaN` ni `Infinity`.
 - **Evidencia:** salida JSONL de ejemplo en `resultados/` y captura del comando.
 - **Pendientes:** PEND-05, PEND-09.
 
@@ -339,18 +353,19 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Depende de:** P5-02 (datos sintéticos primero); datos reales con P5-11
 - **Por qué:** E6 exige un script de recálculo; las cifras resumidas no bastan.
 - **Alcance**
-  - **Emparejamiento uno a uno** de cajas de la **misma clase** con IoU ≥ 0.50; cada caja real se empareja una sola vez; duplicados son FP; objetos sin pareja son FN.
+  - **Emparejamiento uno a uno**, por cuadro y por clase: las predicciones se ordenan por confianza (de mayor a menor) y cada una se empareja con la caja real **aún libre de mayor IoU** de su clase, si IoU ≥ 0.50; cada caja real se usa una sola vez; duplicados son FP; objetos sin pareja son FN; una clase equivocada es FP para la predicción **y** FN para el objeto real. Las cajas se comparan en el mismo sistema de coordenadas (D-04).
   - `precisión = TP/(TP+FP)`, `recall = TP/(TP+FN)`, `F1 = 2TP/(2TP+FP+FN)`; con denominador cero se usa 0 y se marca **"sin soporte"**.
-  - Resultados **por clase** y globales; incluye **cuadros negativos** (sin objetos, donde cualquier detección es FP).
+  - Resultados **micro** (el que puntúa 1.4) y **por clase con su soporte**; incluye **cuadros negativos** (sin objetos, donde cualquier detección es FP). AP es opcional y no sustituye esta fórmula.
   - Comando `metrics` con detecciones, anotaciones y carpeta de salida como parámetros; salida CSV/JSON con TP/FP/FN por cuadro, no solo el resumen.
-  - Pruebas con casos armados a mano: caja perfecta, caja desplazada por debajo de 0.5, duplicado, clase equivocada, cuadro negativo con falso positivo, conjunto sin objetos.
-  - Reportar sobre **todo el conjunto** y por separado sobre la partición de evaluación (D-06).
+  - Pruebas con casos armados a mano: caja perfecta, caja desplazada por debajo de 0.5, duplicado, clase equivocada (1 FP y 1 FN), cuadro negativo con falso positivo, conjunto sin objetos.
+  - Sin ajuste (D-06), todo el conjunto es evaluación: se reporta **un solo juego de cifras sobre todos los cuadros**, con los negativos, los errores y los cuadros omitidos. Un cuadro sin predicción sigue en el denominador (sus objetos son FN) y sale listado; nada se quita para mejorar el F1.
+  - Comprueba que el `model_sha256` y el `config_sha256` de las detecciones coinciden con los pesos y la configuración congelados, y que las predicciones cubren todos los cuadros del manifiesto. Si no, lo avisa: 1.4 solo se acredita con predicciones de procedencia comprobada.
 - **Criterios de aceptación**
   - [ ] Las pruebas manuales dan exactamente los TP/FP/FN esperados.
   - [ ] Otra persona recalcula F1 desde los archivos y obtiene el mismo valor.
   - [ ] Se puede calcular el puntaje 1.4 (`floor(12×F1)/2`) a partir de la salida.
-  - [ ] El umbral de confianza **no** se ajustó con la partición de evaluación (queda dicho en el reporte).
-- **Pendientes:** PEND-07 (detalle y topes del criterio 1.4).
+  - [ ] El umbral de confianza y el NMS estaban congelados antes de correr sobre los cuadros (D-06) y el reporte lo dice.
+- **Pendientes:** ninguno (PEND-07 quedó cerrado el 2026-10-26).
 
 #### P5-15 · Arnés de benchmark (10 calentamientos + 100 ejecuciones)
 - **Responsable:** A3 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2 (arnés) y 6 (medición final) · **Marca:** `[GUÍA]` E7
@@ -379,11 +394,13 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - Anotar cajas con clase en cada cuadro (herramienta de D-03) en el formato acordado (PEND-08) y registrar el **estado esperado** del cuadro (obstáculo/despejado y, útil para B, la zona: izquierda / centro / derecha).
   - Las etiquetas reales **se guardan aparte** de las detecciones.
   - **Revisión cruzada:** A3 revisa una muestra (≥ 20 %) y se corrigen discrepancias antes de congelar.
+  - Se anotan **todos** los objetos de las clases elegidas, también los que quedan fuera de la zona de riesgo (laterales, lejanos, parciales): C3 y C4 necesitan el lado ocupado anotado, y un objeto sin anotar que el detector sí encuentra cuenta como falso positivo. Si se fija un tamaño mínimo, queda escrito y se aplica igual en todos los cuadros.
   - Criterio de anotación escrito (qué cuenta como obstáculo, objetos parciales, tamaño mínimo y **objetos transitables, que no se etiquetan**).
 - **Criterios de aceptación**
   - [ ] Todos los cuadros anotados; los despejados tienen lista vacía **a propósito**, no por olvido.
   - [ ] Muestra revisada por otra persona con las discrepancias resueltas y anotadas.
   - [ ] Las cajas caen sobre los objetos al dibujarlas (script de revisión visual).
+  - [ ] En los cuadros de C3 y C4 el objeto lateral está anotado, y en los cuadros con varios objetos están todos.
 - **Pendientes:** PEND-08.
 
 #### P5-11 · Manifiesto, verificación del conjunto y congelamiento
@@ -391,11 +408,12 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-10
 - **Alcance**
-  - Manifiesto (CSV/JSON): `frame_id`, `sequence_id`, `t_relativo_ms`, ruta, SHA-256, `split` (ajuste/evaluación), estado esperado y procedencia.
-  - Script `verify_dataset`: ≥ 60 cuadros **únicos**, ≥ 6 secuencias, ≥ 20 con obstáculo, ≥ 20 despejados, **ninguna secuencia repartida entre ajuste y evaluación**, hashes coinciden, anotaciones válidas. Sale con código ≠ 0 si algo falla.
-  - **Congelar:** registrar el hash del manifiesto y etiquetar el commit; a partir de ahí, cambios solo con visto bueno de ambos PM.
+  - Manifiesto (CSV/JSON): `frame_id`, `sequence_id`, `t_relativo_ms`, ruta, SHA-256, `split` (`evaluacion` en todos: D-06 declara que no hubo ajuste), estado esperado y procedencia.
+  - Script `verify_dataset`: ≥ 60 cuadros **únicos**, ≥ 6 secuencias, ≥ 20 con obstáculo, ≥ 20 despejados (los mínimos se cumplen con el conjunto de evaluación por sí solo), hashes coinciden, anotaciones válidas. Sale con código ≠ 0 si algo falla.
+  - **Hueco máximo entre cuadros:** ningún par de cuadros consecutivos de una secuencia puede estar separado por más de `validez_orden_ms` (400 ms, se lee de `config/control/plazos.yaml` en vez de fijarlo a mano). Una orden vale 400 ms; si el siguiente cuadro llega después, el corredor de B frena con STOP (T05, #25) en una secuencia que debía avanzar (C1). A los 600 ms (`watchdog_ms`) entra además el watchdog. Si el script de captura (P5-09) deja un hueco mayor, se regraba la secuencia; una armada a propósito con huecos se marca así en el manifiesto.
+  - **Congelar:** registrar el hash del manifiesto y etiquetar el commit, con el umbral de confianza y el NMS ya escritos en `config/` (D-06); a partir de ahí, cambios solo con visto bueno de ambos PM.
 - **Criterios de aceptación**
-  - [ ] `verify_dataset` pasa y falla cuando se rompe una regla (probar quitando un cuadro y moviendo un cuadro de una secuencia a otra partición).
+  - [ ] `verify_dataset` pasa y falla cuando se rompe una regla (probar quitando un cuadro, repitiendo una imagen, abriendo un hueco de más de 400 ms entre dos cuadros y marcando una secuencia con otro `split`).
   - [ ] Hash del manifiesto y de la configuración de evaluación documentados.
   - [ ] Congelado **antes** de ver los resultados del detector sobre evaluación.
 - **Evidencia:** salida de `verify_dataset`; etiqueta del repo con el congelamiento.
@@ -508,7 +526,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Depende de:** P5-11
 - **Alcance**
   - Sección del README del grupo A: responsables y traspasos (con los **ocho nombres** y los dos PM cuando B aporte los suyos), comandos `infer`, `metrics`, `bench`, `verify_dataset`, versión de entrega.
-  - `datos/README.md`: procedencia, cómo se filmó, criterio de anotación, partición y hashes.
+  - `datos/README.md`: procedencia, cómo se filmó, criterio de anotación, la declaración de que no hubo ajuste (D-06) y hashes.
   - Sin secretos; rutas relativas y configurables.
 - **Criterios de aceptación**
   - [ ] Cada comando del README se probó en P5-17.
@@ -540,7 +558,7 @@ Con **E4** (política, adaptador) y **E5** (ejecutar C1–C10) cubiertos por el 
 | Solo hay un clasificador, no un detector. | Sin cajas no hay recorrido: compuerta de 60. | P5-04 en el bloque 1; no reciclar el modelo de P3/P4. |
 | Datos incompletos: faltan negativas, cajas laterales o cuadros únicos. | E3 incumplido; C3/C4 sin material. | Matriz de P5-03; `verify_dataset` (P5-11); D-05 con margen. |
 | Contrato cambiante o coordenadas incompatibles. | B decide mal; izquierda y derecha invertidas. | Versión del contrato, ejemplo compartido (P5-02, P5-08), D-04. |
-| Ajustar el umbral o NMS con la partición de evaluación. | Métricas infladas. | Congelar antes (P5-11); reportar por partición. |
+| Ajustar el umbral o NMS mirando los cuadros de evaluación. | Métricas infladas. | Sin ajuste (D-06): congelar antes (P5-11) y reportar un solo conjunto. |
 | BGR/RGB o *letterbox* mal deshecho. | Detecciones corridas, F1 bajo sin causa clara. | Pruebas de P5-05 con imagen de tamaño distinto. |
 | Integración al final. | Cada grupo muestra su parte y no hay recorrido único. | Primer recorrido el lunes 26 (P5-08). |
 | Licencia del detector (p. ej. AGPL) sin declarar. | E2 incumplido o incómodo de entregar. | D-01: declarar origen y licencia en P5-07. |
