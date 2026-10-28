@@ -324,40 +324,60 @@ def _ram_bytes() -> int | None:
             memoria.dwLength = ctypes.sizeof(_Memoria)
             ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memoria))
             return int(memoria.ullTotalPhys)
+        if platform.system() == "Darwin":
+            comando = ["sysctl", "-n", "hw.memsize"]
+            return int(subprocess.run(comando, capture_output=True, text=True, check=True).stdout)
         return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
-    except (AttributeError, OSError, ValueError):
+    except (AttributeError, OSError, ValueError, subprocess.SubprocessError):
         return None
 
 
+def _energia_windows() -> str | None:
+    class _Energia(ctypes.Structure):
+        _fields_ = [
+            ("ACLineStatus", ctypes.c_ubyte),
+            ("BatteryFlag", ctypes.c_ubyte),
+            ("BatteryLifePercent", ctypes.c_ubyte),
+            ("SystemStatusFlag", ctypes.c_ubyte),
+            ("BatteryLifeTime", ctypes.c_ulong),
+            ("BatteryFullLifeTime", ctypes.c_ulong),
+        ]
+
+    estado = _Energia()
+    if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(estado)):
+        return None
+    return {1: "corriente", 0: "bateria"}.get(estado.ACLineStatus)
+
+
+def _energia_mac() -> str | None:
+    # La primera línea dice "Now drawing from 'AC Power'" o "... 'Battery Power'".
+    comando = ["pmset", "-g", "batt"]
+    salida = subprocess.run(comando, capture_output=True, text=True, check=True).stdout
+    if "AC Power" in salida:
+        return "corriente"
+    if "Battery Power" in salida:
+        return "bateria"
+    return None
+
+
+def _energia_linux() -> str | None:
+    for fuente in Path("/sys/class/power_supply").glob("*/online"):
+        if (fuente.parent / "type").read_text(encoding="utf-8").strip() == "Mains":
+            return "corriente" if fuente.read_text(encoding="utf-8").strip() == "1" else "bateria"
+    return None
+
+
 def energia() -> str:
-    """`corriente`, `bateria` o `desconocida`. Solo se detecta en Windows y Linux."""
+    """`corriente`, `bateria` o `desconocida` (Windows, macOS y Linux)."""
+    detectar = {
+        "Windows": _energia_windows,
+        "Darwin": _energia_mac,
+        "Linux": _energia_linux,
+    }.get(platform.system())
     try:
-        if platform.system() == "Windows":
-
-            class _Energia(ctypes.Structure):
-                _fields_ = [
-                    ("ACLineStatus", ctypes.c_ubyte),
-                    ("BatteryFlag", ctypes.c_ubyte),
-                    ("BatteryLifePercent", ctypes.c_ubyte),
-                    ("SystemStatusFlag", ctypes.c_ubyte),
-                    ("BatteryLifeTime", ctypes.c_ulong),
-                    ("BatteryFullLifeTime", ctypes.c_ulong),
-                ]
-
-            estado = _Energia()
-            if ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(estado)):
-                return {1: "corriente", 0: "bateria"}.get(estado.ACLineStatus, "desconocida")
-        elif platform.system() == "Linux":
-            for fuente in Path("/sys/class/power_supply").glob("*/online"):
-                if (fuente.parent / "type").read_text(encoding="utf-8").strip() == "Mains":
-                    return (
-                        "corriente"
-                        if fuente.read_text(encoding="utf-8").strip() == "1"
-                        else "bateria"
-                    )
-    except (AttributeError, OSError):
-        pass
-    return "desconocida"
+        return (detectar() if detectar else None) or "desconocida"
+    except (AttributeError, OSError, subprocess.SubprocessError):
+        return "desconocida"
 
 
 def hardware() -> dict[str, Any]:

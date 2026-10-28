@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import subprocess
 
 import pytest
 
@@ -9,6 +10,7 @@ from bench import (
     DetectorFalso,
     ErrorBench,
     EtapaPolitica,
+    arnes,
     cargar_entradas,
     ejecutar_una,
     medir,
@@ -255,6 +257,38 @@ def test_hardware_y_energia():
     assert datos["nucleos_logicos"] >= 1
     assert datos["so"]
     assert energia() in {"corriente", "bateria", "desconocida"}
+
+
+@pytest.mark.parametrize(
+    ("pmset", "esperado"),
+    [
+        ("Now drawing from 'AC Power'\n -InternalBattery-0 100%; charged", "corriente"),
+        ("Now drawing from 'Battery Power'\n -InternalBattery-0 80%; discharging", "bateria"),
+        ("", "desconocida"),
+    ],
+)
+def test_energia_en_mac(monkeypatch, pmset, esperado):
+    # El equipo del benchmark es una MacBook (PEND-05): se simula pmset en cualquier SO.
+    monkeypatch.setattr(arnes.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        arnes.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, stdout=pmset),
+    )
+    assert energia() == esperado
+
+
+def test_hardware_en_mac(monkeypatch):
+    salidas = {"machdep.cpu.brand_string": "Apple M3\n", "hw.memsize": "17179869184\n"}
+    monkeypatch.setattr(arnes.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        arnes.subprocess,
+        "run",
+        lambda comando, **k: subprocess.CompletedProcess(comando, 0, stdout=salidas[comando[-1]]),
+    )
+    datos = hardware()
+    assert datos["cpu"] == "Apple M3"
+    assert datos["ram_bytes"] == 16 * 1024**3
 
 
 def test_el_resumen_declara_lo_que_no_se_mide(imagenes, tmp_path):

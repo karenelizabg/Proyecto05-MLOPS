@@ -112,7 +112,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--opcion", action="append", default=[], help="clave=valor para crear().")
     parser.add_argument("--model-sha256", help="SHA-256 de los pesos congelados.")
     parser.add_argument("--config-sha256", help="SHA-256 de la configuración congelada.")
-    parser.add_argument("--equipo", help="Máquina declarada (PEND-05), p. ej. 'laptop de A3'.")
+    parser.add_argument(
+        "--equipo", help="Máquina declarada (PEND-05), p. ej. 'MacBook Air M3 de Heri'."
+    )
     parser.add_argument(
         "--mediciones", type=int, default=MINIMO_MEDICIONES, help="Ejecuciones válidas (>= 100)."
     )
