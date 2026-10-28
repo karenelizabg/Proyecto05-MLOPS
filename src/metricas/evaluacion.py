@@ -123,6 +123,18 @@ def _procedencia(
     return datos, advertencias
 
 
+def _estado_y_predicciones(evento: dict[str, Any] | None) -> tuple[str, list[Prediccion]]:
+    """Solo un evento `ok` trae predicciones; sin evento, `error` o `stale` no predicen nada."""
+    if evento is None:
+        return "sin_evento", []
+    if evento["status"] != "ok":
+        return evento["status"], []
+    return "ok", [
+        Prediccion(d["class_id"], d["confidence"], a_xyxy(d["bbox"], evento["bbox_format"]))
+        for d in evento["detections"]
+    ]
+
+
 def evaluar(
     anotaciones: list[Any],
     eventos: list[Any],
@@ -148,29 +160,23 @@ def evaluar(
         frame = anotacion["frame_id"]
         reales = [Objeto(o["class_id"], tuple(map(float, o["bbox"]))) for o in anotacion["objetos"]]
         evento = por_frame.get(frame)
-        if evento is None:
-            estado, predicciones = "sin_evento", []
+        estado, predicciones = _estado_y_predicciones(evento)
+        if estado == "sin_evento":
             sin_evento.append(frame)
-        elif evento["status"] != "ok":
-            estado, predicciones = evento["status"], []
+        elif estado != "ok":
             con_falla.append(frame)
-        else:
-            estado = "ok"
-            dims = (evento["image_width"], evento["image_height"])
-            if dims != (anotacion["image_width"], anotacion["image_height"]):
-                otras_dimensiones.append(frame)
-            predicciones = [
-                Prediccion(d["class_id"], d["confidence"], a_xyxy(d["bbox"], evento["bbox_format"]))
-                for d in evento["detections"]
-            ]
+        elif (evento["image_width"], evento["image_height"]) != (
+            anotacion["image_width"],
+            anotacion["image_height"],
+        ):
+            otras_dimensiones.append(frame)
 
         pares = emparejar(predicciones, reales)
         conteo = contar(pares)
         total += conteo
-        for clase in {p.class_id for p in pares} | {o.class_id for o in reales}:
-            por_clase[clase] = por_clase.get(clase, Conteo()) + contar(
-                p for p in pares if p.class_id == clase
-            )
+        # Todo objeto real sale en un par (TP o FN), así que los pares cubren todas las clases.
+        for par in pares:
+            por_clase[par.class_id] = por_clase.get(par.class_id, Conteo()) + contar([par])
         por_cuadro.append(
             {
                 "frame_id": frame,

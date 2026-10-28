@@ -10,6 +10,10 @@ y `resumen.json` (micro, por clase, criterio 1.4, procedencia y advertencias).
 Salida: 0 si todo está en orden, 1 si se calcularon las métricas pero hay advertencias
 (procedencia sin comprobar, cuadros sin predicción, mínimos de E3...), 2 si una entrada no se
 puede leer o no cumple su formato.
+
+Las rutas las elige quien corre el comando y pueden estar en cualquier carpeta (el evaluador usa
+las suyas). Por eso las lecturas y escrituras con esas rutas llevan `NOSONAR (S8707)`, como en
+`python -m control`: no hay una carpeta base contra la cual limitarlas.
 """
 
 from __future__ import annotations
@@ -29,11 +33,11 @@ from .evaluacion import EntradaInvalida, evaluar
 
 
 def _sha256(ruta: Path) -> str:
-    return hashlib.sha256(ruta.read_bytes()).hexdigest()
+    return hashlib.sha256(ruta.read_bytes()).hexdigest()  # NOSONAR (S8707)
 
 
 def _escribir_csv(ruta: Path, filas: list[dict[str, Any]], columnas: list[str]) -> None:
-    with ruta.open("w", encoding="utf-8", newline="") as archivo:
+    with ruta.open("w", encoding="utf-8", newline="") as archivo:  # NOSONAR (S8707)
         escritor = csv.DictWriter(archivo, fieldnames=columnas, lineterminator="\n")
         escritor.writeheader()
         escritor.writerows(filas)
@@ -74,7 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "detecciones": {"ruta": args.detecciones.as_posix(), "sha256": _sha256(args.detecciones)},
         "anotaciones": {"ruta": args.anotaciones.as_posix(), "sha256": _sha256(args.anotaciones)},
     }
-    args.salida.mkdir(parents=True, exist_ok=True)
+    args.salida.mkdir(parents=True, exist_ok=True)  # NOSONAR (S8707)
     _escribir_csv(
         args.salida / "por_cuadro.csv",
         resultado.por_cuadro,
@@ -85,9 +89,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         resultado.detalle,
         ["frame_id", "tipo", "class_id", "confidence", "iou", "caja_predicha", "caja_real"],
     )
-    (args.salida / "resumen.json").write_text(
-        json.dumps(resultado.resumen, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    resumen = json.dumps(resultado.resumen, ensure_ascii=False, indent=2) + "\n"
+    (args.salida / "resumen.json").write_text(resumen, encoding="utf-8")  # NOSONAR (S8707)
 
     micro, criterio = resultado.resumen["micro"], resultado.resumen["criterio_1_4"]
     print(

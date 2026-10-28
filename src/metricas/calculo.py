@@ -81,24 +81,29 @@ def emparejar(
     libres = list(range(len(reales)))
     # sorted es estable: con la misma confianza manda el orden en que llegaron.
     for p in sorted(predicciones, key=lambda p: -p.confidence):
-        mejor, mejor_iou = None, 0.0
-        for j in libres:
-            if reales[j].class_id == p.class_id:
-                valor = iou(p.caja, reales[j].caja)
-                if mejor is None or valor > mejor_iou:
-                    mejor, mejor_iou = j, valor
+        mejor, mejor_iou = _libre_de_mayor_iou(p, reales, libres)
         if mejor is not None and mejor_iou >= umbral_iou:
             libres.remove(mejor)
             pares.append(Par("TP", p.class_id, p.confidence, mejor_iou, p.caja, reales[mejor].caja))
         else:
             # Para un FP se anota el mejor IoU que tuvo con un objeto libre de su clase (o nada).
-            pares.append(
-                Par(
-                    "FP", p.class_id, p.confidence, mejor_iou if mejor is not None else None, p.caja
-                )
-            )
+            pares.append(Par("FP", p.class_id, p.confidence, mejor_iou, p.caja))
     pares.extend(Par("FN", reales[j].class_id, caja_real=reales[j].caja) for j in libres)
     return pares
+
+
+def _libre_de_mayor_iou(
+    p: Prediccion, reales: Sequence[Objeto], libres: list[int]
+) -> tuple[int | None, float | None]:
+    """El objeto libre de la clase de `p` con mayor IoU; (None, None) si no queda ninguno."""
+    candidatos = [
+        (iou(p.caja, reales[j].caja), j) for j in libres if reales[j].class_id == p.class_id
+    ]
+    if not candidatos:
+        return None, None
+    # Con el mismo IoU gana el primero en la lista de objetos.
+    mejor_iou, mejor = max(candidatos, key=lambda c: (c[0], -c[1]))
+    return mejor, mejor_iou
 
 
 def contar(pares: Iterable[Par]) -> Conteo:

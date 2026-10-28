@@ -91,7 +91,8 @@ def test_gana_la_prediccion_de_mayor_confianza_aunque_tenga_menos_iou():
     casi = (105.0, 105.0, 205.0, 205.0)
     pares = emparejar([pred(confidence=0.6, caja=CAJA), pred(confidence=0.9, caja=casi)], [real()])
     tp = next(p for p in pares if p.tipo == "TP")
-    assert tp.confidence == 0.9 and tp.caja_predicha == casi
+    assert tp.confidence == 0.9
+    assert tp.caja_predicha == casi
     assert contar(pares) == Conteo(tp=1, fp=1)
 
 
@@ -376,8 +377,18 @@ def test_cli_archivo_que_no_existe_sale_con_2(tmp_path):
 
 
 def test_cli_rechaza_un_hash_mal_escrito(tmp_path):
+    argumentos = [
+        "--detecciones",
+        str(escribir_jsonl(tmp_path / "detecciones.jsonl", [])),
+        "--anotaciones",
+        str(escribir_jsonl(tmp_path / "anotaciones.jsonl", [anotacion("S01_f01")])),
+        "--salida",
+        str(tmp_path / "salida"),
+        "--model-sha256",
+        "ABC",
+    ]
     with pytest.raises(SystemExit) as exc:
-        correr(tmp_path, [anotacion("S01_f01")], [], "--model-sha256", "ABC")
+        main(argumentos)
     assert exc.value.code == 2
 
 
