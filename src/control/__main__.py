@@ -21,6 +21,16 @@ watchdog frene a tiempo aunque haya un hueco (C8); también justo antes de cada 
 `cerrar(ahora_ms)`. No se lee el reloj del sistema, así que la misma entrada deja siempre los
 mismos archivos.
 
+`--acciones acciones.yaml` (opcional, T17) agrega eventos sin cuadro en instantes fijos del mismo
+reloj: `tick`, `emergencia`, `rearmar` y `cerrar` (C10). Una acción va después de los cuadros que
+llegan antes o en su mismo instante; los tics de reloj siguen corriendo hasta ella. Si una acción
+cierra el run, al final ya no se vuelve a cerrar. `run.json` guarda cada acción hecha, con su
+instante y la línea de `comandos.jsonl` que dejó:
+
+    acciones:
+      - {t_ms: 300, accion: emergencia}
+      - {t_ms: 700, accion: rearmar}
+
 Las rutas de `--entrada`, `--config` y `--salida` las elige quien corre el comando y pueden estar
 en cualquier carpeta (el evaluador usa las suyas). Por eso las lecturas y escrituras con esas rutas
 llevan `NOSONAR (S8707)`: no hay una carpeta base contra la cual limitarlas.
@@ -67,6 +77,7 @@ PLAZOS = (
     "paso_reloj_ms",
 )
 CAMPOS_DE_LA_POLITICA = ("action", "speed", "steering", "reason")
+ACCIONES = ("tick", "emergencia", "rearmar", "cerrar")
 
 
 class ErrorPlazos(ValueError):
@@ -75,6 +86,10 @@ class ErrorPlazos(ValueError):
 
 class ErrorEntrada(ValueError):
     """La entrada trae NaN o Infinity, que no son JSON."""
+
+
+class ErrorAcciones(ValueError):
+    """acciones.yaml no tiene la forma esperada."""
 
 
 def cargar_plazos(ruta: Path) -> dict[str, Any]:
@@ -90,6 +105,25 @@ def cargar_plazos(ruta: Path) -> dict[str, Any]:
     if malos:
         raise ErrorPlazos(f"{ruta}: faltan o no son números > 0: {malos}")
     return datos
+
+
+def cargar_acciones(ruta: Path) -> list[dict[str, Any]]:
+    """Lee acciones.yaml: `t_ms` finito >= 0 que no baja y una `accion` de ACCIONES."""
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))  # NOSONAR (S8707)
+    lista = datos.get("acciones") if isinstance(datos, dict) else None
+    if not isinstance(lista, list):
+        raise ErrorAcciones(f"{ruta}: debe tener una lista `acciones`")
+    anterior = 0.0
+    for n, item in enumerate(lista, start=1):
+        t = item.get("t_ms") if isinstance(item, dict) else None
+        if not isinstance(item, dict) or set(item) != {"t_ms", "accion"}:
+            raise ErrorAcciones(f"{ruta}: acción {n}: lleva exactamente t_ms y accion")
+        if not _es_numero(t) or not math.isfinite(t) or t < anterior:
+            raise ErrorAcciones(f"{ruta}: acción {n}: t_ms debe ser un número >= {anterior}")
+        if item["accion"] not in ACCIONES:
+            raise ErrorAcciones(f"{ruta}: acción {n}: {item['accion']!r} no es una de {ACCIONES}")
+        anterior = float(t)
+    return lista
 
 
 class PoliticaRegistrada:
@@ -132,6 +166,9 @@ class Corrida:
         self.comandos = 0
         self.invalidos = 0
         self.ahora_ms = 0.0
+        # Cada acción hecha (acciones.yaml y el cierre final), para run.json.
+        self.hechas: list[dict[str, Any]] = []
+        self.cerrada = False
 
     def cuadro(self, evento: Any) -> None:
         """Un evento del detector: tics de reloj hasta su llegada y luego el supervisor decide."""
@@ -146,8 +183,40 @@ class Corrida:
         comando = self.supervisor.procesar_evento(evento, self.ahora_ms)
         self._registrar(comando, self.politica.propuesta)
 
+    def accion(self, nombre: str, t_ms: float) -> None:
+        """Un evento sin cuadro de acciones.yaml: tics de reloj hasta `t_ms` y luego la acción."""
+        if t_ms > self.ahora_ms:
+            self._tics_hasta(t_ms)
+            self.ahora_ms = float(t_ms)
+        if nombre == "cerrar":
+            self.cerrar()
+            return
+        posicion = self.comandos
+        self.politica.propuesta = None
+        if nombre == "tick":
+            comando = self.supervisor.tick(self.ahora_ms)
+        elif nombre == "emergencia":
+            comando = self.supervisor.emergencia(self.ahora_ms)
+        else:
+            # Al rearmar, la política puede decidir con el último cuadro (T06).
+            comando = self.supervisor.rearmar(self.ahora_ms)
+        self._registrar(comando, self.politica.propuesta)
+        self._anotar(nombre, posicion, comando)
+
     def cerrar(self) -> None:
-        self._registrar(self.supervisor.cerrar(self.ahora_ms), None)
+        """STOP final. Solo una vez: si acciones.yaml ya cerró el run, no se repite."""
+        if self.cerrada:
+            return
+        self.cerrada = True
+        posicion = self.comandos
+        comando = self.supervisor.cerrar(self.ahora_ms)
+        self._registrar(comando, None)
+        self._anotar("cerrar", posicion, comando)
+
+    def _anotar(self, nombre: str, posicion: int, comando: dict[str, Any] | None) -> None:
+        # `comando`: la línea (desde 0) de comandos.jsonl que dejó la acción, o None si no dejó.
+        linea = posicion if comando is not None else None
+        self.hechas.append({"accion": nombre, "t_ms": self.ahora_ms, "comando": linea})
 
     def _tics_hasta(self, llegada_ms: float) -> None:
         """Un tic cada `paso_reloj_ms` desde el cuadro anterior, sin llegar al siguiente."""
@@ -201,13 +270,21 @@ class Corrida:
             },
         )
 
-    def escribir_run(self, entrada: Path, carpeta_config: Path) -> dict[str, Any]:
-        """run.json: con qué entrada y configuración se corrió y cuánto salió."""
+    def escribir_run(
+        self, entrada: Path, carpeta_config: Path, acciones: Path | None = None
+    ) -> dict[str, Any]:
+        """run.json: con qué entrada, acciones y configuración se corrió y cuánto salió."""
         detecciones = _leer_jsonl(self.ruta_detecciones)
         eventos = [e for e in detecciones if isinstance(e, dict)]
         resumen = {
             "run_ids": _distintos(eventos, "run_id"),
             "entrada": {"ruta": entrada.as_posix(), "sha256": _sha256(entrada)},
+            "acciones": {
+                "archivo": (
+                    {"ruta": acciones.as_posix(), "sha256": _sha256(acciones)} if acciones else None
+                ),
+                "hechas": self.hechas,
+            },
             "config": {
                 nombre: {
                     "ruta": (carpeta_config / nombre).as_posix(),
@@ -238,12 +315,38 @@ class Corrida:
         return resumen
 
 
+def correr(
+    salida: Path,
+    plazos: dict[str, Any],
+    config_politica: Any,
+    eventos: list[Any],
+    acciones: Sequence[dict[str, Any]] = (),
+) -> Corrida:
+    """Pasa los eventos y las acciones en orden de reloj y cierra el run."""
+    corrida = Corrida(salida, plazos, config_politica)
+    pendientes = list(acciones)
+    for evento in eventos:
+        llegada_ms = _reloj(evento, corrida.ahora_ms)
+        while pendientes and pendientes[0]["t_ms"] < llegada_ms:
+            accion = pendientes.pop(0)
+            corrida.accion(accion["accion"], accion["t_ms"])
+        corrida.cuadro(evento)
+    for accion in pendientes:
+        corrida.accion(accion["accion"], accion["t_ms"])
+    corrida.cerrar()
+    return corrida
+
+
 def _reloj(evento: Any, anterior_ms: float) -> float:
     """`t_emit_ms` del evento; si no trae uno válido, se queda el instante anterior."""
     t = evento.get("t_emit_ms") if isinstance(evento, dict) else None
-    if isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 0:
+    if _es_numero(t) and t >= 0:
         return float(t)
     return anterior_ms
+
+
+def _es_numero(valor: Any) -> bool:
+    return isinstance(valor, (int, float)) and not isinstance(valor, bool)
 
 
 def _anexar(ruta: Path, linea: Any) -> None:
@@ -296,6 +399,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="carpeta con plazos.yaml y politica.yaml",
     )
     parser.add_argument("--salida", type=Path, required=True, help="carpeta de resultados del run")
+    parser.add_argument(
+        "--acciones",
+        type=Path,
+        default=None,
+        help="acciones.yaml con tick, emergencia, rearmar y cerrar en instantes fijos (T17)",
+    )
     args = parser.parse_args(argv)
 
     entrada, carpeta_config, salida = args.entrada, args.config, args.salida
@@ -306,6 +415,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_politica = cargar_config_politica(carpeta_config / NOMBRE_POLITICA)
         eventos = leer_eventos(entrada)
         _revisar_entrada(eventos)
+        acciones = cargar_acciones(args.acciones) if args.acciones else []
     except (
         OSError,
         json.JSONDecodeError,
@@ -313,15 +423,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         ErrorPlazos,
         ErrorConfigPolitica,
         ErrorEntrada,
+        ErrorAcciones,
     ) as exc:
         print(f"no se pudo leer la entrada o la configuración: {exc}", file=sys.stderr)
         return 2
 
-    corrida = Corrida(salida, plazos, config_politica)
-    for evento in eventos:
-        corrida.cuadro(evento)
-    corrida.cerrar()
-    conteos = corrida.escribir_run(entrada, carpeta_config)["conteos"]
+    corrida = correr(salida, plazos, config_politica, eventos, acciones)
+    conteos = corrida.escribir_run(entrada, carpeta_config, args.acciones)["conteos"]
 
     print(
         f"{salida}: {conteos['eventos']} eventos, {conteos['comandos']} comandos, "

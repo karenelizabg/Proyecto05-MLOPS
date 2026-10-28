@@ -423,3 +423,132 @@ def test_python_m_control_desde_la_raiz(tmp_path):
     assert proceso.returncode == 0, proceso.stderr
     assert "5 eventos, 6 comandos, 2 errores" in proceso.stdout
     assert len(leer(salida / "comandos.jsonl")) == 6
+
+
+# --- acciones.yaml: tick, emergencia, rearmar y cerrar (T17) ----------------------
+
+
+def con_acciones(tmp_path: Path, acciones: list[dict]) -> Path:
+    ruta = tmp_path / "acciones.yaml"
+    ruta.write_text(yaml.safe_dump({"acciones": acciones}), encoding="utf-8")
+    return ruta
+
+
+def correr_con_acciones(salida: Path, acciones: Path, entrada: Path = FLUJO) -> int:
+    return main(
+        [
+            *("--entrada", str(entrada), "--config", str(CONFIG)),
+            *("--salida", str(salida), "--acciones", str(acciones)),
+        ]
+    )
+
+
+def libres(tmp_path: Path, n: int = 4) -> Path:
+    """n cuadros despejados a 5 fps: capturados cada 200 ms, recibidos 40 ms después."""
+    base = leer_eventos(FLUJO)[0]
+    eventos = [
+        {
+            **base,
+            "frame_id": f"S02_f{i + 1:04d}",
+            "t_capture_ms": 200 * i,
+            "t_emit_ms": 200 * i + 40,
+        }
+        for i in range(n)
+    ]
+    return escribir(tmp_path / "libres.jsonl", eventos)
+
+
+def test_emergencia_y_rearme_en_su_instante_y_en_run_json(tmp_path):
+    acciones = con_acciones(
+        tmp_path, [{"t_ms": 300, "accion": "emergencia"}, {"t_ms": 500, "accion": "rearmar"}]
+    )
+    salida = tmp_path / "s"
+    assert correr_con_acciones(salida, acciones, libres(tmp_path)) == 0
+
+    comandos = leer(salida / "comandos.jsonl")
+    pasos = [(c["event"], c["action"], c["t_command_ms"]) for c in comandos]
+    assert pasos == [
+        ("frame", "AVANZAR", 40.0),
+        ("frame", "AVANZAR", 240.0),
+        ("emergency", "STOP", 300.0),
+        ("frame", "STOP", 440.0),  # emergencia_activa
+        ("rearm", "AVANZAR", 500.0),  # T06: decide con el cuadro de 440, que es fresco
+        ("frame", "AVANZAR", 640.0),
+        ("shutdown", "STOP", 640.0),
+    ]
+    assert all(validar_comando(c) == [] for c in comandos)
+    run = json.loads((salida / "run.json").read_text(encoding="utf-8"))
+    assert run["acciones"]["archivo"]["sha256"] == hashlib.sha256(acciones.read_bytes()).hexdigest()
+    assert run["acciones"]["hechas"] == [
+        {"accion": "emergencia", "t_ms": 300.0, "comando": 2},
+        {"accion": "rearmar", "t_ms": 500.0, "comando": 4},
+        {"accion": "cerrar", "t_ms": 640.0, "comando": 6},
+    ]
+    rearme = leer(salida / "decisiones.jsonl")[4]
+    assert (rearme["event"], rearme["decidio"]) == ("rearm", "politica")
+
+
+def test_una_accion_va_despues_del_cuadro_de_su_mismo_instante(tmp_path):
+    acciones = con_acciones(tmp_path, [{"t_ms": 240, "accion": "emergencia"}])
+    salida = tmp_path / "s"
+    assert correr_con_acciones(salida, acciones, libres(tmp_path, 2)) == 0
+    eventos = [c["event"] for c in leer(salida / "comandos.jsonl")]
+    assert eventos == ["frame", "frame", "emergency", "shutdown"]
+
+
+def test_cerrar_en_acciones_no_se_repite_al_final(tmp_path):
+    acciones = con_acciones(tmp_path, [{"t_ms": 300, "accion": "cerrar"}])
+    salida = tmp_path / "s"
+    assert correr_con_acciones(salida, acciones, libres(tmp_path)) == 0
+    comandos = leer(salida / "comandos.jsonl")
+    assert [c["event"] for c in comandos].count("shutdown") == 1
+    cierre, *despues = comandos[2:]
+    assert (cierre["event"], cierre["t_command_ms"]) == ("shutdown", 300.0)
+    # Los cuadros que llegan después del cierre dan STOP (T06).
+    assert [(c["action"], c["reason"]) for c in despues] == [("STOP", "supervisor_cerrado")] * 2
+
+
+def test_tick_despues_del_ultimo_cuadro_deja_correr_el_reloj(tmp_path):
+    """Un hueco al final de la entrada: sin un tick, el run cerraría antes de que venza la orden."""
+    acciones = con_acciones(tmp_path, [{"t_ms": 1000, "accion": "tick"}])
+    salida = tmp_path / "s"
+    assert correr_con_acciones(salida, acciones, libres(tmp_path, 1)) == 0
+    comandos = leer(salida / "comandos.jsonl")
+    assert [(c["event"], c["action"]) for c in comandos] == [
+        ("frame", "AVANZAR"),
+        ("clock", "STOP"),
+        ("shutdown", "STOP"),
+    ]
+    # La orden de 40 ms vale hasta 440; el primer tic después es el de 540.
+    assert comandos[1]["t_command_ms"] == pytest.approx(540.0)
+    hechas = json.loads((salida / "run.json").read_text(encoding="utf-8"))["acciones"]["hechas"]
+    assert hechas[0] == {"accion": "tick", "t_ms": 1000.0, "comando": None}
+
+
+def test_sin_acciones_run_json_solo_trae_el_cierre(salida):
+    run = json.loads((salida / "run.json").read_text(encoding="utf-8"))
+    assert run["acciones"] == {
+        "archivo": None,
+        "hechas": [{"accion": "cerrar", "t_ms": 1650.0, "comando": 5}],
+    }
+
+
+@pytest.mark.parametrize(
+    "contenido",
+    [
+        "acciones: [{t_ms: 100, accion: frenar}]\n",
+        "acciones: [{t_ms: 300, accion: tick}, {t_ms: 200, accion: tick}]\n",
+        "acciones: [{t_ms: -1, accion: tick}]\n",
+        "acciones: [{t_ms: .nan, accion: tick}]\n",
+        "acciones: [{t_ms: 100}]\n",
+        "acciones: [{t_ms: 100, accion: tick, extra: 1}]\n",
+        "acciones: [{t_ms: true, accion: tick}]\n",
+        "- {t_ms: 100, accion: tick}\n",
+    ],
+)
+def test_acciones_mal_escritas_salen_2_sin_escribir_nada(tmp_path, contenido):
+    ruta = tmp_path / "acciones.yaml"
+    ruta.write_text(contenido, encoding="utf-8")
+    salida = tmp_path / "s"
+    assert correr_con_acciones(salida, ruta) == 2
+    assert not salida.exists()
