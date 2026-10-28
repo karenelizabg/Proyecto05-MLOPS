@@ -39,6 +39,28 @@ RUTA_ESQUEMA_ANOTACIONES = RAIZ / "config" / "anotaciones" / "anotaciones.v1.sch
 MINIMOS_E3 = {"cuadros": 60, "secuencias": 6, "con_objetos": 20, "sin_objetos": 20}
 TOPE_SIN_MINIMOS_E3 = 3.0
 
+# Misma tolerancia que el validador del contrato: solo absorbe redondeo de coma flotante. Una
+# caja que pasa del borde se recorta a la imagen al anotar, igual que el detector al emitir.
+_TOL = 1e-6
+
+# D-06: no hay partición de ajuste. Todo el conjunto es evaluación y el umbral de confianza y el
+# NMS se congelan antes de correr sobre los cuadros (su hash es el config_sha256).
+PARTICION = {
+    "evaluacion": "todo el conjunto",
+    "ajuste": "no hubo (D-06)",
+    "umbral_y_nms": "congelados antes de correr sobre los cuadros; ver config_sha256",
+}
+
+AVISOS_POR_CUADRO = {
+    "sin_evento": "cuadros anotados sin evento del detector",
+    "error_o_stale": "cuadros con status error o stale",
+    "secuencia_distinta": "cuadros cuyo sequence_id no coincide con el anotado",
+    "dimensiones_distintas": (
+        "cuadros con dimensiones distintas a las anotadas: "
+        "las cajas no están en el mismo sistema de coordenadas"
+    ),
+}
+
 
 class EntradaInvalida(Exception):
     """Las detecciones o las anotaciones no se pueden evaluar tal como están."""
@@ -88,7 +110,7 @@ def validar_anotaciones(anotaciones: list[Any]) -> list[str]:
                 errores.append(f"{donde}: debe tener números finitos")
             elif x2 <= x1 or y2 <= y1:
                 errores.append(f"{donde}: la caja debe tener ancho y alto positivos")
-            elif x2 > ancho or y2 > alto:
+            elif x2 > ancho + _TOL or y2 > alto + _TOL:
                 errores.append(f"{donde}: la caja sale de la imagen ({ancho}x{alto})")
     return errores
 
@@ -135,6 +157,21 @@ def _estado_y_predicciones(evento: dict[str, Any] | None) -> tuple[str, list[Pre
     ]
 
 
+def _problemas_del_cuadro(
+    anotacion: dict[str, Any], evento: dict[str, Any] | None, estado: str
+) -> list[str]:
+    """Claves de `AVISOS_POR_CUADRO` que aplican a este cuadro."""
+    if evento is None:
+        return ["sin_evento"]
+    claves = [] if estado == "ok" else ["error_o_stale"]
+    if evento["sequence_id"] != anotacion["sequence_id"]:
+        claves.append("secuencia_distinta")
+    dims = (evento["image_width"], evento["image_height"])
+    if estado == "ok" and dims != (anotacion["image_width"], anotacion["image_height"]):
+        claves.append("dimensiones_distintas")
+    return claves
+
+
 def evaluar(
     anotaciones: list[Any],
     eventos: list[Any],
@@ -154,22 +191,15 @@ def evaluar(
     por_cuadro: list[dict[str, Any]] = []
     detalle: list[dict[str, Any]] = []
     total, por_clase = Conteo(), {}
-    sin_evento, con_falla, otras_dimensiones = [], [], []
+    problemas: dict[str, list[str]] = {clave: [] for clave in AVISOS_POR_CUADRO}
 
     for anotacion in anotaciones:
         frame = anotacion["frame_id"]
         reales = [Objeto(o["class_id"], tuple(map(float, o["bbox"]))) for o in anotacion["objetos"]]
         evento = por_frame.get(frame)
         estado, predicciones = _estado_y_predicciones(evento)
-        if estado == "sin_evento":
-            sin_evento.append(frame)
-        elif estado != "ok":
-            con_falla.append(frame)
-        elif (evento["image_width"], evento["image_height"]) != (
-            anotacion["image_width"],
-            anotacion["image_height"],
-        ):
-            otras_dimensiones.append(frame)
+        for clave in _problemas_del_cuadro(anotacion, evento, estado):
+            problemas[clave].append(frame)
 
         pares = emparejar(predicciones, reales)
         conteo = contar(pares)
@@ -192,15 +222,11 @@ def evaluar(
         detalle += [_fila_detalle(frame, par) for par in pares]
 
     sin_anotar = sorted(set(por_frame) - anotados)
-    if sin_evento:
-        advertencias.append(f"{len(sin_evento)} cuadros anotados sin evento del detector")
-    if con_falla:
-        advertencias.append(f"{len(con_falla)} cuadros con status error o stale")
-    if otras_dimensiones:
-        advertencias.append(
-            f"{len(otras_dimensiones)} cuadros con dimensiones distintas a las anotadas: "
-            "las cajas no están en el mismo sistema de coordenadas"
-        )
+    advertencias += [
+        f"{len(problemas[clave])} {aviso}"
+        for clave, aviso in AVISOS_POR_CUADRO.items()
+        if problemas[clave]
+    ]
     if sin_anotar:
         advertencias.append(f"{len(sin_anotar)} eventos de cuadros sin anotación (no se cuentan)")
 
@@ -222,13 +248,12 @@ def evaluar(
     resumen = {
         "version": 1,
         "umbral_iou": UMBRAL_IOU,
+        "particion": PARTICION,
         "procedencia": procedencia,
         "conjunto": {**conjunto, "minimos_e3": MINIMOS_E3, "cumple_minimos_e3": not faltan_minimos},
         "cuadros": {
             "ok": sum(1 for f in por_cuadro if f["estado"] == "ok"),
-            "sin_evento": sin_evento,
-            "error_o_stale": con_falla,
-            "dimensiones_distintas": otras_dimensiones,
+            **problemas,
             "eventos_sin_anotacion": sin_anotar,
         },
         "micro": calcular_metricas(total),
@@ -241,7 +266,9 @@ def evaluar(
             "puntaje": puntaje,
             "puntaje_con_tope_e3": min(puntaje, TOPE_SIN_MINIMOS_E3) if faltan_minimos else puntaje,
             "procedencia_comprobada": procedencia["comprobada"],
-            "cobertura_completa": not (sin_evento or con_falla or sin_anotar),
+            "cobertura_completa": not (
+                problemas["sin_evento"] or problemas["error_o_stale"] or sin_anotar
+            ),
         },
         "advertencias": advertencias,
     }

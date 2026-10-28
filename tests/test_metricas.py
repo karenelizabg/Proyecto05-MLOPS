@@ -253,6 +253,29 @@ def test_dimensiones_distintas_se_avisan():
     assert resumen["cuadros"]["dimensiones_distintas"] == ["S01_f01"]
 
 
+def test_secuencia_distinta_se_avisa():
+    anotaciones = [anotacion("S01_f01", secuencia="S01")]
+    resumen = evaluar(anotaciones, [evento("S01_f01", 0, secuencia="S02")], MODELO, CONFIG).resumen
+
+    assert resumen["cuadros"]["secuencia_distinta"] == ["S01_f01"]
+    assert any("sequence_id no coincide" in a for a in resumen["advertencias"])
+
+
+def test_caja_en_el_borde_usa_la_tolerancia_del_contrato():
+    justo = anotacion("S01_f01", objetos=[(0, (100, 100, 200, 480.0000001))])
+    assert evaluar([justo], [evento("S01_f01", 0)], MODELO, CONFIG).por_cuadro[0]["reales"] == 1
+
+    pasada = anotacion("S01_f01", objetos=[(0, (100, 100, 200, 480.4))])
+    with pytest.raises(EntradaInvalida, match="sale de la imagen"):
+        evaluar([pasada], [evento("S01_f01", 0)])
+
+
+def test_el_reporte_declara_que_no_hubo_ajuste():
+    resumen = evaluar([anotacion("S01_f01")], [evento("S01_f01", 0)], MODELO, CONFIG).resumen
+    assert resumen["particion"]["ajuste"] == "no hubo (D-06)"
+    assert "congelados" in resumen["particion"]["umbral_y_nms"]
+
+
 def test_procedencia():
     anotaciones, eventos = [anotacion("S01_f01")], [evento("S01_f01", 0)]
 

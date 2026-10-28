@@ -21,6 +21,8 @@ Un JSONL con **una línea por cuadro del conjunto**, también los despejados:
 - `image_width`, `image_height`: el cuadro original. Si no coinciden con las del evento, las métricas lo avisan:
   las cajas no estarían en el mismo sistema de coordenadas.
 - `objetos[].bbox`: `[x1, y1, x2, y2]` en píxeles del cuadro original (D-04, igual que el contrato).
+  **Se recorta a la imagen al anotar**: una caja que termina en 480.4 sobre un cuadro de 480 se rechaza. La
+  tolerancia es la misma del validador del contrato (`1e-6`, solo para redondeo).
 - `objetos[].class_id`: según `modelo/clases.json`. `class_name` es opcional.
 - Un cuadro despejado lleva `"objetos": []` **a propósito**. Se pueden agregar campos (por ejemplo, el estado
   esperado para B); las métricas los ignoran.
@@ -56,5 +58,10 @@ distintos de los congelados, cuadros sin predicción válida, mínimos de E3, di
 entrada no se puede leer o no cumple su formato. La corrida que se entrega debe salir con `0`: predicciones
 de los pesos y la configuración congelados, que cubren todos los cuadros de un conjunto que cumple E3.
 
-El umbral de confianza y el NMS **no** se aplican aquí: vienen congelados en la configuración del detector
-(D-06), y su hash es el `--config-sha256`.
+**Partición (D-06):** no hay partición de ajuste. Todo el conjunto es evaluación, así que hay **un solo juego
+de cifras**, sobre todos los cuadros; `resumen.json` lo declara en `particion`. El umbral de confianza y el NMS
+**no** se ajustaron con estos cuadros ni se aplican aquí: vienen congelados en la configuración del detector
+antes de correr, y su hash es el `--config-sha256`.
+
+Si el `sequence_id` de un evento no coincide con el anotado para el mismo cuadro, se avisa
+(`secuencia_distinta`): los mínimos de E3 se cuentan con las secuencias anotadas.
