@@ -1,0 +1,31 @@
+Caso  Entrada  Tramos  Resultado
+C1    -        -       FALLA
+C2    -        -       FALLA
+C3    -        -       FALLA
+C4    -        -       FALLA
+C5    -        -       FALLA
+C6    -        -       FALLA
+C7    -        -       FALLA
+C8    armada   3/3     PASA
+C9    armada   4/4     PASA
+C10   armada   6/7     FALLA
+
+2 de 10 casos pasan.
+
+Por qué fallan (detalle en resultados/casos/Cn/veredicto.json):
+  C1
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C2
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C3
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C4
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C5
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C6
+    - falta entrada.jsonl
+  C7
+    - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
+  C10
+    - rearme: orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida

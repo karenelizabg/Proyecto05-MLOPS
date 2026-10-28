@@ -1,0 +1,3 @@
+{"run_id": "casos-c8-armado", "frame_id": null, "t_ms": 940.0, "motivo": "orden_vencida", "errores": ["la orden AVANZAR valía hasta 840.0 ms"]}
+{"run_id": "casos-c8-armado", "frame_id": "X01_f0004", "t_ms": 1440.0, "motivo": "stale", "errores": ["status=stale: cuadro de 540 ms; se rechaza y se cancela la orden previa"]}
+{"run_id": "casos-c8-armado", "frame_id": "X01_f0005", "t_ms": 1640.0, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 540.0 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}

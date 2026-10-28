@@ -1,0 +1,65 @@
+{
+  "caso": "C10",
+  "entrada": "armada",
+  "tramos": [
+    {
+      "tramo": "antes_de_la_emergencia",
+      "ordenes": [
+        1,
+        2
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "emergencia",
+      "ordenes": [
+        3
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "enclavada",
+      "ordenes": [
+        4,
+        5
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "rearme",
+      "ordenes": [
+        6
+      ],
+      "motivos": [
+        "orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida"
+      ]
+    },
+    {
+      "tramo": "rearme_con_cuadro_viejo",
+      "ordenes": [
+        8
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "rearme_con_cuadro_fresco",
+      "ordenes": [
+        9,
+        10,
+        11
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "cierre",
+      "ordenes": [
+        12
+      ],
+      "motivos": []
+    }
+  ],
+  "pasa": false,
+  "motivos": [
+    "rearme: orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida"
+  ]
+}

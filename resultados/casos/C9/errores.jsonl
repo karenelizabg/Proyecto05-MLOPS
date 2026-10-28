@@ -1,0 +1,5 @@
+{"run_id": "casos-c9-armado", "frame_id": "X02_f0002", "t_ms": 240.0, "motivo": "error_detector:unreadable_image", "errores": ["error.code: 'unreadable_image'", "error.message: 'No se pudo decodificar el cuadro (JPEG truncado).'"]}
+{"run_id": "casos-c9-armado", "frame_id": "X02_f0004", "t_ms": 640.0, "motivo": "error_detector:detector_exception", "errores": ["error.code: 'detector_exception'", "error.message: 'El detector lanzó una excepción.'"]}
+{"run_id": "casos-c9-armado", "frame_id": null, "t_ms": 1340.0, "motivo": "orden_vencida", "errores": ["la orden AVANZAR valía hasta 1240.0 ms"]}
+{"run_id": "casos-c9-armado", "frame_id": "X02_f0006", "t_ms": 1500.0, "motivo": "error_detector:detector_timeout", "errores": ["error.code: 'detector_timeout'", "error.message: 'La inferencia pasó de 500 ms.'"]}
+{"run_id": "casos-c9-armado", "frame_id": "X02_f0008", "t_ms": 1840.0, "motivo": "error_detector:invalid_output", "errores": ["error.code: 'invalid_output'", "error.message: 'La salida del detector no tiene la forma esperada.'"]}
