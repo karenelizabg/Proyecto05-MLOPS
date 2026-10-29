@@ -61,8 +61,11 @@ def cuadro(n: int, **cambios) -> dict:
     return evento
 
 
+BOTELLA = 39  # bottle: una de las clases_obstaculo de config/control/politica.yaml
+
+
 def obstaculo(x1: float, x2: float, confianza: float = 0.9) -> list[dict]:
-    return [{"class_id": 1, "confidence": confianza, "bbox": [x1, 100.0, x2, 400.0]}]
+    return [{"class_id": BOTELLA, "confidence": confianza, "bbox": [x1, 100.0, x2, 400.0]}]
 
 
 def armar_caso(casos: Path, caso: str, eventos: list[dict], tramos: dict, entrada="real") -> None:
