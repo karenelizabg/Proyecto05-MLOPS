@@ -1,0 +1,8 @@
+grupo,fotografias,clases_de_interes,asociaciones_visuales_clase_interes_geometria_valida,asociaciones_visuales_geometria_invalida,observacion
+botella,4,bottle,3,0,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+mochila,7,backpack,2,1,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+taza,4,cup,1,0,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+silla,6,chair,1,0,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+maleta,4,suitcase;handbag,1,0,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+vacio,2,,no aplica,no aplica,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia
+varios,2,,no aplica,no aplica,Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia

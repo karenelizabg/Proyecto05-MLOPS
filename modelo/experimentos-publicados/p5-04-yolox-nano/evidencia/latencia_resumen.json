@@ -1,0 +1,40 @@
+{
+  "load_ms": 44.039374974090606,
+  "first_image": "botella_centro_cerca.jpg",
+  "first_image_ms": {
+    "preprocess_ms": 6.995707983151078,
+    "inference_ms": 23.77958397846669,
+    "postprocess_ms": 0.9399169939570129,
+    "wall_ms": 31.853583001066
+  },
+  "subsequent_images": 28,
+  "preprocess_ms": {
+    "min": 0.8100830018520355,
+    "median": 0.8918330131564289,
+    "p95_linear": 1.100183537346311,
+    "max": 1.1154170497320592
+  },
+  "inference_ms": {
+    "min": 19.291332981083542,
+    "median": 19.760271010454744,
+    "p95_linear": 21.08795580570586,
+    "max": 21.36812504613772
+  },
+  "postprocess_ms": {
+    "min": 0.6525830249302089,
+    "median": 0.7594784838147461,
+    "p95_linear": 0.8734666713280602,
+    "max": 1.4971669879741967
+  },
+  "wall_ms": {
+    "min": 20.870542037300766,
+    "median": 21.55827099340968,
+    "p95_linear": 23.17189943860285,
+    "max": 23.260417045094073
+  },
+  "invalid_results": [
+    "mochila_cerca.jpg clase 24: caja fuera de límites o degenerada",
+    "mochila_cerca.jpg clase 28: caja fuera de límites o degenerada",
+    "mochila_lado_2.jpg clase 0: caja fuera de límites o degenerada"
+  ]
+}

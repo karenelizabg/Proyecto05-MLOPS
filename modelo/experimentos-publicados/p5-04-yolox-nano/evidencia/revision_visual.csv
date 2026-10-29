@@ -1,0 +1,30 @@
+archivo,objeto_visible,estado_visual,asociacion_clase_objetivo_valida,asociacion_clase_objetivo_geometria_invalida,observacion
+botella_centro_cerca.jpg,botella,coincide,1,0,Bottle sobre la botella cercana.
+botella_centro_lejos.jpg,botella,omitido,0,0,No se detecta la botella lejana; chair aparece sobre el bote del fondo.
+botella_der.jpg,botella,coincide_con_confusion,1,0,Bottle y parking meter comparten la botella derecha.
+botella_izq.jpg,botella,coincide,1,0,Bottle sobre la botella izquierda.
+maleta_centro_cerca.jpg,estuche_blando,coincide_suitcase,1,0,Suitcase sobre el estuche rojo cercano; no hay handbag.
+maleta_centro_lejos.jpg,estuche_blando,omitido,0,0,Estuche lejano omitido; refrigerator aparece sobre muebles o puertas del fondo.
+maleta_der.jpg,estuche_blando,clase_incorrecta,0,0,Chair sobre el estuche; refrigerator sobre muebles o puertas del fondo.
+maleta_izq.jpg,estuche_blando,clase_incorrecta,0,0,Chair y couch sobre el estuche; refrigerator sobre el fondo.
+mochila_centro_cerca.jpg,mochila,clase_incorrecta,0,0,Dos cajas suitcase sobre la mochila; sin backpack.
+mochila_centro_lejos.jpg,mochila,coincide_con_confusion,1,0,Backpack y suitcase sobre la misma mochila lejana.
+mochila_cerca.jpg,mochila,coincide_geometria_invalida,0,1,Backpack y suitcase sobre la mochila pero ambas cajas tienen y1 negativa; no se cuentan como válidas.
+mochila_der.jpg,mochila,clase_incorrecta,0,0,Suitcase sobre la mochila derecha; sin backpack.
+mochila_izq.jpg,mochila,coincide_con_confusion,1,0,Backpack y suitcase sobre la mochila izquierda.
+mochila_lado.jpg,mochila,clase_incorrecta,0,0,Person sobre la mochila lateral; sin backpack.
+mochila_lado_2.jpg,mochila,clase_incorrecta_geometria_invalida,0,0,Person sobre la mochila lateral; caja con y1 negativa; sin backpack.
+silla_centro_cerca.jpg,silla,omitido,0,0,No hay detecciones; la silla cercana aparece principalmente como base parcial.
+silla_centro_der.jpg,silla,clase_incorrecta,0,0,Airplane sobre la silla real; chair sobre el bote de la izquierda y no sobre la silla.
+silla_centro_lejos.jpg,silla,coincide_con_falso_positivo,1,0,Dos cajas chair sobre la silla real y otra chair sobre el bote de la izquierda.
+silla_der.jpg,silla,clase_incorrecta,0,0,Tv sobre la silla real; refrigerator sobre fondo; se omite la botella visible en el borde.
+silla_izq.jpg,silla,clase_incorrecta,0,0,Traffic light sobre el respaldo de la silla; sin chair.
+silla_lado.jpg,silla,clase_incorrecta,0,0,Skateboard sobre la base y airplane sobre la silla; chair sobre el bote de la izquierda.
+taza_centro_cerca.jpg,taza,coincide,1,0,Cup sobre la taza cercana.
+taza_centro_lejos.jpg,taza,omitido,0,0,Taza lejana omitida; chair sobre el bote del fondo.
+taza_der.jpg,taza,omitido,0,0,Taza derecha omitida; chair sobre el bote del fondo.
+taza_izq.jpg,taza,omitido,0,0,Taza izquierda omitida; dos chair sobre el bote y zona adyacente.
+vacio_1.jpg,paso_despejado,sin_obstaculo_en_via,,,Refrigerator sobre puerta o mueble del fondo; la vía está despejada.
+vacio_2.jpg,paso_despejado,sin_obstaculo_en_via,,,Ninguna detección; la vía está despejada.
+varios_1.jpg,botella_mochila_taza,parcial,,,Bottle sobre botella y backpack sobre mochila; suitcase solapado con mochila; taza omitida.
+varios_2.jpg,botella_mochila_taza,parcial,,,Backpack sobre mochila y suitcase solapado; fire hydrant sobre botella; taza parcialmente cortada y omitida.
