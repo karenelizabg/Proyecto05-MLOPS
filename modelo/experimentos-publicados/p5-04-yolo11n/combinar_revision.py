@@ -6,7 +6,6 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-
 HERE = Path(__file__).resolve().parent
 EVIDENCE = HERE / "evidencia"
 
@@ -34,9 +33,7 @@ def main() -> None:
         "estado_visual",
         "observacion",
     ]
-    with (EVIDENCE / "revision_por_imagen.csv").open(
-        "w", newline="", encoding="utf-8"
-    ) as target:
+    with (EVIDENCE / "revision_por_imagen.csv").open("w", newline="", encoding="utf-8") as target:
         writer = csv.DictWriter(target, fieldnames=fields)
         writer.writeheader()
         for row in images:

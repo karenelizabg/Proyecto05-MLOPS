@@ -30,8 +30,12 @@ for image in images:
 write("revision_por_imagen.csv", combined)
 
 interests = {
-    "botella": "bottle", "mochila": "backpack", "taza": "cup",
-    "silla": "chair", "maleta": "suitcase;handbag", "vacio": "",
+    "botella": "bottle",
+    "mochila": "backpack",
+    "taza": "cup",
+    "silla": "chair",
+    "maleta": "suitcase;handbag",
+    "vacio": "",
     "varios": "",
 }
 summary = []
@@ -39,12 +43,21 @@ for group, classes in interests.items():
     rows = [row for row in combined if row["grupo_nombre"] == group]
     valid = sum(row["asociacion_clase_objetivo_valida"] == "1" for row in rows)
     invalid = sum(row["asociacion_clase_objetivo_geometria_invalida"] == "1" for row in rows)
-    summary.append({
-        "grupo": group, "fotografias": len(rows), "clases_de_interes": classes,
-        "asociaciones_visuales_clase_interes_geometria_valida": valid if classes else "no aplica",
-        "asociaciones_visuales_geometria_invalida": invalid if classes else "no aplica",
-        "observacion": "Juicio visual exploratorio; no es una métrica formal de recall ni verdad de referencia",
-    })
+    summary.append(
+        {
+            "grupo": group,
+            "fotografias": len(rows),
+            "clases_de_interes": classes,
+            "asociaciones_visuales_clase_interes_geometria_valida": valid
+            if classes
+            else "no aplica",
+            "asociaciones_visuales_geometria_invalida": invalid if classes else "no aplica",
+            "observacion": (
+                "Juicio visual exploratorio; no es una métrica formal de recall "
+                "ni verdad de referencia"
+            ),
+        }
+    )
 assert sum(int(row["fotografias"]) for row in summary) == 29
 write("resumen_por_objeto.csv", summary)
 print("Revisión: 29 fotografías; resumen por siete grupos.")

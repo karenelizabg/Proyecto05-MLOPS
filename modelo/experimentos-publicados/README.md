@@ -6,10 +6,10 @@ comparación. Los archivos experimentales originales locales permanecen en
 sustituyeron únicamente rutas personales de fotos, pesos y entornos en los
 README y en `evidencia/configuracion.json`; cada configuración conserva en
 `publicacion.configuracion_original_sha256` el hash del archivo original.
-Los valores de los CSV de resultados, manifiestos y latencias, así como los
-scripts y reportes, conservan su contenido; `.gitattributes` normaliza los
-finales de línea de texto a LF al incorporarlos a Git. Se excluyó un caché
-`.pyc` no necesario.
+Los valores de los CSV de resultados, manifiestos y latencias y el texto de
+los reportes conservan su contenido. Los scripts se formatearon para cumplir
+Ruff sin cambiar su lógica. `.gitattributes` normaliza los finales de línea
+de texto a LF al incorporarlos a Git. Se excluyó un caché `.pyc` no necesario.
 
 Los 29 JPEG originales de la ESP32-CAM **no** están incluidos. Se identifican
 mediante nombre, tamaño, resolución y SHA-256 en cada `manifiesto.csv`.

@@ -21,7 +21,6 @@ import torchvision
 import ultralytics
 from ultralytics import YOLO
 
-
 EXPECTED_MODEL_SHA256 = "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
 MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt"
 SETTINGS = {"device": "cpu", "imgsz": 640, "conf": 0.25, "iou": 0.7, "batch": 1}
@@ -84,7 +83,9 @@ def main() -> None:
     config = {
         "proposito": "Prueba tecnica de seleccion P5-04; no evaluacion final ni benchmark P5-15",
         "fuente_fotos": str(args.images.resolve()),
-        "camara": "ESP32-CAM real del carrito (declarado por el usuario; no consta en registro.csv)",
+        "camara": (
+            "ESP32-CAM real del carrito (declarado por el usuario; no consta en registro.csv)"
+        ),
         "modelo": "YOLO11n",
         "checkpoint": str(args.weights.resolve()),
         "checkpoint_url": MODEL_URL,
@@ -107,7 +108,11 @@ def main() -> None:
             "arquitectura": platform.machine(),
             "procesador": platform.processor(),
         },
-        "medicion": "wall_ms incluye lectura y llamadas a predict; speed de Ultralytics separa preprocesamiento, inferencia y posprocesamiento. Primera imagen separada.",
+        "medicion": (
+            "wall_ms incluye lectura y llamadas a predict; speed de Ultralytics "
+            "separa preprocesamiento, inferencia y posprocesamiento. "
+            "Primera imagen separada."
+        ),
     }
 
     load_start = time.perf_counter()
@@ -192,7 +197,18 @@ def main() -> None:
     write_csv(args.output / "por_imagen.csv", list(per_image[0]), per_image)
     write_csv(
         args.output / "detecciones.csv",
-        ["archivo", "indice", "class_id", "class_name", "confidence", "x1", "y1", "x2", "y2", "validacion"],
+        [
+            "archivo",
+            "indice",
+            "class_id",
+            "class_name",
+            "confidence",
+            "x1",
+            "y1",
+            "x2",
+            "y2",
+            "validacion",
+        ],
         detections,
     )
     steady = per_image[1:]

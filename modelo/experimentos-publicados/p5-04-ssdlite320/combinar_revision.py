@@ -4,7 +4,6 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-
 ROOT = Path(__file__).parent / "evidencia"
 
 
@@ -34,33 +33,42 @@ for item in images:
     found = detections[name]
     if len(found) != int(item["detecciones"]):
         raise SystemExit(f"Conteo diferente en {name}")
-    combined.append({
-        "archivo": name,
-        "grupo_nombre": item["grupo_nombre"],
-        "objeto_visible": reviews[name]["objeto_visible"],
-        "clases_confianzas": "; ".join(
-            f"{row['class_name']}:{float(row['confidence']):.3f}" for row in found
-        ),
-        "detecciones": len(found),
-        "estado_visual": reviews[name]["estado_visual"],
-        "observacion": reviews[name]["observacion"],
-    })
+    combined.append(
+        {
+            "archivo": name,
+            "grupo_nombre": item["grupo_nombre"],
+            "objeto_visible": reviews[name]["objeto_visible"],
+            "clases_confianzas": "; ".join(
+                f"{row['class_name']}:{float(row['confidence']):.3f}" for row in found
+            ),
+            "detecciones": len(found),
+            "estado_visual": reviews[name]["estado_visual"],
+            "observacion": reviews[name]["observacion"],
+        }
+    )
 write("revision_por_imagen.csv", list(combined[0]), combined)
 
 expected = {
-    "botella": ("bottle",), "mochila": ("backpack",),
-    "taza": ("cup",), "silla": ("chair",),
+    "botella": ("bottle",),
+    "mochila": ("backpack",),
+    "taza": ("cup",),
+    "silla": ("chair",),
     "maleta": ("suitcase", "handbag"),
 }
 summary = []
 for group in ("botella", "mochila", "taza", "silla", "maleta", "vacio", "varios"):
     subset = [row for row in combined if row["grupo_nombre"] == group]
     associated = sum(row["estado_visual"].startswith("coincide") for row in subset)
-    summary.append({
-        "grupo": group, "fotografias": len(subset),
-        "clases_de_interes": ";".join(expected.get(group, ())),
-        "asociaciones_visuales_clase_interes": associated if group in expected else "no aplica",
-        "observacion": "Conteo exploratorio visual; no es métrica de recall ni verdad de referencia",
-    })
+    summary.append(
+        {
+            "grupo": group,
+            "fotografias": len(subset),
+            "clases_de_interes": ";".join(expected.get(group, ())),
+            "asociaciones_visuales_clase_interes": associated if group in expected else "no aplica",
+            "observacion": (
+                "Conteo exploratorio visual; no es métrica de recall ni verdad de referencia"
+            ),
+        }
+    )
 write("resumen_por_objeto.csv", list(summary[0]), summary)
 print(f"Revisión de {len(combined)} fotografías y {len(summary)} grupos")
