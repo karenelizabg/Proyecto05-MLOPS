@@ -1,0 +1,36 @@
+{
+  "caso": "C9",
+  "entrada": "armada",
+  "tramos": [
+    {
+      "tramo": "unreadable_image",
+      "ordenes": [
+        2
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "detector_exception",
+      "ordenes": [
+        4
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "detector_timeout",
+      "ordenes": [
+        7
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "invalid_output",
+      "ordenes": [
+        9
+      ],
+      "motivos": []
+    }
+  ],
+  "pasa": true,
+  "motivos": []
+}
