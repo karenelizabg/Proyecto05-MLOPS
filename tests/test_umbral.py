@@ -14,7 +14,8 @@ from control.politica import ESTADO_INICIAL, decidir, ignoradas_por_confianza
 CONFIG = cargar_config_politica()
 UMBRAL = CONFIG.umbral_confianza
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
-OBSTACULO = 1
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(CONFIG.clases_obstaculo)
 NO_RELEVANTE = 7
 CENTRO = [260, 100, 380, 400]  # en una imagen de 640 px
 IZQ = [20, 100, 120, 400]
@@ -58,7 +59,7 @@ def test_debajo_del_umbral_avanza_y_lo_menciona():
     assert comando["action"] == "AVANZAR"
     assert comando["speed"] > 0
     assert "ignorada_por_confianza" in comando["reason"]
-    assert "class_id 1, confianza 0.1" in comando["reason"]
+    assert f"class_id {OBSTACULO}, confianza 0.1" in comando["reason"]
 
 
 def test_justo_en_el_umbral_cuenta():
@@ -87,7 +88,7 @@ def test_obstaculo_seguro_y_otro_dudoso():
     # El de la derecha es dudoso: no cuenta, así que la derecha sigue libre para girar.
     comando = decide(evento((CENTRO, 0.9), (IZQ, 0.9), (DER, 0.2)))
     assert comando["action"] == "GIRAR_DER"
-    assert "ignorada_por_confianza: class_id 1, confianza 0.2" in comando["reason"]
+    assert f"ignorada_por_confianza: class_id {OBSTACULO}, confianza 0.2" in comando["reason"]
 
 
 def test_clase_no_relevante_no_se_reporta_como_ignorada():

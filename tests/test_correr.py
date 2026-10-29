@@ -15,6 +15,7 @@ import control.__main__ as correr
 from contrato import leer_eventos, validar_comando
 from control import Supervisor
 from control.__main__ import main
+from control.config import cargar_config_politica
 
 RAIZ = Path(__file__).resolve().parents[1]
 FLUJO = RAIZ / "config" / "contrato" / "ejemplos" / "flujo.jsonl"
@@ -94,7 +95,16 @@ def test_todos_los_comandos_cumplen_el_contrato(salida):
         assert validar_comando(comando) == []
 
 
-def test_decisiones_del_flujo(salida):
+def test_decisiones_del_flujo(tmp_path):
+    # En el flujo del contrato la mochila de ejemplo es class_id 1. Con las clases definitivas
+    # (T12, #32) ese id ya no es obstáculo, así que se cambia por una clase real de politica.yaml.
+    obstaculo = min(cargar_config_politica().clases_obstaculo)
+    eventos = leer_eventos(FLUJO)
+    for evento in eventos:
+        for det in evento["detections"]:
+            det["class_id"] = obstaculo
+    salida = tmp_path / "s"
+    assert correr_flujo(salida, escribir(tmp_path / "flujo.jsonl", eventos)) == 0
     decisiones = leer(salida / "decisiones.jsonl")
     assert [(d["frame_id"], d["action"], d["decidio"]) for d in decisiones] == [
         ("S02_f0001", "AVANZAR", "politica"),
