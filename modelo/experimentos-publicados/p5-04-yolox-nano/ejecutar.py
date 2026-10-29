@@ -107,11 +107,8 @@ COCO_CLASSES = (
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+        return hashlib.file_digest(source, "sha256").hexdigest()
 
 
 def save_csv(path: Path, rows: list[dict], columns: list[str] | None = None) -> None:
@@ -377,45 +374,41 @@ def main() -> None:
             "taza fue coherente con esta ruta."
         ),
     }
+    measured_steps = ("preprocess_ms", "inference_ms", "postprocess_ms", "wall_ms")
     steady = per_image[1:]
+    first_image_ms = {step: per_image[0][step] for step in measured_steps}
+    steady_metrics = {step: metrics([row[step] for row in steady]) for step in measured_steps}
     summary = {
         "load_ms": load_ms,
         "first_image": per_image[0]["archivo"],
-        "first_image_ms": {
-            key: per_image[0][key]
-            for key in ("preprocess_ms", "inference_ms", "postprocess_ms", "wall_ms")
-        },
+        "first_image_ms": first_image_ms,
         "subsequent_images": len(steady),
-        **{
-            key: metrics([row[key] for row in steady])
-            for key in ("preprocess_ms", "inference_ms", "postprocess_ms", "wall_ms")
-        },
+        **steady_metrics,
         "invalid_results": invalid,
     }
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "configuracion.json").write_text(
-        json.dumps(config, ensure_ascii=False, indent=2) + "\n"
+    for filename, payload in (("configuracion.json", config), ("latencia_resumen.json", summary)):
+        (args.output / filename).write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        )
+    for filename, rows in (("manifiesto.csv", manifest), ("por_imagen.csv", per_image)):
+        save_csv(args.output / filename, rows)
+    detection_columns = (
+        "archivo",
+        "indice",
+        "class_id",
+        "class_name",
+        "confidence",
+        "x1",
+        "y1",
+        "x2",
+        "y2",
+        "validacion",
     )
-    (args.output / "latencia_resumen.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
-    )
-    save_csv(args.output / "manifiesto.csv", manifest)
-    save_csv(args.output / "por_imagen.csv", per_image)
     save_csv(
         args.output / "detecciones.csv",
         detections,
-        [
-            "archivo",
-            "indice",
-            "class_id",
-            "class_name",
-            "confidence",
-            "x1",
-            "y1",
-            "x2",
-            "y2",
-            "validacion",
-        ],
+        list(detection_columns),
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"imagenes={len(per_image)} detecciones={len(detections)}")
