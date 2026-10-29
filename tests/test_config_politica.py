@@ -38,9 +38,9 @@ def test_carga_el_archivo_del_repo():
 
 
 def test_clases_definitivas():
-    # Aprobadas por las PM A y B (P5-04, DC-5): mochila, botella y taza con YOLO11n (T12, #32).
+    # Aprobadas por las PM A y B (P5-04, DC-5): botella y taza con YOLO11n (T12, #32).
     config = cargar_config_politica()
-    assert config.clases_obstaculo == frozenset({24, 39, 41})
+    assert config.clases_obstaculo == frozenset({39, 41})
     assert config.clases_provisionales is False
 
 

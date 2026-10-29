@@ -53,17 +53,16 @@ el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 
 
 ### Clases definitivas
 
-Las PM A y B aprobaron tres objetos con el detector **YOLO11n** (P5-04, decisión DC-5 del
+Las PM A y B aprobaron dos objetos con el detector **YOLO11n** (P5-04, decisión DC-5 del
 contrato). Los `class_id` son los de COCO de 80 clases que usa YOLO11n, los mismos que publica
 el grupo A en `modelo/clases.json`:
 
 | Objeto | Clase | `class_id` |
 |---|---|---|
-| Mochila | `backpack` | 24 |
 | Botella | `bottle` | 39 |
 | Taza | `cup` | 41 |
 
-En `politica.yaml`: `clases_obstaculo: [24, 39, 41]` y `clases_provisionales: false`.
+En `politica.yaml`: `clases_obstaculo: [39, 41]` y `clases_provisionales: false`.
 
 - **Cualquier otra clase que dé el detector no es obstáculo** para la política. Por ejemplo,
   el cuaderno de la secuencia S8 puede salir como `book`: se ignora y el carrito avanza.
@@ -165,7 +164,7 @@ cargar y, si algo no cumple, falla con un mensaje que dice qué valor corregir.
 |---|---|---|---|
 | `zonas` | 0–0.33 / 0.33–0.67 / 0.67–1 | contiguas, de 0 a 1 | Franjas izquierda, centro y derecha. |
 | `traslape_minimo` | 0.15 | 0 < x ≤ 1 | Fracción de la caja que debe caer en una zona para ocuparla. |
-| `clases_obstaculo` | `[24, 39, 41]` | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo (mochila, botella, taza). |
+| `clases_obstaculo` | `[39, 41]` | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo (botella y taza). |
 | `clases_provisionales` | `false` | true/false | `true` solo mientras las clases no estén aprobadas. |
 | `umbral_confianza` | 0.5 | 0 ≤ x ≤ 1 | Confianza mínima para que una detección cuente. |
 | `cuadros_libres_para_reanudar` | 3 | entero ≥ 1 | N de la histéresis. |
