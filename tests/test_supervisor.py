@@ -10,6 +10,9 @@ from control import AdaptadorVirtual, Supervisor, politica_de_prueba
 from control.config import cargar_config_politica
 from control.politica import decidir
 
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(cargar_config_politica().clases_obstaculo)
+
 RAIZ = Path(__file__).resolve().parents[1]
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 PLAZOS = yaml.safe_load((RAIZ / "config" / "control" / "plazos.yaml").read_text(encoding="utf-8"))
@@ -222,7 +225,7 @@ def en_t(tipo: str, frame_id: str, t_capture_ms: float) -> dict:
     ev = evento(nombre, frame_id=frame_id, t_capture_ms=t_capture_ms, t_emit_ms=t_capture_ms + 40)
     if tipo == BLOQUEO:
         ev["detections"] = [
-            {"class_id": 1, "confidence": 0.9, "bbox": caja} for caja in CAJAS_BLOQUEO
+            {"class_id": OBSTACULO, "confidence": 0.9, "bbox": caja} for caja in CAJAS_BLOQUEO
         ]
     return ev
 

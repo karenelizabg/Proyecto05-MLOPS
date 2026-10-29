@@ -1,0 +1,39 @@
+{
+  "proposito": "Prueba tecnica de seleccion P5-04; no evaluacion final ni benchmark P5-15",
+  "fuente_fotos": "Fotografías ESP32-CAM originales; identidad fijada en manifiesto.csv",
+  "camara": "ESP32-CAM real del carrito (declarado por el usuario; no consta en registro.csv)",
+  "modelo": "YOLO11n",
+  "checkpoint": "yolo11n.pt",
+  "checkpoint_url": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt",
+  "checkpoint_release": "v8.3.0",
+  "checkpoint_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+  "checkpoint_bytes": 5613764,
+  "licencia": "Ultralytics declara AGPL-3.0 para codigo y modelos; revisar antes de adoptar",
+  "parametros": {
+    "device": "cpu",
+    "imgsz": 640,
+    "conf": 0.25,
+    "iou": 0.7,
+    "batch": 1
+  },
+  "torch_threads": 1,
+  "versiones": {
+    "python": "3.12.14",
+    "ultralytics": "8.3.0",
+    "torch": "2.9.0",
+    "torchvision": "0.24.0",
+    "numpy": "1.26.4",
+    "opencv": "4.11.0"
+  },
+  "hardware": {
+    "sistema": "macOS-27.0.1-arm64-arm-64bit",
+    "arquitectura": "arm64",
+    "procesador": "arm"
+  },
+  "medicion": "wall_ms incluye lectura y llamadas a predict; speed de Ultralytics separa preprocesamiento, inferencia y posprocesamiento. Primera imagen separada.",
+  "publicacion": {
+    "tipo": "copia de revisión; resultados numéricos originales intactos",
+    "configuracion_original_sha256": "a827cc88a0cb2aba19d86175cd7c36c7f2b8a17d931ad76bb05e34e8d8e43df7",
+    "rutas_locales": "sustituidas por nombres relativos; no afectan inferencia ni resultados"
+  }
+}

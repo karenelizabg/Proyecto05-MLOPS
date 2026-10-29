@@ -1,0 +1,5 @@
+{"frame_id": "S02_f0001", "sequence_id": "S02", "image_width": 640, "image_height": 480, "objetos": []}
+{"frame_id": "S02_f0002", "sequence_id": "S02", "image_width": 640, "image_height": 480, "objetos": [{"class_id": 1, "class_name": "mochila", "bbox": [210.0, 150.0, 430.0, 450.0]}]}
+{"frame_id": "S02_f0003", "sequence_id": "S02", "image_width": 640, "image_height": 480, "objetos": [{"class_id": 1, "class_name": "mochila", "bbox": [195.0, 125.0, 450.0, 468.0]}, {"class_id": 0, "class_name": "lata", "bbox": [20.0, 300.0, 88.0, 410.0]}]}
+{"frame_id": "S02_f0004", "sequence_id": "S02", "image_width": 640, "image_height": 480, "objetos": [{"class_id": 1, "class_name": "mochila", "bbox": [180.0, 110.0, 470.0, 479.0]}]}
+{"frame_id": "S02_f0005", "sequence_id": "S02", "image_width": 640, "image_height": 480, "objetos": []}

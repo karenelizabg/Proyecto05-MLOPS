@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/karenelizabg/Proyecto05-MLOPS/config/anotaciones/anotaciones.v1.schema.json",
+  "title": "Anotación de un cuadro (verdad de referencia) v1",
+  "description": "Una línea por cuadro del conjunto. Las cajas usan el mismo sistema que el contrato de percepción: xyxy en píxeles del cuadro original. Un cuadro despejado lleva objetos vacío a propósito.",
+  "type": "object",
+  "required": ["frame_id", "sequence_id", "image_width", "image_height", "objetos"],
+  "properties": {
+    "frame_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$",
+      "description": "El mismo frame_id que emite el detector para este cuadro."
+    },
+    "sequence_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "image_width": {"type": "integer", "minimum": 1},
+    "image_height": {"type": "integer", "minimum": 1},
+    "objetos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["class_id", "bbox"],
+        "properties": {
+          "class_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Según modelo/clases.json, igual que en el contrato."
+          },
+          "class_name": {"type": "string", "description": "Opcional, solo para leer."},
+          "bbox": {
+            "type": "array",
+            "items": {"type": "number", "minimum": 0},
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "[x1, y1, x2, y2] en píxeles del cuadro original."
+          }
+        }
+      }
+    }
+  }
+}

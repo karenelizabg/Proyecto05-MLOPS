@@ -14,6 +14,8 @@ from control.politica import ESTADO_INICIAL, decidir
 
 # Sin giro, un obstáculo al centro siempre es STOP (como en la secuencia del issue).
 CONFIG = replace(cargar_config_politica(), permitir_giro=False)
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(CONFIG.clases_obstaculo)
 N = CONFIG.cuadros_libres_para_reanudar
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 CENTRO = [260, 100, 380, 400]  # en una imagen de 640 px
@@ -36,7 +38,7 @@ def evento(i, *cajas, conf=0.9):
         "status": "ok",
         "bbox_format": "xyxy",
         "bbox_unit": "px",
-        "detections": [{"class_id": 1, "confidence": conf, "bbox": c} for c in cajas],
+        "detections": [{"class_id": OBSTACULO, "confidence": conf, "bbox": c} for c in cajas],
     }
     assert validar_evento(ev) == []
     return ev
