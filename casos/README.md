@@ -135,3 +135,56 @@ Las órdenes que no caen en ningún tramo no se juzgan, salvo para `stop_con_eve
 `es_el_ultimo_comando`. Por ejemplo, el STOP con `event=shutdown` al final de C1 no cuenta contra
 "nunca STOP". El caso pasa si pasan todos sus tramos y cada evento de `stop_con_evento` dejó su
 STOP.
+
+## Cómo se corren los casos (T17)
+
+```bash
+uv run python casos/runner.py            # los diez casos
+uv run python casos/runner.py C8 C10     # solo esos
+```
+
+Para cada caso, `casos/runner.py` revisa la carpeta, corre la entrada con `python -m control` (la
+misma `main`, en el mismo proceso) y juzga lo que quedó en `resultados/casos/Cn/` con las reglas de
+la sección anterior. Imprime la tabla PASA/FALLA y, debajo, el motivo de cada falla. La tabla queda
+también en `resultados/casos/resumen.txt`, y el detalle de cada tramo, en
+`resultados/casos/Cn/veredicto.json`. Sale con `0` si todos pasan, `1` si alguno falla y `2` si
+no se puede leer `config/control/politica.yaml` o el esquema. En los motivos, "orden N" es la
+línea N de `comandos.jsonl`.
+
+Además de `expectativa.yaml`, cada carpeta trae:
+
+| Archivo | Qué es |
+|---|---|
+| `entrada.jsonl` | Los eventos de percepción, uno por línea, que cumplen el contrato (`python -m contrato` sale con 0). C1 a C5 y C7 usan secuencias reales de A (`datos/MAPA_CASOS.md`, P5-12). C8 a C10 pueden usar eventos armados. |
+| `tramos.yaml` | `entrada: real` o `entrada: armada`, y en `tramos` los `frame_id` de cada tramo con `origen: cuadros`. Los tramos de eventos sin cuadro no se listan. |
+| `acciones.yaml` | Opcional. Eventos sin cuadro en instantes fijos del reloj de la entrada (`t_ms`, en ms): `tick`, `emergencia`, `rearmar` y `cerrar`. Se pasa a `python -m control --acciones`. |
+
+```yaml
+# tramos.yaml
+entrada: armada
+tramos:
+  antes_del_hueco: [X01_f0001, X01_f0002, X01_f0003]
+  cuadro_viejo: [X01_f0004, X01_f0005]
+```
+
+```yaml
+# acciones.yaml
+acciones:
+  - {t_ms: 300, accion: emergencia}
+  - {t_ms: 700, accion: rearmar}
+  - {t_ms: 1800, accion: cerrar}
+```
+
+Una acción va después de los cuadros que llegan antes o en su mismo instante, y los tics de reloj
+corren hasta ella. `tick` sirve para dejar correr el reloj después del último cuadro. Si
+`acciones.yaml` no cierra el run, `python -m control` lo cierra con el último cuadro, como siempre.
+Cada acción hecha queda en `run.json` (`acciones.hechas`) con su instante y la línea de
+`comandos.jsonl` que dejó. De ahí sale el instante de `plazo_desde: evento`.
+
+Un caso falla, aunque sus órdenes estén bien, si le falta `entrada.jsonl` o `tramos.yaml`, si su
+entrada no cumple el contrato, si `tramos.yaml` no lista exactamente los tramos de cuadros de la
+expectativa, o si es C1 a C5 o C7 y su entrada no es `real`. También falla si `python -m control`
+no sale con `0`.
+
+`tests/test_runner.py` prueba que el runner falla cuando se cambia una expectativa en una copia
+temporal de `casos/`, y cada regla de la sección anterior con órdenes escritas a mano.

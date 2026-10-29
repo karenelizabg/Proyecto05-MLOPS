@@ -1,0 +1,9 @@
+# C10 · Eventos sin cuadro que se mandan al supervisor (T17), en el reloj de entrada.jsonl (ms).
+# Formato: casos/README.md, "Cómo se corren los casos".
+#
+# La emergencia llega entre el segundo y el tercer cuadro. El rearme, 60 ms después del cuarto
+# cuadro, como pasaría con cuadros a 5 fps. El cierre, 60 ms después del último.
+acciones:
+  - {t_ms: 300, accion: emergencia}
+  - {t_ms: 700, accion: rearmar}
+  - {t_ms: 1800, accion: cerrar}

@@ -1,0 +1,32 @@
+{
+  "caso": "C8",
+  "entrada": "armada",
+  "tramos": [
+    {
+      "tramo": "antes_del_hueco",
+      "ordenes": [
+        1,
+        2,
+        3
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "hueco",
+      "ordenes": [
+        4
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "cuadro_viejo",
+      "ordenes": [
+        5,
+        6
+      ],
+      "motivos": []
+    }
+  ],
+  "pasa": true,
+  "motivos": []
+}

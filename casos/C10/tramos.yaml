@@ -1,0 +1,11 @@
+# C10 · Qué cuadros de entrada.jsonl le tocan a cada tramo de expectativa.yaml (T17).
+# Formato: casos/README.md, "Cómo se corren los casos".
+#
+# Eventos armados a 5 fps; la emergencia, el rearme y el cierre están en acciones.yaml. Los
+# tramos `emergencia`, `rearme` y `cierre` no llevan cuadros: son las órdenes de esos eventos.
+entrada: armada
+tramos:
+  antes_de_la_emergencia: [X03_f0001, X03_f0002]
+  enclavada: [X03_f0003, X03_f0004]
+  rearme_con_cuadro_viejo: [X03_f0005]
+  rearme_con_cuadro_fresco: [X03_f0006, X03_f0007, X03_f0008]

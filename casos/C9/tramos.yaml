@@ -1,0 +1,13 @@
+# C9 · Qué cuadros de entrada.jsonl le tocan a cada tramo de expectativa.yaml (T17).
+# Formato: casos/README.md, "Cómo se corren los casos".
+#
+# Eventos armados con los cuatro error.code del contrato, cada uno después de un cuadro libre.
+# Cuando lleguen las fixtures de P5-12, se cambian por esas. El de detector_timeout se publica
+# a los 500 ms de la captura (detector_timeout_ms), así que la orden del cuadro libre anterior
+# ya venció y el reloj la frenó antes; los cuadros libres no se juzgan.
+entrada: armada
+tramos:
+  unreadable_image: [X02_f0002]
+  detector_exception: [X02_f0004]
+  detector_timeout: [X02_f0006]
+  invalid_output: [X02_f0008]
