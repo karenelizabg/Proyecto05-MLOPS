@@ -152,7 +152,7 @@ def test_mientras_espera_no_gira_aunque_haya_lado_libre():
 # La caja CENTRO cae justo a la mitad: con los dos lados libres desempata hacia la izquierda.
 
 
-def test_tras_un_giro_un_cuadro_libre_no_reanuda():
+def test_tras_un_giro_repite_el_giro_y_reanuda_en_el_n_esimo():
     con_giro = replace(CONFIG, permitir_giro=True)
     # libre -> bloqueo con un lado libre -> un libre -> bloqueo -> N libres
     secuencia = [evento(1), evento(2, CENTRO, DER), evento(3), evento(4, CENTRO)]
@@ -160,14 +160,35 @@ def test_tras_un_giro_un_cuadro_libre_no_reanuda():
     comandos, estado = correr(secuencia, con_giro)
 
     assert acciones(comandos[:2]) == ["AVANZAR", "GIRAR_IZQ"]  # gira hacia el lado libre
-    assert comandos[2]["action"] == "STOP"  # el libre suelto no hace avanzar
-    assert "esperando_cuadros_libres 1/" in comandos[2]["reason"]
-    assert comandos[3]["action"] == "STOP"  # bloqueo otra vez: la racha se corta
-    assert "esperando_cuadros_libres 0/" in comandos[3]["reason"]
+    # El libre suelto repite la acción anterior (mantener_accion_cuadros de C7), no avanza.
+    assert comandos[2]["action"] == "GIRAR_IZQ"
+    assert comandos[2]["steering"] < 0
+    assert comandos[2]["reason"].startswith("esperando_cuadros_libres 1/")
+    assert comandos[3]["action"] == "GIRAR_IZQ"  # bloqueo otra vez: la racha se corta
+    assert comandos[3]["reason"].startswith("esperando_cuadros_libres 0/")
     finales = comandos[4:]
-    assert acciones(finales) == ["STOP"] * (N - 1) + ["AVANZAR"]  # reanuda en el N-ésimo
+    # Sigue girando mientras espera y reanuda solo en el N-ésimo libre.
+    assert acciones(finales) == ["GIRAR_IZQ"] * (N - 1) + ["AVANZAR"]
     assert finales[-1]["reason"].startswith(f"Reanuda tras {N}/{N}")
     assert estado["esperando_libres"] is False
+
+
+def test_tras_un_stop_el_libre_suelto_repite_stop():
+    con_giro = replace(CONFIG, permitir_giro=True)
+    # Bloqueo sin lado libre -> STOP; luego un libre: repite STOP, no gira ni avanza.
+    comandos, _ = correr([evento(1), evento(2, IZQ, CENTRO, DER), evento(3)], con_giro)
+    assert acciones(comandos) == ["AVANZAR", "STOP", "STOP"]
+
+
+def test_si_el_lado_del_giro_se_ocupa_frena():
+    con_giro = replace(CONFIG, permitir_giro=True)
+    # Gira a la izquierda; luego la izquierda se ocupa (y la derecha queda libre): STOP,
+    # no cambia de lado. Después ya venía en STOP: los libres repiten STOP hasta el N-ésimo.
+    secuencia = [evento(1), evento(2, CENTRO, DER), evento(3, IZQ, CENTRO)]
+    secuencia += [evento(i) for i in range(4, 4 + N)]
+    comandos, _ = correr(secuencia, con_giro)
+    assert acciones(comandos) == ["AVANZAR", "GIRAR_IZQ", "STOP"] + ["STOP"] * (N - 1) + ["AVANZAR"]
+    assert "ya no está libre" in comandos[2]["reason"]
 
 
 def test_un_desvio_de_varios_cuadros_sigue_girando():
@@ -181,7 +202,7 @@ def test_un_desvio_de_varios_cuadros_sigue_girando():
 def test_tras_un_giro_n_sale_de_la_config(n):
     config = replace(CONFIG, permitir_giro=True, cuadros_libres_para_reanudar=n)
     comandos, _ = correr(["L", "B"] + ["L"] * n, config)
-    assert acciones(comandos) == ["AVANZAR", "GIRAR_IZQ"] + ["STOP"] * (n - 1) + ["AVANZAR"]
+    assert acciones(comandos) == ["AVANZAR"] + ["GIRAR_IZQ"] * n + ["AVANZAR"]
 
 
 def test_obstaculo_con_poca_confianza_cuenta_como_libre():
