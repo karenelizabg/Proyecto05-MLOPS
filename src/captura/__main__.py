@@ -24,6 +24,7 @@ import json
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from datetime import datetime
@@ -93,6 +94,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--secuencia solo admite letras, números, '.', '_' y '-' (hasta 64)")
     if args.cuadros < 1 or args.cada_ms < 1:
         parser.error("--cuadros y --cada-ms deben ser al menos 1")
+    url = urllib.parse.urlsplit(args.url)
+    if url.scheme not in ("http", "https") or not url.hostname:
+        parser.error("--url debe ser http(s)://IP:puerto/stream")
     carpeta = args.salida / args.secuencia
     if carpeta.exists():
         print(f"{carpeta.as_posix()} ya existe: bórrala o usa otra secuencia", file=sys.stderr)
@@ -102,7 +106,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.sin_pausa:
         input(f"Secuencia {args.secuencia}: Enter para empezar a capturar...")
     try:
-        with urllib.request.urlopen(args.url, timeout=10) as respuesta:
+        # La URL la da quien corre el comando (la cámara en su red); solo se acepta http(s).
+        with urllib.request.urlopen(args.url, timeout=10) as respuesta:  # NOSONAR (S8703)
             captura = capturar(
                 leer_partes(respuesta),
                 reloj_ms=lambda: time.monotonic_ns() / 1e6,

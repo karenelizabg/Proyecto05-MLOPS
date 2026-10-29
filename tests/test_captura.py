@@ -132,7 +132,8 @@ def test_comando_guarda_los_cuadros_tal_como_llegan(tmp_path, camara):
     assert [f["frame_id"] for f in filas] == ["S01_f0001", "S01_f0002", "S01_f0003"]
     assert [f["t_capture_ms"] for f in filas] == [0, 200, 400]
     assert (carpeta / "S01_f0002.jpg").read_bytes() == partes[1]
-    assert filas[0]["image_width"] == 640 and filas[0]["image_height"] == 480
+    assert filas[0]["image_width"] == 640
+    assert filas[0]["image_height"] == 480
 
 
 def test_comando_avisa_huecos_y_cuadros_faltantes(tmp_path, camara, capsys):
@@ -157,3 +158,10 @@ def test_comando_no_sobrescribe_una_secuencia(tmp_path, camara):
     (tmp_path / "S01").mkdir()
     camara([jpeg()], [0])
     assert correr(tmp_path) == 2
+
+
+@pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://carro/stream", "http:///stream"])
+def test_comando_solo_acepta_urls_http(tmp_path, url):
+    with pytest.raises(SystemExit):
+        cli.main(["--url", url, "--secuencia", "S01", "--sin-pausa", "--salida", str(tmp_path)])
+    assert not (tmp_path / "S01").exists()
