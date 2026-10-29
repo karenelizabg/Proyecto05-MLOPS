@@ -1,0 +1,123 @@
+{
+  "alcance": "Consolidación derivada; no altera experimentos originales; no benchmark P5-15",
+  "fotografias": 29,
+  "digest_nombres_y_sha256": "f8e531e76ac5ae66bb776c0d561a910b53f4de64bffe341164b4248c5cd93c7f",
+  "modelos": {
+    "YOLO11n": {
+      "versiones": {
+        "python": "3.12.14",
+        "ultralytics": "8.3.0",
+        "torch": "2.9.0",
+        "torchvision": "0.24.0",
+        "numpy": "1.26.4",
+        "opencv": "4.11.0"
+      },
+      "checkpoint_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+      "checkpoint_bytes": 5613764,
+      "parametros": {
+        "device": "cpu",
+        "imgsz": 640,
+        "conf": 0.25,
+        "iou": 0.7,
+        "batch": 1
+      },
+      "detecciones": 35,
+      "fotos_sin_detecciones": 6,
+      "latencia_total_28_ms": {
+        "min": 24.62404203834012,
+        "median": 25.135875010164455,
+        "p95_linear": 26.00113291409798,
+        "max": 26.188416057266295
+      },
+      "cajas_invalidas": 0
+    },
+    "SSDLite320": {
+      "versiones": {
+        "python": "3.12.14",
+        "torch": "2.9.0",
+        "torchvision": "0.24.0",
+        "numpy": "1.26.4",
+        "opencv": "4.11.0"
+      },
+      "checkpoint_sha256": "a79551df90c79834bcd3bb3845ef9d966b5449a3a9b2833ae8404778ca5d65d2",
+      "checkpoint_bytes": 14069355,
+      "parametros": {
+        "device": "cpu",
+        "batch": 1,
+        "native_size": [
+          320,
+          320
+        ],
+        "report_confidence": 0.25,
+        "internal_score_thresh": 0.001,
+        "internal_nms_iou": 0.55,
+        "topk_candidates": 300,
+        "detections_per_img": 300
+      },
+      "detecciones": 72,
+      "fotos_sin_detecciones": 0,
+      "latencia_total_28_ms": {
+        "min": 33.62383396597579,
+        "median": 36.402395518962294,
+        "p95_linear": 38.9268522238126,
+        "max": 39.133917016442865
+      },
+      "cajas_invalidas": 0
+    },
+    "YOLOX-Nano": {
+      "versiones": {
+        "python": "3.12.14",
+        "onnxruntime": "1.31.1",
+        "numpy": "1.26.4",
+        "opencv": "4.11.0"
+      },
+      "checkpoint_sha256": "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d",
+      "checkpoint_bytes": 3659407,
+      "parametros": {
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "batch": 1,
+        "input_size": [
+          416,
+          416
+        ],
+        "letterbox": "arriba-izquierda",
+        "padding": 114,
+        "channels": "BGR CHW float32",
+        "normalization": "none",
+        "decode_strides": [
+          8,
+          16,
+          32
+        ],
+        "score": "objectness * class_probability",
+        "report_confidence_gte": 0.25,
+        "nms": "por clase, NumPy YOLOX 0.1.1rc0",
+        "nms_iou": 0.45,
+        "intra_op_threads": 1,
+        "inter_op_threads": 1
+      },
+      "detecciones": 48,
+      "fotos_sin_detecciones": 2,
+      "latencia_total_28_ms": {
+        "min": 20.870542037300766,
+        "median": 21.55827099340968,
+        "p95_linear": 23.17189943860285,
+        "max": 23.260417045094073
+      },
+      "cajas_invalidas": 3
+    }
+  },
+  "politica_clipping_hipotetica": {
+    "momento": "después de decodificar, remapear y aplicar NMS; antes de validar o consumir",
+    "regla": "x1,x2 a [0,640]; y1,y2 a [0,480]; descartar si x1>=x2 o y1>=y2",
+    "detecciones_originales_yolox": 48,
+    "detecciones_tras_recorte": 48,
+    "cajas_originales_fuera_de_limites": 3,
+    "cajas_validas_tras_recorte": 3,
+    "asociaciones_backpack_validas_originales": 2,
+    "asociaciones_backpack_validas_si_se_recorta": 3,
+    "nota": "Escenario derivado; los CSV originales y el contrato v1 no se modifican"
+  }
+}

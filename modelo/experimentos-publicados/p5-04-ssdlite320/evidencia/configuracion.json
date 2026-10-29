@@ -1,0 +1,46 @@
+{
+  "proposito": "Prueba técnica de selección P5-04; no benchmark P5-15",
+  "fuente_fotos": "Fotografías ESP32-CAM originales; identidad fijada en manifiesto.csv",
+  "camara": "ESP32-CAM real del carrito (declarado por el usuario)",
+  "modelo": "torchvision.models.detection.ssdlite320_mobilenet_v3_large",
+  "pesos": "SSDLite320_MobileNet_V3_Large_Weights.COCO_V1",
+  "checkpoint": "ssdlite320_mobilenet_v3_large_coco-a79551df.pth",
+  "checkpoint_url": "https://download.pytorch.org/models/ssdlite320_mobilenet_v3_large_coco-a79551df.pth",
+  "checkpoint_sha256": "a79551df90c79834bcd3bb3845ef9d966b5449a3a9b2833ae8404778ca5d65d2",
+  "checkpoint_bytes": 14069355,
+  "licencia_codigo": "BSD-3-Clause (torchvision)",
+  "licencia_pesos": "No especificada de forma independiente en metadatos COCO_V1; verificar condiciones de dataset y uso antes de adoptar",
+  "parametros": {
+    "device": "cpu",
+    "batch": 1,
+    "native_size": [
+      320,
+      320
+    ],
+    "report_confidence": 0.25,
+    "internal_score_thresh": 0.001,
+    "internal_nms_iou": 0.55,
+    "topk_candidates": 300,
+    "detections_per_img": 300
+  },
+  "torch_threads": 1,
+  "versiones": {
+    "python": "3.12.14",
+    "torch": "2.9.0",
+    "torchvision": "0.24.0",
+    "numpy": "1.26.4",
+    "opencv": "4.11.0"
+  },
+  "hardware": {
+    "sistema": "macOS-27.0.1-arm64-arm-64bit",
+    "arquitectura": "arm64",
+    "procesador": "arm",
+    "equipo": "MacBook Air Apple M3, 8 núcleos, 16 GB RAM"
+  },
+  "medicion": "preprocess_ms=lectura JPEG+RGB+tensor; inference_ms=model([tensor]) incluye resize interno 320x320, backbone, cabezal, NMS y remapeo de cajas; postprocess_ms=filtrado >=0.25 y CSV; wall_ms=todo. Primera imagen separada.",
+  "publicacion": {
+    "tipo": "copia de revisión; resultados numéricos originales intactos",
+    "configuracion_original_sha256": "606bf5f4dfab07edcd274780e273083f287bd4d8371eee95f380b464d57d29f8",
+    "rutas_locales": "sustituidas por nombres relativos; no afectan inferencia ni resultados"
+  }
+}

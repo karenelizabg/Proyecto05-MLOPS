@@ -1,0 +1,20 @@
+{
+  "load_ms": 22.370791994035244,
+  "first_image": "botella_centro_cerca.jpg",
+  "first_image_wall_ms": 162.0562500320375,
+  "first_image_inference_ms": 36.05508804321289,
+  "subsequent_images": 28,
+  "inference_ms": {
+    "min": 23.24509620666504,
+    "median": 23.749947547912598,
+    "p95_linear": 24.4870662689209,
+    "max": 24.753093719482422
+  },
+  "wall_ms": {
+    "min": 24.62404203834012,
+    "median": 25.135875010164455,
+    "p95_linear": 26.00113291409798,
+    "max": 26.188416057266295
+  },
+  "invalid_results": []
+}
