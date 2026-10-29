@@ -20,9 +20,10 @@ comando el supervisor toma `action`, `speed`, `steering` y `reason`; el resto de
 GIRANDO_DER) más lo que la política necesite guardar, p. ej. `{"nombre": "AVANZANDO",
 "libres_seguidos": 0}`. El supervisor guarda el diccionario completo, se lo pasa a la política en el
 siguiente cuadro y usa `estado["nombre"]` para `state_before` y `state_after`. Empieza en
-`{"nombre": "DETENIDO"}`. Cada STOP del supervisor solo cambia `nombre` a `DETENIDO` y conserva las
-demás claves: la histéresis de la política (T11: `esperando_libres`, `libres_seguidos`) sigue viva
-después de un `stale`, un error o un STOP de reloj, y el carro no reanuda antes de tiempo.
+`{"nombre": "DETENIDO"}`. Cada STOP del supervisor cambia `nombre` a `DETENIDO`, pone
+`libres_seguidos` en 0 si existe y conserva las demás claves: la histéresis de la política (T11)
+sigue esperando después de un `stale`, un error o un STOP de reloj, y un cuadro que no se pudo ver
+corta la racha de cuadros libres, igual que cuando la política misma ve un `stale`.
 
 `tick(ahora_ms)` es el watchdog (C8, T05): si la orden activa no es STOP y pasaron más de
 `watchdog_ms` desde el último cuadro aceptado (`watchdog_vencido`), o ya venció su
@@ -35,9 +36,10 @@ Emergencia, rearme y cierre (C10, T06). Prioridad: cierre y emergencia > error o
   libre.
 - `rearmar(ahora_ms)`: quita la emergencia solo si el último cuadro recibido **después** de la
   emergencia es `ok`, cumple el contrato y es fresco
-  (`ahora_ms - t_capture_ms <= max_frame_age_ms`).
-  Entonces la política decide con ese cuadro y el comando sale con `event=rearm`. Si no, sigue en
-  STOP (`rearme_rechazado`, también con `event=rearm`) y el motivo queda en `errores.jsonl`.
+  (`ahora_ms - t_capture_ms <= max_frame_age_ms`). Rearmar solo quita la emergencia: manda STOP
+  (`rearmado`, `event=rearm`) y el carro no se mueve hasta que la política decida con el siguiente
+  cuadro fresco. Si no se puede rearmar, sigue en STOP (`rearme_rechazado`, también con
+  `event=rearm`) y el motivo queda en `errores.jsonl`.
 - `cerrar(ahora_ms)`: STOP final con `event=shutdown` (`cierre`). Después, cada cuadro da STOP
   `supervisor_cerrado` y rearmar ya no hace nada.
 
@@ -57,6 +59,7 @@ from typing import Any
 from contrato import validar_comando, validar_evento
 
 from .adaptador_virtual import AdaptadorVirtual
+from .politica import LIBRES_SEGUIDOS
 
 Estado = dict[str, Any]
 Politica = Callable[[dict[str, Any], Estado, Any], tuple[dict[str, Any], Estado]]
@@ -177,22 +180,22 @@ class Supervisor:
         return self._stop(self._ultimo_run_id, None, "emergency", "emergencia", ahora_ms)
 
     def rearmar(self, ahora_ms: float) -> dict[str, Any] | None:
-        """Quita la emergencia si hay un cuadro fresco y válido. `None` si no había emergencia."""
+        """Quita la emergencia si hay un cuadro fresco y válido, y manda STOP: el carro no avanza
+        hasta el siguiente cuadro. `None` si no había emergencia."""
         if self._cerrado or not self._emergencia:
             return None
 
         evento = self._ultimo_recibido
+        run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
+        frame_id = self._id_del_evento(evento, "frame_id")
         motivo = self._por_que_no_rearmar(evento, ahora_ms)
         if motivo:
-            run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
-            frame_id = self._id_del_evento(evento, "frame_id")
             self._registrar_error(run_id, frame_id, ahora_ms, "rearme_rechazado", [motivo])
             return self._stop(run_id, frame_id, "rearm", "rearme_rechazado", ahora_ms)
 
         self._emergencia = False
-        self._ultimo_run_id = evento["run_id"]
-        self._ultimo_cuadro_ms = ahora_ms
-        return self._decidir(evento, ahora_ms, tipo="rearm")
+        self._ultimo_run_id = run_id
+        return self._stop(run_id, frame_id, "rearm", "rearmado", ahora_ms)
 
     def cerrar(self, ahora_ms: float) -> dict[str, Any]:
         """Fin del run: STOP final. Después ningún cuadro mueve el carro."""
@@ -218,9 +221,7 @@ class Supervisor:
             )
         return None
 
-    def _decidir(
-        self, evento: dict[str, Any], ahora_ms: float, tipo: str = "frame"
-    ) -> dict[str, Any]:
+    def _decidir(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
         """Llama a la política. Si falla o devuelve un comando o estado fuera de lo acordado,
         STOP."""
         try:
@@ -231,17 +232,17 @@ class Supervisor:
         except Exception as exc:
             # Cualquier falla de la política termina en STOP, no tumba el programa.
             detalle = [f"{type(exc).__name__}: {exc}"]
-            return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle, tipo)
+            return self._stop_por_evento(evento, ahora_ms, "politica_excepcion", detalle)
 
         errores = _errores_del_estado(estado_nuevo)
         if not errores:
             comando = self._comando(
-                evento["run_id"], evento["frame_id"], estado_nuevo["nombre"], ahora_ms, tipo
+                evento["run_id"], evento["frame_id"], estado_nuevo["nombre"], ahora_ms
             )
             comando.update(accion)
             errores = validar_comando(self._como_se_enviaria(comando, ahora_ms))
         if errores:
-            return self._stop_por_evento(evento, ahora_ms, "politica_invalida", errores, tipo)
+            return self._stop_por_evento(evento, ahora_ms, "politica_invalida", errores)
         return self._enviar(comando, estado_nuevo, ahora_ms)
 
     def _como_se_enviaria(self, comando: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
@@ -265,18 +266,13 @@ class Supervisor:
         return self._stop_por_evento(evento, ahora_ms, f"error_detector:{codigo}", detalle)
 
     def _stop_por_evento(
-        self,
-        evento: Any,
-        ahora_ms: float,
-        motivo: str,
-        errores: list[str],
-        tipo: str = "frame",
+        self, evento: Any, ahora_ms: float, motivo: str, errores: list[str]
     ) -> dict[str, Any]:
         run_id = self._id_del_evento(evento, "run_id") or self._ultimo_run_id
         frame_id = self._id_del_evento(evento, "frame_id") or ID_DESCONOCIDO
         self._registrar_error(run_id, frame_id, ahora_ms, motivo, errores)
 
-        return self._stop(run_id, frame_id, tipo, motivo, ahora_ms)
+        return self._stop(run_id, frame_id, "frame", motivo, ahora_ms)
 
     def _stop_por_reloj(self, ahora_ms: float, motivo: str, errores: list[str]) -> dict[str, Any]:
         """STOP sin cuadro: `event=clock` y `frame_id=null`."""
@@ -286,8 +282,11 @@ class Supervisor:
     def _stop(
         self, run_id: str, frame_id: str | None, evento: str, motivo: str, ahora_ms: float
     ) -> dict[str, Any]:
-        # Solo cambia el nombre: las demás claves (p. ej. la histéresis de T11) se conservan.
+        # Cambia el nombre y conserva las demás claves (la espera de la histéresis de T11), pero
+        # corta la racha de cuadros libres: un cuadro que no se pudo ver no cuenta como libre.
         detenido = {**self.estado, "nombre": ESTADO_INICIAL["nombre"]}
+        if LIBRES_SEGUIDOS in detenido:
+            detenido[LIBRES_SEGUIDOS] = 0
         comando = self._comando(run_id, frame_id, detenido["nombre"], ahora_ms, evento)
         comando.update({"action": "STOP", "speed": 0, "steering": 0.0, "reason": motivo})
         return self._enviar(comando, detenido, ahora_ms)
