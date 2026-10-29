@@ -29,11 +29,25 @@ Medidas con el carro armado, sobre piso plano.
 | Altura de la cámara | 10 cm | Del piso al centro del lente |
 | Ángulo de la cámara | 0° | Mira derecho al frente, sin inclinación |
 
-**Regla obstáculo / transitable** (la define P5-03 en `DOMINIO.md`): es obstáculo lo que mide
-más que el radio de la llanta o que la altura libre del chasis, lo que sea menor. Con estas
-medidas el límite es la altura libre: **2 cm** (menor que el radio de 3.2 cm). Algo más bajo
-(un borrador, una tapa, un cable) es transitable. Entre 2 y 3.2 cm la llanta podría subirse,
-pero los motores pegarían: también es obstáculo.
+### Verificación (P5-19, 2026-10-29)
+
+Heri (A1) repitió dos medidas con regla sobre el mismo carro:
+
+| Medida | Andy | Heri | Diferencia |
+|---|---|---|---|
+| Diámetro de llanta | 64 mm | 66 mm | 2 mm |
+| Altura libre del chasis | 20 mm | 20 mm | 0 |
+
+La altura libre, que es la que fija el límite, coincide. El diámetro difiere 2 mm (radio de 3.2 a
+3.3 cm); no cambia el límite porque el radio queda por encima de la altura libre en los dos casos.
+
+**Regla obstáculo / transitable** (la define P5-03 en `DOMINIO.md`): el límite es lo menor entre
+el radio de la llanta y la altura libre del chasis. Con estas medidas es la altura libre:
+**2 cm (20 mm)**, menor que el radio de 3.2 a 3.3 cm.
+
+- **20 mm o más** es obstáculo: a esa altura el objeto ya toca los motores. Entre 2 y 3.2 cm
+  la llanta podría subirse, pero los motores pegarían.
+- **Menos de 20 mm** es transitable (un borrador, una tapa, un cable).
 
 Con la cámara a 10 cm y mirando al frente, el horizonte queda a media imagen y el piso ocupa la
 mitad de abajo; un objeto pegado al frente del carro queda fuera de cuadro o cortado arriba.
@@ -54,6 +68,27 @@ mitad de abajo; un objeto pegado al frente del carro queda fuera de cuadro o cor
 Tiempos por cuadro que reporta el firmware (`JPG: … ms`) en las pruebas del 2026-10-28: entre 75
 y 616 ms, con la primera captura más lenta. **No es una medición de la secuencia:** el hueco
 real entre cuadros (límite de 400 ms, `validez_orden_ms`) se mide en P5-09 y P5-11.
+
+### Video desde otra computadora
+
+El 2026-10-29 Heri (A1) abrió el video desde su MacBook Air con Safari, conectado a la misma red
+que el carro, y comprobó que se movía en tiempo real (captura en `docs/carro/video_mac_safari.jpg`).
+Con eso, dos personas del equipo vieron el video desde su propia computadora: Andy (Windows) y
+Heri (macOS).
+
+### Cuadros de prueba con objetos del dominio
+
+Tres cuadros de la ESP32-CAM del carro, a 640×480, con objetos de las clases elegidas en P5-04
+(`bottle` y `cup`). Son los mismos JPEG de las fotos de selección de P5-04, sin modificar: su
+SHA-256 coincide con `modelo/experimentos-publicados/p5-04-yolo11n/evidencia/manifiesto.csv`.
+Igual que las demás fotos de selección, **no** forman parte de las 8 secuencias de evaluación
+(D-06).
+
+| Archivo | Original en P5-04 | Objeto | SHA-256 |
+|---|---|---|---|
+| `objeto_botella_izq.jpg` | `botella_izq.jpg` | Botella a la izquierda | `b30d6f5b4e01c262527ca480ac32540bf065bdf2b0bec85ab4e8f409d224f7e1` |
+| `objeto_botella_der.jpg` | `botella_der.jpg` | Botella a la derecha | `8e360d41326126ea58b781a071f583a9e8b7f5a841af0539e2c0ba19322a4e07` |
+| `objeto_taza_centro_cerca.jpg` | `taza_centro_cerca.jpg` | Taza al centro, cerca | `670fec5473ceda61b5a6283711596d610d75577dfb1bc9d5ffc8de52c1e9cbcc` |
 
 ## Firmware
 
@@ -106,6 +141,8 @@ En `docs/carro/`, reducidas a 1 MB o menos y sin datos EXIF:
 | `lado.jpg` | Vista general de lado |
 | `atras.jpg` | El carro por detrás, con el portabaterías |
 | `video_transmitiendo.jpg` | El video de `:81/stream` en el navegador (2026-10-28) |
+| `video_mac_safari.jpg` | El video abierto por Heri en Safari desde su MacBook Air (2026-10-29); las caras que salían en el video están pixeladas |
+| `objeto_*.jpg` | Los tres cuadros de prueba con objetos (ver arriba); estos sí van sin reducir, tal como salieron de la cámara |
 | `medida_llanta.jpg` | Escuadra pegada a la cara de la llanta, de borde a borde |
 | `medida_altura_libre.jpg` | Escuadra vertical desde el piso (0 cm abajo) junto a un motor |
 | `medida_camara.jpg` | Escuadra vertical junto al frente, **invertida**: el 0 queda arriba, a la altura del lente, y el 10 abajo, en el piso |
