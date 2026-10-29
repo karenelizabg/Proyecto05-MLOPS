@@ -11,7 +11,12 @@ Uso:
 `--model-sha256` y `--config-sha256` son obligatorios: sin ellos no se sabe si se midió la
 configuración congelada. Para probar el arnés sin hashes está `--prueba`, que lo deja anotado y
 nunca sale con 0. La etapa de B usa `plazos.yaml` y `politica.yaml` de `--config-control`, y sus
-SHA-256 quedan en la procedencia.
+SHA-256 quedan registrados en `procedencia.config_b`. B no tiene todavía una referencia congelada
+con qué compararlos, así que se registran pero no cuentan como procedencia comprobada (esa es
+la del detector, en `procedencia.detector`).
+
+En modo oficial el detector debe tener archivo de pesos: el arnés calcula su SHA-256 y lo compara.
+Un detector sin pesos, como el falso, solo se mide con `--prueba`.
 
 Escribe en la carpeta de salida, que debe no existir o estar vacía:
 - `ejecuciones.csv`: una fila por ejecución válida, calentamientos marcados (`fase`).
@@ -226,8 +231,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="bench-politica-") as temporal:
         try:
             detector = _crear_detector(args.detector, _opciones(args.opcion))
-            procedencia, advertencias = verificar_procedencia(
-                detector, args.model_sha256, args.config_sha256
+            del_detector, advertencias = verificar_procedencia(
+                detector, args.model_sha256, args.config_sha256, args.prueba
             )
             entradas = cargar_entradas(detector, _rutas_de_entrada(args.entradas))
             politica = None
@@ -236,11 +241,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, ValueError, yaml.YAMLError) as exc:
             print(f"no se mide: {exc}", file=sys.stderr)
             return 2
-        procedencia["config_b"] = (
-            None
-            if politica is None
-            else {"carpeta": ruta_publicable(args.config_control), **politica.archivos}
-        )
+        procedencia = {"detector": del_detector, "config_b": None}
+        if politica is not None:
+            procedencia["config_b"] = {
+                "carpeta": ruta_publicable(args.config_control),
+                **politica.archivos,
+                "comparada_con_referencia": False,
+                "nota": "registrada; B no tiene una referencia congelada con qué compararla",
+            }
         medicion = medir(
             detector, entradas, politica, CALENTAMIENTOS, args.mediciones, args.max_fallos
         )

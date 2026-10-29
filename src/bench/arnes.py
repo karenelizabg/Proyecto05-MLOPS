@@ -111,15 +111,30 @@ def cargar_entradas(detector: Detector, rutas: Sequence[Path]) -> list[Entrada]:
 
 
 def verificar_procedencia(
-    detector: Detector, model_sha256: str | None, config_sha256: str | None
+    detector: Detector,
+    model_sha256: str | None,
+    config_sha256: str | None,
+    prueba: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Compara los hashes del detector (y de sus pesos) con los congelados.
+    """Compara los hashes del detector y el SHA-256 de su archivo de pesos con los congelados.
 
-    Uno distinto lanza `ErrorBench`: no se mide otra configuración. Uno sin indicar es advertencia.
+    Uno distinto lanza `ErrorBench`: no se mide otra configuración. Sin archivo de pesos tampoco se
+    mide, salvo en modo de prueba (`prueba=True`), donde queda como advertencia igual que un hash
+    sin indicar.
     """
+    advertencias = []
     pesos = None
-    if detector.ruta_pesos is not None:
+    if detector.ruta_pesos is None:
+        if not prueba:
+            raise ErrorBench(
+                "el detector no tiene archivo de pesos: no se puede comprobar el checkpoint "
+                "(un detector sin pesos solo se mide con --prueba)"
+            )
+        advertencias.append("pesos no verificados: el detector no tiene archivo de pesos")
+    else:
         ruta = Path(detector.ruta_pesos)
+        if not ruta.is_file():
+            raise ErrorBench(f"no existe el archivo de pesos {ruta_publicable(ruta)}")
         pesos = {
             "ruta": ruta_publicable(ruta),
             "bytes": ruta.stat().st_size,
@@ -130,7 +145,6 @@ def verificar_procedencia(
                 f"los pesos {ruta} tienen SHA-256 {pesos['sha256']}, "
                 f"pero el detector dice {detector.model_sha256}"
             )
-    advertencias = []
     for campo, esperado in (("model_sha256", model_sha256), ("config_sha256", config_sha256)):
         real = getattr(detector, campo)
         if esperado is None:

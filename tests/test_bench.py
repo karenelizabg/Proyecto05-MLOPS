@@ -2,6 +2,8 @@ import csv
 import hashlib
 import json
 import subprocess
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -60,6 +62,8 @@ def correr(imagenes, salida, *extra):
             FALSO.model_sha256,
             "--config-sha256",
             FALSO.config_sha256,
+            # El detector falso no tiene pesos: solo se puede medir en modo de prueba.
+            "--prueba",
             *extra,
         ]
     )
@@ -84,9 +88,11 @@ def test_diez_calentamientos_y_cien_validas(imagenes, tmp_path):
     for etapa in resumen["etapas"].values():
         assert etapa["n"] == 100
         assert etapa["minimo"] <= etapa["p50"] <= etapa["p95"] <= etapa["maximo"]
-    assert resumen["procedencia"]["comprobada"] is True
+    assert resumen["procedencia"]["detector"]["comprobada"] is False
     assert resumen["advertencias"] == [
-        "detector falso: prueba el arnés, no es la medición del entregable"
+        "modo de prueba (--prueba): no es la medición del entregable",
+        "detector falso: prueba el arnés, no es la medición del entregable",
+        "pesos no verificados: el detector no tiene archivo de pesos",
     ]
     assert (
         resumen["archivos"]["ejecuciones.csv"]
@@ -133,7 +139,7 @@ def test_modo_de_prueba_sin_hashes(imagenes, tmp_path):
     assert main(argumentos) == 1
     resumen = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
     assert resumen["protocolo"]["prueba"] is True
-    assert resumen["procedencia"]["comprobada"] is False
+    assert resumen["procedencia"]["detector"]["comprobada"] is False
     assert any("modo de prueba" in a for a in resumen["advertencias"])
 
 
@@ -155,6 +161,7 @@ def test_registra_la_configuracion_de_b(imagenes, tmp_path):
 
     a, b = config_b("a"), config_b("b")
     assert a["carpeta"] == "control"
+    assert a["comparada_con_referencia"] is False
     assert a["plazos.yaml"] == b["plazos.yaml"]
     assert a["politica.yaml"] != b["politica.yaml"]
     assert (
@@ -168,15 +175,82 @@ def test_configuracion_de_b_que_no_se_puede_leer(imagenes, tmp_path):
     assert not salida.exists()
 
 
+class DetectorConPesos:
+    """Un detector cualquiera (no el falso) con archivo de pesos, para la ruta oficial."""
+
+    def __init__(self, ruta_pesos):
+        self._falso = DetectorFalso()
+        self.ruta_pesos = ruta_pesos
+        self.model_sha256 = hashlib.sha256(Path(ruta_pesos).read_bytes()).hexdigest()
+        self.config_sha256 = self._falso.config_sha256
+
+    def __getattr__(self, nombre):
+        return getattr(self._falso, nombre)
+
+
+@pytest.fixture
+def detector_con_pesos(tmp_path, monkeypatch):
+    pesos = tmp_path / "pesos.onnx"
+    pesos.write_bytes(b"pesos congelados")
+    modulo = types.ModuleType("detector_con_pesos")
+    modulo.crear = lambda **opciones: DetectorConPesos(pesos)
+    monkeypatch.setitem(sys.modules, "detector_con_pesos", modulo)
+    return hashlib.sha256(b"pesos congelados").hexdigest()
+
+
+def oficial(imagenes, salida, model_sha256, *extra):
+    return main(
+        [
+            "--entradas", str(imagenes), "--salida", str(salida), "--equipo", "pruebas",
+            "--detector", "detector_con_pesos",
+            "--model-sha256", model_sha256, "--config-sha256", FALSO.config_sha256,
+            *extra,
+        ]
+    )  # fmt: skip
+
+
+def test_medicion_oficial_con_pesos_verificados(imagenes, tmp_path, detector_con_pesos):
+    salida = tmp_path / "run"
+    assert oficial(imagenes, salida, detector_con_pesos) == 0
+    resumen = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
+    detector = resumen["procedencia"]["detector"]
+    assert detector["comprobada"] is True
+    assert detector["pesos"] == {
+        "ruta": "pesos.onnx",
+        "bytes": len(b"pesos congelados"),
+        "sha256": detector_con_pesos,
+    }
+    assert resumen["protocolo"]["prueba"] is False
+    assert resumen["advertencias"] == []
+
+
+def test_medicion_oficial_sin_pesos_no_se_hace(imagenes, tmp_path):
+    # El caso de la revisión: hashes que coinciden, pero ningún checkpoint que comprobar.
+    salida = tmp_path / "run"
+    argumentos = [
+        "--entradas", str(imagenes), "--salida", str(salida), "--equipo", "pruebas",
+        "--model-sha256", FALSO.model_sha256, "--config-sha256", FALSO.config_sha256,
+    ]  # fmt: skip
+    assert main(argumentos) == 2
+    assert not salida.exists()
+
+
+def test_pesos_que_no_existen(tmp_path):
+    detector = DetectorFalso()
+    detector.ruta_pesos = tmp_path / "no-existe.onnx"
+    with pytest.raises(ErrorBench, match="no existe el archivo de pesos"):
+        verificar_procedencia(detector, None, None)
+
+
 def test_rechaza_otro_modelo():
     with pytest.raises(ErrorBench, match="model_sha256"):
-        verificar_procedencia(FALSO, "0" * 64, FALSO.config_sha256)
+        verificar_procedencia(FALSO, "0" * 64, FALSO.config_sha256, prueba=True)
 
 
 def test_sin_hashes_mide_pero_avisa():
-    procedencia, advertencias = verificar_procedencia(FALSO, None, None)
+    procedencia, advertencias = verificar_procedencia(FALSO, None, None, prueba=True)
     assert procedencia["comprobada"] is False
-    assert len(advertencias) == 2
+    assert len(advertencias) == 3
 
 
 def test_pesos_que_no_coinciden_con_el_detector(tmp_path):
@@ -185,7 +259,7 @@ def test_pesos_que_no_coinciden_con_el_detector(tmp_path):
     detector = DetectorFalso()
     detector.ruta_pesos = pesos
     with pytest.raises(ErrorBench, match="SHA-256"):
-        verificar_procedencia(detector, None, None)
+        verificar_procedencia(detector, None, None, prueba=True)
 
 
 def test_pesos_se_registran_con_tamano_y_hash(tmp_path):

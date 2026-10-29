@@ -32,11 +32,13 @@ uv run python -m bench \
 
 - `--entradas`: imágenes o carpetas (de una carpeta se toman `.jpg`, `.jpeg` y `.png` en orden de nombre). Se
   recorren en ciclo hasta juntar las ejecuciones.
-- `--detector falso` (el valor por omisión) usa el detector de prueba del arnés. El detector real (P5-05) se
+- `--detector falso` (el valor por omisión) usa el detector de prueba del arnés. No tiene archivo de pesos, así que
+  **solo corre con `--prueba`**. El detector real (P5-05) se
   conecta con un módulo que expone `crear(**opciones)` y devuelve un objeto como el `Detector` de
   [`src/bench/detector.py`](../src/bench/detector.py). `--opcion clave=valor` se pasa a `crear`.
-- `--model-sha256` y `--config-sha256` son **obligatorios**. Para probar el arnés sin ellos está `--prueba`: mide,
-  pero lo anota en `resumen.json` y nunca sale con `0`.
+- `--model-sha256` y `--config-sha256` son **obligatorios**, y el detector debe tener **archivo de pesos**. Para
+  probar el arnés sin hashes o sin pesos está `--prueba`: mide, pero lo anota en `resumen.json` y nunca sale con
+  `0`.
 - `--config-control` (por omisión `config/control/`): de dónde se leen `plazos.yaml` y `politica.yaml` de B.
 - `--mediciones` (100 por omisión, no menos) y `--max-fallos` (10). `--sin-politica` mide solo el detector.
 
@@ -63,14 +65,19 @@ mide, para no mezclar corridas.
 | `fallos.csv` | Las ejecuciones que fallaron en cualquier etapa (también al armar el evento o en B), **aparte**: etapa, tipo de error y mensaje. No cuentan ni entran en p50/p95; el arnés sigue hasta juntar las 10 + 100 válidas. |
 | `resumen.json` | Por etapa: p50, p95, máximo, mínimo y media de las 100 mediciones (sin calentamientos). Hardware, energía, runtime e hilos, pesos (ruta, bytes, SHA-256), procedencia, protocolo, SHA-256 de cada entrada y de los CSV, y advertencias. |
 
-**Procedencia:** si el `model_sha256` o el `config_sha256` del detector no son los congelados, o los pesos no
-tienen el SHA-256 que dice el detector, **no se mide** (salida 2). La procedencia también registra en `config_b` el
-SHA-256 de `plazos.yaml` y `politica.yaml` con que se midió la etapa de B: si alguien cambia la política, el hash
-cambia.
+**Procedencia.** `resumen.json` separa dos cosas:
+
+- `procedencia.detector` (**comprobada**): el arnés calcula el SHA-256 del archivo de pesos y lo compara con el
+  `model_sha256` del detector y con `--model-sha256`; también compara el `config_sha256` con `--config-sha256`.
+  Si el detector no tiene archivo de pesos, si el archivo no existe o si algún hash no coincide, **no se mide**
+  (salida 2). Solo con `--prueba` se puede medir sin pesos, y entonces `comprobada` queda en `false`.
+- `procedencia.config_b` (**registrada**): el SHA-256 de `plazos.yaml` y `politica.yaml` con que se midió la etapa
+  de B. Si alguien cambia la política, el hash cambia. B todavía no tiene una referencia congelada con qué
+  compararlos, así que quedan con `comparada_con_referencia: false`.
 
 **Código de salida:** `0` completo y sin advertencias · `1` se midió pero hay advertencias (detector falso,
-`--prueba`, equipo sin declarar, en batería, sin política) o quedó incompleto porque los fallos pasaron de
-`--max-fallos` · `2` no se mide así (configuración distinta, hashes sin indicar, entradas, configuración de B o
+`--prueba`, pesos sin verificar, equipo sin declarar, en batería, sin política) o quedó incompleto porque los fallos pasaron de
+`--max-fallos` · `2` no se mide así (configuración distinta, hashes sin indicar, sin archivo de pesos, entradas, configuración de B o
 argumentos inválidos; no se escribe nada). La medición del entregable debe salir con `0`.
 
 El detector falso no decodifica, pero rechaza archivos que no sean un JPEG o PNG completo.
