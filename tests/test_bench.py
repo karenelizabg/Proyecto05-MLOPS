@@ -24,6 +24,12 @@ from bench.arnes import energia, hardware
 FALSO = DetectorFalso()
 
 
+@pytest.fixture(autouse=True)
+def en_corriente(monkeypatch):
+    # Las pruebas no dependen de si la compu que las corre está en batería.
+    monkeypatch.setattr("bench.__main__.energia", lambda: "corriente")
+
+
 @pytest.fixture
 def imagenes(tmp_path):
     carpeta = tmp_path / "cuadros"
@@ -90,6 +96,15 @@ def test_rechaza_una_configuracion_distinta(imagenes, tmp_path):
     # El umbral cambia config_sha256: ya no es la configuración congelada.
     assert correr(imagenes, salida, "--opcion", "umbral=0.4") == 2
     assert not salida.exists()
+
+
+def test_en_bateria_mide_pero_avisa(imagenes, tmp_path, monkeypatch):
+    monkeypatch.setattr("bench.__main__.energia", lambda: "bateria")
+    salida = tmp_path / "run"
+    assert correr(imagenes, salida) == 1
+    resumen = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
+    assert resumen["energia"] == "bateria"
+    assert any("batería" in a for a in resumen["advertencias"])
 
 
 def test_rechaza_otro_modelo():
