@@ -3,19 +3,23 @@
 from .stream import (
     Captura,
     Cuadro,
+    StreamDefectuoso,
     capturar,
     dimensiones_jpeg,
-    huecos_mayores,
+    huecos_excedidos,
     jpeg_completo,
     leer_partes,
+    motivo_rechazo,
 )
 
 __all__ = [
     "Captura",
     "Cuadro",
+    "StreamDefectuoso",
     "capturar",
     "dimensiones_jpeg",
-    "huecos_mayores",
+    "huecos_excedidos",
     "jpeg_completo",
     "leer_partes",
+    "motivo_rechazo",
 ]
