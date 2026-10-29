@@ -482,7 +482,7 @@ def test_emergencia_y_rearme_en_su_instante_y_en_run_json(tmp_path):
         ("frame", "AVANZAR", 240.0),
         ("emergency", "STOP", 300.0),
         ("frame", "STOP", 440.0),  # emergencia_activa
-        ("rearm", "AVANZAR", 500.0),  # T06: decide con el cuadro de 440, que es fresco
+        ("rearm", "STOP", 500.0),  # T06 (#71): el rearme solo quita la emergencia
         ("frame", "AVANZAR", 640.0),
         ("shutdown", "STOP", 640.0),
     ]
@@ -495,7 +495,7 @@ def test_emergencia_y_rearme_en_su_instante_y_en_run_json(tmp_path):
         {"accion": "cerrar", "t_ms": 640.0, "comando": 6},
     ]
     rearme = leer(salida / "decisiones.jsonl")[4]
-    assert (rearme["event"], rearme["decidio"]) == ("rearm", "politica")
+    assert (rearme["event"], rearme["decidio"]) == ("rearm", "supervisor")
 
 
 def test_una_accion_va_despues_del_cuadro_de_su_mismo_instante(tmp_path):

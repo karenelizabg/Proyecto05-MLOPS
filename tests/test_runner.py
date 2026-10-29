@@ -123,16 +123,13 @@ def test_sin_secuencia_real_el_caso_falla_y_lo_dice(tmp_path, caso):
     assert "secuencia real" in motivo
 
 
-def test_c10_falla_hoy_porque_el_rearme_avanza(tmp_path):
-    """El supervisor (T06) reanuda al rearmar con el último cuadro fresco; C10 (T15) pide STOP.
-
-    Si se corrige el supervisor o la expectativa (en su PR aparte), esta prueba se actualiza.
-    """
+def test_c10_pasa_porque_el_rearme_solo_quita_la_emergencia(tmp_path):
+    """Desde #71 (T06) el rearme manda STOP y reanuda el siguiente cuadro fresco, como pide C10."""
     salida = tmp_path / "salida"
-    assert correr("C10", "--salida", str(salida)) == 1
+    assert correr("C10", "--salida", str(salida)) == 0
     v = veredicto(salida, "C10")
-    assert [t["tramo"] for t in v["tramos"] if t["motivos"]] == ["rearme"]
-    assert "AVANZAR, event=rearm" in v["motivos"][0]
+    assert v["pasa"] is True
+    assert v["motivos"] == []
 
 
 # --- cambiar una expectativa a propósito -------------------------------------------
@@ -359,13 +356,14 @@ def test_c7_con_un_bloqueo_que_tapa_todo_pasa(copia, tmp_path):
 
 
 def test_c7_un_bloqueo_que_deja_girar_y_un_cuadro_libre_avanza(copia, tmp_path):
-    """Hoy la histéresis (T11) solo empieza con STOP: tras un giro, el primer cuadro libre ya
-    avanza, en medio del bloqueo y al final. Si la secuencia real de S6 deja girar, C7 falla."""
+    """Desde #69 la espera de cuadros libres también empieza tras un giro, y al final ya no
+    avanza con el primer cuadro libre. Pero en el cuadro libre suelto la política da STOP, y C7
+    pide repetir la acción anterior (el giro). Si la secuencia real de S6 deja girar, C7 falla."""
     armar_caso(copia, "C7", *c7(obstaculo(250, 400)))
     salida = tmp_path / "s"
     assert correr("C7", "--casos", str(copia), "--salida", str(salida)) == 1
     fallan = [t["tramo"] for t in veredicto(salida, "C7")["tramos"] if t["motivos"]]
-    assert fallan == ["un_cuadro_libre", "libre_otra_vez"]
+    assert fallan == ["un_cuadro_libre"]
 
 
 # --- cada regla del juez, con órdenes escritas a mano -------------------------------

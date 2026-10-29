@@ -8,9 +8,9 @@ C6    -        -       FALLA
 C7    -        -       FALLA
 C8    armada   3/3     PASA
 C9    armada   4/4     PASA
-C10   armada   6/7     FALLA
+C10   armada   7/7     PASA
 
-2 de 10 casos pasan.
+3 de 10 casos pasan.
 
 Por qué fallan (detalle en resultados/casos/Cn/veredicto.json):
   C1
@@ -27,5 +27,3 @@ Por qué fallan (detalle en resultados/casos/Cn/veredicto.json):
     - falta entrada.jsonl
   C7
     - falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)
-  C10
-    - rearme: orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida

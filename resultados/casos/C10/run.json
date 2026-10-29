@@ -25,7 +25,7 @@
       {
         "accion": "cerrar",
         "t_ms": 1800.0,
-        "comando": 11
+        "comando": 10
       }
     ]
   },
@@ -53,9 +53,9 @@
   },
   "conteos": {
     "eventos": 8,
-    "comandos": 12,
+    "comandos": 11,
     "comandos_fuera_de_contrato": 0,
-    "errores": 2
+    "errores": 1
   },
   "archivos": [
     "detecciones.jsonl",
