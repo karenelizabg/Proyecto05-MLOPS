@@ -15,7 +15,7 @@ el comando va al adaptador virtual, que solo lo registra.
 | Obstáculo al centro y un lado libre | **GIRAR** hacia el lado libre | C2 |
 | Obstáculo al centro sin lado libre, o con el giro desactivado | **STOP** | C2, C5 |
 | Obstáculo con confianza debajo del umbral | Se ignora y queda en `reason` | C6 |
-| Después de un STOP por obstáculo | Sigue en STOP hasta ver N cuadros libres seguidos | C7 |
+| Después de un STOP o un giro por obstáculo | No avanza hasta ver N cuadros libres seguidos | C7 |
 
 Cada comando explica en `reason` qué regla se aplicó y qué detecciones la activaron
 (`class_id` y confianza).
@@ -103,9 +103,11 @@ En `politica.yaml`: `clases_obstaculo: [39, 41]` y `clases_provisionales: false`
 
 Sirve para no arrancar y frenar a cada cuadro cuando la detección parpadea.
 
-1. Un **STOP por obstáculo** empieza la espera.
-2. Mientras espera, la política sigue en **STOP**, aunque haya un lado libre para girar, con
-   `reason` `esperando_cuadros_libres k/N`.
+1. Un **STOP por obstáculo** o un **giro por obstáculo al centro** empieza la espera. El giro
+   se manda igual; lo que cambia es que el siguiente cuadro libre ya no basta para avanzar.
+2. Mientras espera, la política da **STOP** con `reason` `esperando_cuadros_libres k/N`. Si
+   venía girando y el centro sigue ocupado con un lado libre, **sigue girando** (un desvío de
+   varios cuadros no se corta); después de un STOP no arranca a girar.
 3. Cada cuadro con el centro libre suma 1. Un cuadro con el centro ocupado regresa la cuenta
    a 0: **un solo cuadro libre en medio de un bloqueo no reanuda.**
 4. Al llegar a `cuadros_libres_para_reanudar` (N = 3) cuadros libres seguidos → **AVANZAR**,
@@ -118,8 +120,16 @@ cuadro:  L  L  B     B     L     B     L     L     L
 acción:  ▶  ▶  ■     ■     ■ 1/3 ■ 0/3 ■ 1/3 ■ 2/3 ▶ reanuda
 ```
 
-Un GIRAR no es un STOP, así que no activa la espera. La histéresis empieza después de un STOP
-por obstáculo: al arrancar el run se avanza con el primer cuadro libre.
+Con un lado libre (G = obstáculo al centro con la derecha libre, gira a la izquierda):
+
+```
+cuadro:  L  G     L     B     L     L     L
+acción:  ▶  ↰     ■ 1/3 ■ 0/3 ■ 1/3 ■ 2/3 ▶ reanuda
+```
+
+Antes, un giro no activaba la espera y ese primer cuadro libre suelto hacía avanzar (lo
+encontró Luis en C7). Al arrancar el run se avanza con el primer cuadro libre: no hay nada que
+esperar.
 
 ## 6. Pérdida de percepción: `stale` y `error`
 
@@ -131,11 +141,17 @@ El **supervisor** (`src/control/supervisor.py`, T03/T04) revisa estos casos **an
 a la política, frena por su cuenta y registra la falla en `errores.jsonl`. La política repite
 los mismos chequeos por seguridad, por si alguien la llama sin supervisor.
 
-**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error` o
-STOP de reloj), **solo cambia `nombre` a `DETENIDO`** y conserva las demás claves de la
-política (`esperando_libres`, `libres_seguidos`). Así, tras un bloqueo seguido de un `stale`, el
-carrito sigue esperando N cuadros libres y no reanuda con uno solo
-(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop`).
+**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error`,
+STOP de reloj, emergencia, rearme o cierre), **cambia `nombre` a `DETENIDO`, pone
+`libres_seguidos` en 0 si existe** y conserva las demás claves de la política
+(`esperando_libres`). Así, tras un bloqueo seguido de un `stale`, el carrito sigue esperando N
+cuadros libres, y el `stale` corta la racha igual que cuando la política misma lo ve
+(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop` y
+`test_un_stale_corta_la_racha_de_cuadros_libres`).
+
+**Rearme (C10).** `rearmar()` solo quita la emergencia y manda STOP (`event=rearm`); no le
+pregunta a la política. El carrito avanza hasta que la política decide con el siguiente cuadro
+fresco (`test_emergencia.py::test_rearmar_con_un_cuadro_fresco_y_libre_manda_stop_y_no_avanza`).
 
 ## 7. Estado entre cuadros
 
