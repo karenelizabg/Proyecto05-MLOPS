@@ -31,7 +31,9 @@ Medidas con el carro armado, sobre piso plano.
 
 ### Verificación (P5-19, 2026-10-29)
 
-Heri (A1) repitió dos medidas con regla sobre el mismo carro:
+Heri (A1) repitió dos medidas sobre el mismo carro con un calibrador (vernier). El ticket pide
+regla o cinta; el calibrador se acepta como equivalente porque mide la misma distancia con más
+precisión (Andy midió con escuadra).
 
 | Medida | Andy | Heri | Diferencia |
 |---|---|---|---|
