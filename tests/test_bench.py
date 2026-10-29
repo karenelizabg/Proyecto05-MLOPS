@@ -2,6 +2,7 @@ import csv
 import hashlib
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +23,7 @@ from bench.__main__ import main
 from bench.arnes import energia, hardware
 
 FALSO = DetectorFalso()
+RAIZ = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +37,8 @@ def imagenes(tmp_path):
     carpeta = tmp_path / "cuadros"
     carpeta.mkdir()
     for i in range(5):
-        (carpeta / f"f{i:02d}.jpg").write_bytes(hashlib.sha256(str(i).encode()).digest() * 4)
+        cuerpo = hashlib.sha256(str(i).encode()).digest() * 4
+        (carpeta / f"f{i:02d}.jpg").write_bytes(b"\xff\xd8" + cuerpo + b"\xff\xd9")
     return carpeta
 
 
@@ -107,6 +110,64 @@ def test_en_bateria_mide_pero_avisa(imagenes, tmp_path, monkeypatch):
     assert any("batería" in a for a in resumen["advertencias"])
 
 
+@pytest.mark.parametrize("falta", ["--model-sha256", "--config-sha256"])
+def test_sin_hashes_no_mide(imagenes, tmp_path, falta):
+    argumentos = {
+        "--model-sha256": FALSO.model_sha256,
+        "--config-sha256": FALSO.config_sha256,
+    }
+    del argumentos[falta]
+    salida = tmp_path / "run"
+    with pytest.raises(SystemExit) as error:
+        main(
+            ["--entradas", str(imagenes), "--salida", str(salida)]
+            + [x for par in argumentos.items() for x in par]
+        )
+    assert error.value.code == 2
+    assert not salida.exists()
+
+
+def test_modo_de_prueba_sin_hashes(imagenes, tmp_path):
+    salida = tmp_path / "run"
+    argumentos = ["--entradas", str(imagenes), "--salida", str(salida), "--prueba"]
+    assert main(argumentos) == 1
+    resumen = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
+    assert resumen["protocolo"]["prueba"] is True
+    assert resumen["procedencia"]["comprobada"] is False
+    assert any("modo de prueba" in a for a in resumen["advertencias"])
+
+
+def test_registra_la_configuracion_de_b(imagenes, tmp_path):
+    original = RAIZ / "config" / "control"
+    copia = tmp_path / "control"
+    copia.mkdir()
+    for nombre in ("plazos.yaml", "politica.yaml"):
+        (copia / nombre).write_bytes((original / nombre).read_bytes())
+
+    correr(imagenes, tmp_path / "a", "--config-control", str(copia))
+    texto = (copia / "politica.yaml").read_text(encoding="utf-8")
+    (copia / "politica.yaml").write_text(texto + "\n# cambio\n", encoding="utf-8")
+    correr(imagenes, tmp_path / "b", "--config-control", str(copia))
+
+    def config_b(run):
+        resumen = json.loads((tmp_path / run / "resumen.json").read_text(encoding="utf-8"))
+        return resumen["procedencia"]["config_b"]
+
+    a, b = config_b("a"), config_b("b")
+    assert a["carpeta"] == "control"
+    assert a["plazos.yaml"] == b["plazos.yaml"]
+    assert a["politica.yaml"] != b["politica.yaml"]
+    assert (
+        a["politica.yaml"] == hashlib.sha256((original / "politica.yaml").read_bytes()).hexdigest()
+    )
+
+
+def test_configuracion_de_b_que_no_se_puede_leer(imagenes, tmp_path):
+    salida = tmp_path / "run"
+    assert correr(imagenes, salida, "--config-control", str(tmp_path / "no-existe")) == 2
+    assert not salida.exists()
+
+
 def test_rechaza_otro_modelo():
     with pytest.raises(ErrorBench, match="model_sha256"):
         verificar_procedencia(FALSO, "0" * 64, FALSO.config_sha256)
@@ -135,6 +196,8 @@ def test_pesos_se_registran_con_tamano_y_hash(tmp_path):
     detector.model_sha256 = hashlib.sha256(b"pesos").hexdigest()
     procedencia, _ = verificar_procedencia(detector, detector.model_sha256, None)
     assert procedencia["pesos"]["bytes"] == 5
+    # Sin rutas personales: fuera del repo solo queda el nombre del archivo.
+    assert procedencia["pesos"]["ruta"] == "pesos.onnx"
     assert procedencia["pesos"]["sha256"] == detector.model_sha256
 
 
@@ -157,6 +220,34 @@ def test_fallos_quedan_aparte(imagenes):
     intentos_validos = {e["intento"] for e in medicion.ejecuciones}
     assert intentos_validos.isdisjoint({3, 50, 70})
     assert resumir_etapas(medicion.ejecuciones)["total_ms"]["n"] == 100
+
+
+def test_un_fallo_al_armar_el_evento_queda_aparte(imagenes, monkeypatch):
+    llamadas = []
+
+    def dimensiones(self, imagen):
+        llamadas.append(1)
+        if len(llamadas) == 5:
+            raise RuntimeError("no se pudo leer el tamaño")
+        return 640, 480
+
+    monkeypatch.setattr(DetectorFalso, "dimensiones", dimensiones)
+    entradas = cargar_entradas(FALSO, sorted(imagenes.iterdir()))
+    medicion = medir(DetectorFalso(), entradas)
+    assert medicion.completa
+    assert [(f["intento"], f["etapa"], f["error"]) for f in medicion.fallos] == [
+        (5, "evento", "RuntimeError")
+    ]
+
+
+def test_una_falla_de_la_politica_queda_aparte(imagenes):
+    def politica(evento, ahora_ms):
+        raise RuntimeError("B se cayó")
+
+    entradas = cargar_entradas(FALSO, sorted(imagenes.iterdir()))
+    medicion = medir(DetectorFalso(), entradas, politica, max_fallos=2)
+    assert not medicion.completa
+    assert {f["etapa"] for f in medicion.fallos} == {"politica"}
 
 
 def test_demasiados_fallos_deja_el_benchmark_incompleto(imagenes, tmp_path):
@@ -195,11 +286,13 @@ def test_los_calentamientos_no_entran_en_la_estadistica():
 # --- Una ejecución --------------------------------------------------------------------------------
 
 
-def test_total_es_la_suma_de_las_etapas_y_b_decide(imagenes, tmp_path):
+def test_el_total_es_de_pared_y_cubre_todas_las_etapas(imagenes, tmp_path):
     entrada = cargar_entradas(FALSO, [imagenes / "f00.jpg"])[0]
     fila = ejecutar_una(FALSO, entrada, 1, EtapaPolitica(tmp_path / "b"))
-    etapas = ("preprocesamiento_ms", "inferencia_ms", "posprocesamiento_ms", "politica_ms")
-    assert fila["total_ms"] == pytest.approx(sum(fila[e] for e in etapas))
+    etapas = [e for e in ETAPAS if e != "total_ms"]
+    assert fila["evento_ms"] > 0
+    # Tiempo de pared: incluye cada etapa y lo que pasa entre ellas, así que nunca es menor.
+    assert fila["total_ms"] >= sum(fila[e] for e in etapas)
     assert fila["accion"] in {"AVANZAR", "GIRAR_IZQ", "GIRAR_DER", "STOP"}
     # El comando lo registró el adaptador virtual de B.
     assert (tmp_path / "b" / "comandos.jsonl").read_text(encoding="utf-8").count("\n") == 1
@@ -230,13 +323,20 @@ def test_menos_de_cien_mediciones_no_se_acepta(imagenes, tmp_path):
     assert salida.value.code == 2
 
 
-def test_no_mezcla_con_una_corrida_anterior(imagenes, tmp_path):
+@pytest.mark.parametrize("archivo", ["resumen.json", "otra_cosa.txt"])
+def test_la_salida_debe_estar_vacia(imagenes, tmp_path, archivo):
     salida = tmp_path / "run"
     salida.mkdir()
-    (salida / "resumen.json").write_text("{}", encoding="utf-8")
+    (salida / archivo).write_text("{}", encoding="utf-8")
     with pytest.raises(SystemExit) as error:
         correr(imagenes, salida)
     assert error.value.code == 2
+
+
+def test_una_carpeta_vacia_sirve(imagenes, tmp_path):
+    salida = tmp_path / "run"
+    salida.mkdir()
+    assert correr(imagenes, salida) == 1
 
 
 def test_hash_mal_escrito(imagenes, tmp_path):
@@ -250,6 +350,17 @@ def test_entradas_con_el_mismo_nombre(tmp_path):
         (tmp_path / carpeta / "f.jpg").write_bytes(b"x" * 8)
     with pytest.raises(ErrorBench, match="mismo nombre"):
         cargar_entradas(FALSO, [tmp_path / "a" / "f.jpg", tmp_path / "b" / "f.jpg"])
+
+
+@pytest.mark.parametrize(
+    "contenido",
+    [b"no es una imagen", b"\xff\xd8 cortado a la mitad", b"\x89PNG\r\n\x1a\n cortado"],
+)
+def test_imagen_corrupta(tmp_path, contenido):
+    (tmp_path / "mala.jpg").write_bytes(contenido)
+    with pytest.raises(ErrorBench, match="JPEG"):
+        cargar_entradas(FALSO, [tmp_path / "mala.jpg"])
+    assert correr(tmp_path / "mala.jpg", tmp_path / "run") == 2
 
 
 def test_entrada_que_no_existe(tmp_path):

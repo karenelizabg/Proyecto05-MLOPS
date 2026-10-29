@@ -3,20 +3,25 @@
 Uso:
     python -m bench --entradas datos/cuadros/ --salida mediciones/<run>/ --equipo "<PEND-05>" \
         --detector paquete.modulo [--opcion clave=valor ...] \
-        --model-sha256 HASH --config-sha256 HASH
+        --model-sha256 HASH --config-sha256 HASH [--config-control config/control/]
 
 `--detector falso` usa el detector de prueba del arnés. Con el real, `paquete.modulo` expone
 `crear(**opciones)` (ver `bench/detector.py`).
 
-Escribe en la carpeta de salida, que debe estar vacía:
+`--model-sha256` y `--config-sha256` son obligatorios: sin ellos no se sabe si se midió la
+configuración congelada. Para probar el arnés sin hashes está `--prueba`, que lo deja anotado y
+nunca sale con 0. La etapa de B usa `plazos.yaml` y `politica.yaml` de `--config-control`, y sus
+SHA-256 quedan en la procedencia.
+
+Escribe en la carpeta de salida, que debe no existir o estar vacía:
 - `ejecuciones.csv`: una fila por ejecución válida, calentamientos marcados (`fase`).
 - `fallos.csv`: las ejecuciones fallidas, aparte; no entran en p50/p95.
 - `resumen.json`: p50/p95/máximo por etapa, hardware, runtime, pesos, procedencia y advertencias.
 
 Salida: 0 si el benchmark está completo y sin advertencias; 1 si se midió pero hay advertencias
-(detector falso, hashes sin indicar, equipo sin declarar, en batería) o quedó incompleto por
-fallos; 2 si no se puede medir así (configuración distinta de la congelada, entradas o argumentos
-inválidos). Con 2 no se escribe nada.
+(detector falso, modo de prueba, equipo sin declarar, en batería) o quedó incompleto por fallos;
+2 si no se puede medir así (configuración distinta de la congelada, hashes sin indicar, entradas,
+configuración de B o argumentos inválidos). Con 2 no se escribe nada.
 
 Las rutas las elige quien corre el comando y pueden estar en cualquier carpeta. Por eso las
 lecturas y escrituras con esas rutas llevan `NOSONAR (S8707)`, como en `python -m control`.
@@ -36,6 +41,8 @@ from typing import Any
 
 import yaml
 
+from control.__main__ import CARPETA_CONFIG
+
 from .arnes import (
     CALENTAMIENTOS,
     ETAPAS,
@@ -50,13 +57,13 @@ from .arnes import (
     medir,
     resumir_etapas,
     runtime,
+    ruta_publicable,
     sha256_archivo,
     verificar_procedencia,
 )
 from .detector import DetectorFalso
 
 EXTENSIONES = (".jpg", ".jpeg", ".png")
-NOMBRES_SALIDA = ("ejecuciones.csv", "fallos.csv", "resumen.json")
 COLUMNAS_EJECUCIONES = ["intento", "fase", "entrada_id", *ETAPAS, "detecciones", "accion"]
 COLUMNAS_FALLOS = ["intento", "fase", "entrada_id", "etapa", "error", "mensaje"]
 
@@ -118,6 +125,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-fallos", type=int, default=MAX_FALLOS, help="Fallos tolerados.")
     parser.add_argument("--sin-politica", action="store_true", help="No medir la etapa de B.")
+    parser.add_argument(
+        "--config-control",
+        type=Path,
+        default=CARPETA_CONFIG,
+        help="Carpeta con plazos.yaml y politica.yaml de B.",
+    )
+    parser.add_argument(
+        "--prueba", action="store_true", help="Probar el arnés sin hashes (nunca sale con 0)."
+    )
     return parser
 
 
@@ -127,16 +143,21 @@ def _revisar_argumentos(parser: argparse.ArgumentParser, args: argparse.Namespac
     if args.max_fallos < 0:
         parser.error("--max-fallos no puede ser negativo")
     for nombre in ("model_sha256", "config_sha256"):
+        opcion = f"--{nombre.replace('_', '-')}"
         valor = getattr(args, nombre)
+        if valor is None and not args.prueba:
+            parser.error(f"falta {opcion}: sin él no se rechaza una configuración distinta")
         if valor is not None and not (len(valor) == 64 and set(valor) <= set("0123456789abcdef")):
-            parser.error(f"--{nombre.replace('_', '-')} debe tener 64 caracteres hex en minúsculas")
-    ocupados = [n for n in NOMBRES_SALIDA if (args.salida / n).exists()]  # NOSONAR (S8707)
-    if ocupados:
-        parser.error(f"{args.salida} ya tiene resultados {ocupados}: usa una carpeta vacía")
+            parser.error(f"{opcion} debe tener 64 caracteres hex en minúsculas")
+    salida = args.salida
+    if salida.exists() and (not salida.is_dir() or any(salida.iterdir())):  # NOSONAR (S8707)
+        parser.error(f"{salida} no está vacía: usa una carpeta nueva para no mezclar corridas")
 
 
 def _advertencias(args: argparse.Namespace, detector: Any, corriente: str) -> list[str]:
     advertencias = []
+    if args.prueba:
+        advertencias.append("modo de prueba (--prueba): no es la medición del entregable")
     if isinstance(detector, DetectorFalso):
         advertencias.append("detector falso: prueba el arnés, no es la medición del entregable")
     if not args.equipo:
@@ -148,41 +169,16 @@ def _advertencias(args: argparse.Namespace, detector: Any, corriente: str) -> li
     return advertencias
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = _parser()
-    args = parser.parse_args(argv)
-    _revisar_argumentos(parser, args)
-
-    try:
-        detector = _crear_detector(args.detector, _opciones(args.opcion))
-        procedencia, advertencias = verificar_procedencia(
-            detector, args.model_sha256, args.config_sha256
-        )
-        rutas = _rutas_de_entrada(args.entradas)
-        entradas = cargar_entradas(detector, rutas)
-    except (ErrorBench, OSError) as exc:
-        print(f"no se mide: {exc}", file=sys.stderr)
-        return 2
-
-    corriente = energia()
-    advertencias = _advertencias(args, detector, corriente) + advertencias
-    with tempfile.TemporaryDirectory(prefix="bench-politica-") as temporal:
-        politica = None if args.sin_politica else EtapaPolitica(Path(temporal))
-        medicion = medir(
-            detector, entradas, politica, CALENTAMIENTOS, args.mediciones, args.max_fallos
-        )
-    if not medicion.completa:
-        advertencias.append(
-            f"incompleto: {len(medicion.fallos)} fallos, más de los {args.max_fallos} tolerados"
-        )
-
-    args.salida.mkdir(parents=True, exist_ok=True)  # NOSONAR (S8707)
-    ruta_ejecuciones, ruta_fallos = args.salida / "ejecuciones.csv", args.salida / "fallos.csv"
-    _escribir_csv(ruta_ejecuciones, medicion.ejecuciones, COLUMNAS_EJECUCIONES)
-    _escribir_csv(ruta_fallos, medicion.fallos, COLUMNAS_FALLOS)
-
-    etapas = resumir_etapas(medicion.ejecuciones)
-    resumen = {
+def _resumen(
+    args: argparse.Namespace,
+    detector: Any,
+    procedencia: dict[str, Any],
+    entradas: list[Any],
+    medicion: Any,
+    corriente: str,
+    advertencias: list[str],
+) -> dict[str, Any]:
+    return {
         "version": 1,
         "estado": "completo" if medicion.completa else "incompleto",
         "equipo": args.equipo,
@@ -194,15 +190,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             "calentamientos": CALENTAMIENTOS,
             "mediciones": args.mediciones,
             "max_fallos": args.max_fallos,
+            "prueba": args.prueba,
             "reloj": "time.perf_counter_ns",
             "percentil": "lineal: posición (n - 1) * q, interpolando entre vecinos",
-            "incluye": "preprocesamiento, inferencia, posprocesamiento y política/adaptador de B",
+            "incluye": (
+                "preprocesamiento, inferencia, posprocesamiento, armar y validar el evento, "
+                "y política/adaptador de B"
+            ),
             "excluye": [
                 "leer y decodificar la imagen",
                 "carga del modelo",
                 "pausas de reproducción",
             ],
-            "total": "suma de las etapas de cada ejecución",
+            "total": "tiempo de pared de cada ejecución, del preprocesamiento al comando de B",
             "entradas_en_ciclo": True,
             "periodo_etiqueta_ms": PERIODO_MS,
             "con_politica": not args.sin_politica,
@@ -213,16 +213,58 @@ def main(argv: Sequence[str] | None = None) -> int:
             "mediciones": sum(1 for e in medicion.ejecuciones if e["fase"] == "medicion"),
             "fallos": len(medicion.fallos),
         },
-        "etapas": etapas,
-        "archivos": {
-            "ejecuciones.csv": sha256_archivo(ruta_ejecuciones),
-            "fallos.csv": sha256_archivo(ruta_fallos),
-        },
+        "etapas": resumir_etapas(medicion.ejecuciones),
         "advertencias": advertencias,
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    _revisar_argumentos(parser, args)
+
+    with tempfile.TemporaryDirectory(prefix="bench-politica-") as temporal:
+        try:
+            detector = _crear_detector(args.detector, _opciones(args.opcion))
+            procedencia, advertencias = verificar_procedencia(
+                detector, args.model_sha256, args.config_sha256
+            )
+            entradas = cargar_entradas(detector, _rutas_de_entrada(args.entradas))
+            politica = None
+            if not args.sin_politica:
+                politica = EtapaPolitica(Path(temporal), args.config_control)
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            print(f"no se mide: {exc}", file=sys.stderr)
+            return 2
+        procedencia["config_b"] = (
+            None
+            if politica is None
+            else {"carpeta": ruta_publicable(args.config_control), **politica.archivos}
+        )
+        medicion = medir(
+            detector, entradas, politica, CALENTAMIENTOS, args.mediciones, args.max_fallos
+        )
+
+    corriente = energia()
+    advertencias = _advertencias(args, detector, corriente) + advertencias
+    if not medicion.completa:
+        advertencias.append(
+            f"incompleto: {len(medicion.fallos)} fallos, más de los {args.max_fallos} tolerados"
+        )
+
+    args.salida.mkdir(parents=True, exist_ok=True)  # NOSONAR (S8707)
+    ruta_ejecuciones, ruta_fallos = args.salida / "ejecuciones.csv", args.salida / "fallos.csv"
+    _escribir_csv(ruta_ejecuciones, medicion.ejecuciones, COLUMNAS_EJECUCIONES)
+    _escribir_csv(ruta_fallos, medicion.fallos, COLUMNAS_FALLOS)
+    resumen = _resumen(args, detector, procedencia, entradas, medicion, corriente, advertencias)
+    resumen["archivos"] = {
+        "ejecuciones.csv": sha256_archivo(ruta_ejecuciones),
+        "fallos.csv": sha256_archivo(ruta_fallos),
     }
     texto = json.dumps(resumen, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     (args.salida / "resumen.json").write_text(texto, encoding="utf-8")  # NOSONAR (S8707)
 
+    etapas = resumen["etapas"]
     if "total_ms" in etapas:
         total = etapas["total_ms"]
         print(

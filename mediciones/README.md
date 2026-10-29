@@ -35,29 +35,45 @@ uv run python -m bench \
 - `--detector falso` (el valor por omisión) usa el detector de prueba del arnés. El detector real (P5-05) se
   conecta con un módulo que expone `crear(**opciones)` y devuelve un objeto como el `Detector` de
   [`src/bench/detector.py`](../src/bench/detector.py). `--opcion clave=valor` se pasa a `crear`.
+- `--model-sha256` y `--config-sha256` son **obligatorios**. Para probar el arnés sin ellos está `--prueba`: mide,
+  pero lo anota en `resumen.json` y nunca sale con `0`.
+- `--config-control` (por omisión `config/control/`): de dónde se leen `plazos.yaml` y `politica.yaml` de B.
 - `--mediciones` (100 por omisión, no menos) y `--max-fallos` (10). `--sin-politica` mide solo el detector.
 
-**Qué se mide** en cada ejecución, con `time.perf_counter_ns`: `preprocesamiento_ms`, `inferencia_ms`,
-`posprocesamiento_ms`, `politica_ms` (el Supervisor de B con la política y el AdaptadorVirtual reales, con la
-configuración de `config/control/`) y `total_ms`, la suma de las etapas. **No se mide** leer y decodificar la
-imagen, cargar el modelo ni las pausas de reproducción: un cuadro sale en cuanto termina el anterior.
+**Qué se mide** en cada ejecución, con `time.perf_counter_ns`:
 
-**Qué escribe** (la carpeta debe estar vacía, para no mezclar corridas):
+| Etapa | Qué incluye |
+|---|---|
+| `preprocesamiento_ms` | `preprocesar` del detector. |
+| `inferencia_ms` | `inferir` del detector. |
+| `posprocesamiento_ms` | `posprocesar` del detector (umbral, NMS, cajas a píxeles del cuadro original). |
+| `evento_ms` | Leer las dimensiones del cuadro, armar el evento del contrato v1 y validarlo. |
+| `politica_ms` | El Supervisor de B con la política y el AdaptadorVirtual reales: valida el evento, decide y registra el comando. |
+| `total_ms` | **Tiempo de pared** de toda la ejecución, desde que empieza el preprocesamiento hasta que B registra el comando. Incluye las etapas y lo que pasa entre ellas, así que nunca es menor que su suma. |
+
+**No se mide** leer y decodificar la imagen, cargar el modelo ni las pausas de reproducción: un cuadro sale en
+cuanto termina el anterior.
+
+**Qué escribe.** La carpeta de `--salida` debe no existir o estar **vacía**: con cualquier archivo adentro no se
+mide, para no mezclar corridas.
 
 | Archivo | Contenido |
 |---|---|
 | `ejecuciones.csv` | Una fila por ejecución válida: `intento`, `fase` (`calentamiento` o `medicion`), entrada, cada etapa en ms, número de detecciones y la acción que decidió B. |
-| `fallos.csv` | Las ejecuciones que fallaron, **aparte**: etapa, tipo de error y mensaje. No cuentan ni entran en p50/p95; el arnés sigue hasta juntar las 10 + 100 válidas. |
+| `fallos.csv` | Las ejecuciones que fallaron en cualquier etapa (también al armar el evento o en B), **aparte**: etapa, tipo de error y mensaje. No cuentan ni entran en p50/p95; el arnés sigue hasta juntar las 10 + 100 válidas. |
 | `resumen.json` | Por etapa: p50, p95, máximo, mínimo y media de las 100 mediciones (sin calentamientos). Hardware, energía, runtime e hilos, pesos (ruta, bytes, SHA-256), procedencia, protocolo, SHA-256 de cada entrada y de los CSV, y advertencias. |
 
 **Procedencia:** si el `model_sha256` o el `config_sha256` del detector no son los congelados, o los pesos no
-tienen el SHA-256 que dice el detector, **no se mide** (salida 2). Sin `--model-sha256` o `--config-sha256` se mide
-pero queda como advertencia.
+tienen el SHA-256 que dice el detector, **no se mide** (salida 2). La procedencia también registra en `config_b` el
+SHA-256 de `plazos.yaml` y `politica.yaml` con que se midió la etapa de B: si alguien cambia la política, el hash
+cambia.
 
-**Código de salida:** `0` completo y sin advertencias · `1` se midió pero hay advertencias (detector falso, hashes
-sin indicar, equipo sin declarar, en batería, sin política) o quedó incompleto porque los fallos pasaron de
-`--max-fallos` · `2` no se mide así (configuración distinta, entradas o argumentos inválidos; no se escribe nada).
-La medición del entregable debe salir con `0`.
+**Código de salida:** `0` completo y sin advertencias · `1` se midió pero hay advertencias (detector falso,
+`--prueba`, equipo sin declarar, en batería, sin política) o quedó incompleto porque los fallos pasaron de
+`--max-fallos` · `2` no se mide así (configuración distinta, hashes sin indicar, entradas, configuración de B o
+argumentos inválidos; no se escribe nada). La medición del entregable debe salir con `0`.
+
+El detector falso no decodifica, pero rechaza archivos que no sean un JPEG o PNG completo.
 
 El percentil es lineal (posición `(n - 1) * q`, interpolando entre vecinos), igual que en P4. P5-16 contrasta el p95
 y el máximo con los plazos de `config/control/plazos.yaml`.

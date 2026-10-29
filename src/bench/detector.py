@@ -81,7 +81,13 @@ class DetectorFalso:
         }
 
     def leer(self, ruta: Path) -> bytes:
-        return Path(ruta).read_bytes()
+        """No decodifica (no hay Pillow), pero rechaza lo que no es un JPEG o PNG completo."""
+        datos = Path(ruta).read_bytes()
+        es_jpeg = datos.startswith(b"\xff\xd8") and datos.rstrip(b"\x00").endswith(b"\xff\xd9")
+        es_png = datos.startswith(b"\x89PNG\r\n\x1a\n") and b"IEND" in datos[-12:]
+        if not (es_jpeg or es_png):
+            raise ValueError(f"{ruta} no es un JPEG ni un PNG completo")
+        return datos
 
     def dimensiones(self, imagen: bytes) -> tuple[int, int]:
         return self.ANCHO, self.ALTO

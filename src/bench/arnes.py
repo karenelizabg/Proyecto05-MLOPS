@@ -4,16 +4,19 @@ Cada ejecución toma una entrada ya leída (decodificar la imagen no se cronomet
 y mide por separado con `time.perf_counter_ns`:
 
 - `preprocesamiento_ms`, `inferencia_ms` y `posprocesamiento_ms` del detector;
+- `evento_ms`: leer las dimensiones del cuadro, armar el evento del contrato v1 y validarlo;
 - `politica_ms`: el Supervisor de B con la política real y el AdaptadorVirtual (incluye validar el
   evento y escribir el comando), si se mide con política;
-- `total_ms`: la suma de las etapas, es decir, el cómputo local de un cuadro.
+- `total_ms`: el tiempo de pared de toda la ejecución, desde que empieza el preprocesamiento hasta
+  que B registra el comando. Incluye todo lo anterior y lo que haya entre etapas.
 
 No hay pausas de reproducción: el siguiente cuadro sale en cuanto termina el anterior, y su
 `t_capture_ms` es solo la etiqueta que espera el supervisor (un cuadro cada `PERIODO_MS`).
 
-Una ejecución que falla en cualquier etapa, o cuya salida no cumple el contrato, queda en la lista
-de fallos con su etapa y su error, y **no** cuenta ni entra en p50/p95: el arnés sigue hasta juntar
-las válidas. Si los fallos pasan de `max_fallos`, se detiene y el benchmark queda incompleto.
+Una ejecución que falla en cualquier etapa (también al armar el evento), o cuya salida no cumple
+el contrato, queda en la lista de fallos con su etapa y su error, y **no** cuenta ni entra en
+p50/p95: el arnés sigue hasta juntar las válidas. Si los fallos pasan de `max_fallos`, se
+detiene y el benchmark queda incompleto.
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from typing import Any
 from contrato import validar_evento
 from control import AdaptadorVirtual, Supervisor
 from control.__main__ import CARPETA_CONFIG, NOMBRE_PLAZOS, NOMBRE_POLITICA, cargar_plazos
-from control.config import cargar_config_politica
+from control.config import RAIZ, cargar_config_politica
 from control.politica import decidir
 
 from .detector import Detector
@@ -44,7 +47,14 @@ MINIMO_MEDICIONES = 100
 MAX_FALLOS = 10
 # Ritmo de entrada declarado por B (≈ 5 fps, plazos.yaml): solo etiqueta los t_capture_ms.
 PERIODO_MS = 200
-ETAPAS = ("preprocesamiento_ms", "inferencia_ms", "posprocesamiento_ms", "politica_ms", "total_ms")
+ETAPAS = (
+    "preprocesamiento_ms",
+    "inferencia_ms",
+    "posprocesamiento_ms",
+    "evento_ms",
+    "politica_ms",
+    "total_ms",
+)
 VARIABLES_DE_HILOS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
 RUN_ID = "bench"
 
@@ -68,6 +78,15 @@ class Entrada:
     ruta: Path
     sha256: str
     imagen: Any
+
+
+def ruta_publicable(ruta: Path) -> str:
+    """Relativa a la raíz del repo si está dentro; si no, solo el nombre (sin rutas personales)."""
+    ruta = Path(ruta).resolve()
+    try:
+        return ruta.relative_to(RAIZ).as_posix()
+    except ValueError:
+        return ruta.name
 
 
 def sha256_archivo(ruta: Path) -> str:
@@ -102,7 +121,7 @@ def verificar_procedencia(
     if detector.ruta_pesos is not None:
         ruta = Path(detector.ruta_pesos)
         pesos = {
-            "ruta": ruta.as_posix(),
+            "ruta": ruta_publicable(ruta),
             "bytes": ruta.stat().st_size,
             "sha256": sha256_archivo(ruta),
         }
@@ -136,6 +155,11 @@ class EtapaPolitica:
         plazos = cargar_plazos(carpeta_config / NOMBRE_PLAZOS)
         config = cargar_config_politica(carpeta_config / NOMBRE_POLITICA)
         adaptador = AdaptadorVirtual(carpeta_salida, plazos["validez_orden_ms"])
+        # Con qué configuración de B se midió: va a la procedencia de resumen.json.
+        self.archivos = {
+            nombre: sha256_archivo(carpeta_config / nombre)
+            for nombre in (NOMBRE_PLAZOS, NOMBRE_POLITICA)
+        }
         self.supervisor = Supervisor(decidir, adaptador, plazos, config)
 
     def __call__(self, evento: dict[str, Any], ahora_ms: float) -> dict[str, Any]:
@@ -146,15 +170,18 @@ def _cronometrar(etapa: str, funcion: Callable[..., Any], *args: Any) -> tuple[A
     inicio = time.perf_counter_ns()
     try:
         resultado = funcion(*args)
+    except FalloEjecucion:
+        raise
     except Exception as exc:
         raise FalloEjecucion(etapa, str(exc), type(exc).__name__) from exc
     return resultado, (time.perf_counter_ns() - inicio) / 1_000_000
 
 
 def _evento(detector: Detector, entrada: Entrada, detecciones: Any, intento: int) -> dict[str, Any]:
+    """Arma el evento del contrato v1 y lo valida, como hará `infer` antes de emitirlo."""
     ancho, alto = detector.dimensiones(entrada.imagen)
     t_ms = intento * PERIODO_MS
-    return {
+    evento = {
         "schema_version": "1",
         "run_id": RUN_ID,
         "sequence_id": RUN_ID,
@@ -170,6 +197,14 @@ def _evento(detector: Detector, entrada: Entrada, detecciones: Any, intento: int
         "bbox_unit": "px",
         "detections": detecciones,
     }
+    errores = validar_evento(evento)
+    if errores:
+        raise FalloEjecucion("salida", "; ".join(errores), "salida_invalida")
+    return evento
+
+
+def _accion(politica: Callable[[dict[str, Any], float], dict[str, Any]], evento: Any) -> str:
+    return politica(evento, evento["t_emit_ms"])["action"]
 
 
 def ejecutar_una(
@@ -179,30 +214,25 @@ def ejecutar_una(
     politica: Callable[[dict[str, Any], float], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Una ejecución. Lanza `FalloEjecucion` si una etapa falla o la salida no es válida."""
+    inicio = time.perf_counter_ns()
     tensor, pre_ms = _cronometrar("preprocesamiento", detector.preprocesar, entrada.imagen)
     salida, inf_ms = _cronometrar("inferencia", detector.inferir, tensor)
     detecciones, post_ms = _cronometrar(
         "posprocesamiento", detector.posprocesar, salida, entrada.imagen
     )
-    # Fuera del cronómetro: la validación es del arnés, no del detector.
-    evento = _evento(detector, entrada, detecciones, intento)
-    errores = validar_evento(evento)
-    if errores:
-        raise FalloEjecucion("salida", "; ".join(errores), "salida_invalida")
+    evento, evento_ms = _cronometrar("evento", _evento, detector, entrada, detecciones, intento)
     fila = {
         "preprocesamiento_ms": pre_ms,
         "inferencia_ms": inf_ms,
         "posprocesamiento_ms": post_ms,
+        "evento_ms": evento_ms,
         "politica_ms": None,
         "detecciones": len(detecciones),
         "accion": "",
     }
     if politica is not None:
-        comando, fila["politica_ms"] = _cronometrar(
-            "politica", politica, evento, evento["t_emit_ms"]
-        )
-        fila["accion"] = comando["action"]
-    fila["total_ms"] = pre_ms + inf_ms + post_ms + (fila["politica_ms"] or 0.0)
+        fila["accion"], fila["politica_ms"] = _cronometrar("politica", _accion, politica, evento)
+    fila["total_ms"] = (time.perf_counter_ns() - inicio) / 1_000_000
     return fila
 
 
