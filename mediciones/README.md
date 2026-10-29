@@ -5,19 +5,19 @@ ejecución, tiempos por etapa, p50/p95/máximo, hardware y runtime, y el reporte
 
 ## Equipo declarado (PEND-05)
 
-El benchmark del entregable se mide en **la MacBook Air M3 de Heri** (acordado el 2026-10-27), conectada a la
-corriente. Es la misma máquina en la que P5-04 prueba los detectores en CPU.
+El benchmark del entregable se mide en **la laptop de A3 (Ale)**, conectada a la corriente. Lo da A3 según
+PEND-05; P5-04 comprueba que el detector elegido corre aquí.
 
 | Dato | Valor |
 |---|---|
-| Equipo | MacBook Air M3 |
-| SO | macOS |
-| CPU | Apple M3 (solo CPU: sin GPU ni Neural Engine) |
-| RAM | 16 GB |
-| Python | 3.12 (el de `.python-version`, con `uv`) |
+| SO | Windows 11 Pro (10.0.26200), 64 bits |
+| CPU | Intel Core i5-1135G7 @ 2.40 GHz (4 núcleos, 8 hilos) |
+| RAM | 8 GB |
+| Python | 3.12.14 (el de `.python-version`, con `uv`) |
+| GPU | No se usa: todo en CPU |
 
-`resumen.json` registra en cada corrida el SO, el CPU, la RAM, si estaba conectada a la corriente y las versiones,
-así que se puede comprobar que se midió aquí. La versión exacta de macOS sale de ahí.
+`resumen.json` vuelve a registrar en cada corrida el SO, el CPU, la RAM, si estaba conectada a la corriente y las
+versiones, así que se puede comprobar que se midió aquí.
 
 ## Comando (`python -m bench`)
 
@@ -25,7 +25,7 @@ así que se puede comprobar que se midió aquí. La versión exacta de macOS sal
 uv run python -m bench \
   --entradas datos/cuadros/ \
   --salida mediciones/<run>/ \
-  --equipo "MacBook Air M3 de Heri" \
+  --equipo "laptop de A3" \
   --detector <módulo del detector> \
   --model-sha256 <hash de los pesos congelados> --config-sha256 <hash de la configuración congelada>
 ```

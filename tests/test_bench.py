@@ -268,7 +268,7 @@ def test_hardware_y_energia():
     ],
 )
 def test_energia_en_mac(monkeypatch, pmset, esperado):
-    # El equipo del benchmark es una MacBook (PEND-05): se simula pmset en cualquier SO.
+    # Para quien mida en una Mac: se simula pmset en cualquier SO.
     monkeypatch.setattr(arnes.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(
         arnes.subprocess,
