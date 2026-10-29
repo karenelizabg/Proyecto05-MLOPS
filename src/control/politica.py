@@ -251,9 +251,9 @@ def decidir(
     Las detecciones con confianza debajo de `umbral_confianza` no cuentan y se mencionan en
     `reason` como `ignorada_por_confianza` (C6, T10).
 
-    Histéresis (C7, T11): después de un STOP por obstáculo sigue en STOP, con `reason`
-    `esperando_cuadros_libres k/N`, hasta ver N cuadros libres seguidos
-    (`cuadros_libres_para_reanudar`). Lo lleva en el estado: `esperando_libres` y
+    Histéresis (C7, T11): después de un STOP o de un giro por obstáculo al centro, no
+    avanza hasta ver N cuadros libres seguidos (`cuadros_libres_para_reanudar`); mientras,
+    da STOP con `reason` `esperando_cuadros_libres k/N`. Lo lleva en el estado: `esperando_libres` y
     `libres_seguidos`.
 
     STOP siempre lleva speed=0 y steering=0. No lee el reloj: `t_decision_ms` es el
@@ -296,9 +296,16 @@ def _con_histeresis(
     speed: float,
     steering: float,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Histéresis (T11, C7): tras un STOP por obstáculo, reanuda solo con N cuadros libres.
+    """Histéresis (T11, C7): tras un STOP o un giro por obstáculo, reanuda con N cuadros libres.
 
     - Un STOP por obstáculo empieza la espera (`esperando_libres: true`, contador en 0).
+    - Un giro por obstáculo al centro (GIRAR_IZQ o GIRAR_DER) también: el giro se manda, pero
+      el siguiente cuadro libre no basta para avanzar. Si no, en C7 con un lado libre un solo
+      cuadro libre en medio del bloqueo hacía avanzar.
+    - Mientras espera, un cuadro con el centro ocupado es STOP, salvo que la política venga
+      girando (estado GIRANDO_IZQ o GIRANDO_DER) y la regla de zonas pida girar: entonces
+      sigue girando. Así un desvío de varios cuadros no se corta, y tras un STOP no arranca
+      a girar.
     - Mientras espera, la política sigue en STOP. Cada cuadro con el centro libre suma 1;
       un cuadro con el centro ocupado regresa el contador a 0, así que un solo cuadro libre
       en medio de un bloqueo no reanuda.
@@ -309,12 +316,21 @@ def _con_histeresis(
         if accion == "STOP":
             extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
             return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+        if accion in ("GIRAR_IZQ", "GIRAR_DER"):
+            # Solo se gira por un obstáculo al centro: la espera empieza igual que con STOP.
+            extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+            return _comando(evento, estado, accion, razon, speed, steering, extra)
         extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
         return _comando(evento, estado, accion, razon, speed, steering, extra)
 
     if accion != "AVANZAR":
         # Camino bloqueado otra vez: la racha de cuadros libres se corta.
         extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+        if accion in ("GIRAR_IZQ", "GIRAR_DER") and _nombre_de(estado) in (
+            GIRANDO_IZQ,
+            GIRANDO_DER,
+        ):
+            return _comando(evento, estado, accion, razon, speed, steering, extra)
         return _comando(
             evento, estado, "STOP", f"esperando_cuadros_libres 0/{n}: {razon}", 0, 0, extra
         )
