@@ -21,6 +21,11 @@ cuadro real → infer (A, P5-05) → eventos .jsonl → python -m contrato → p
     Un obstáculo que solo está a un lado deja el centro libre y la política avanza recto en los
     dos casos, así que no habría comandos opuestos que comparar (ver
     [docs/politica.md](politica.md), sección 4).
+  - Por eso **S3 y S4 no sirven** para este recorrido: en el plan de `datos/DOMINIO.md` la
+    botella va en el tercio de un lado con el centro libre. Hacen falta tomas aparte.
+  - El obstáculo es una botella (39) o una taza (41). En las fotos de P5-04 la taza se detectó
+    al centro de cerca (0.96) y la botella al centro de cerca no pasó de 0.29, así que la taza
+    es la mejor opción para tocar el centro.
 
 ## Comandos exactos
 
@@ -88,7 +93,7 @@ PENDIENTE. Revisar sobre todo:
 | Qué | Cómo se revisa | Encontrado |
 |---|---|---|
 | Coordenadas | Las cajas están en píxeles del cuadro **original**, con `image_width` e `image_height` reales; la caja cae del lado en que se ve el objeto en la foto. | |
-| Clases | Cada `class_id` está en `modelo/clases.json`, y el obstáculo filmado tiene un `class_id` de `clases_obstaculo` (hoy `[0, 1]`, provisional, DC-5). | |
+| Clases | Cada `class_id` está en `modelo/clases.json`, y el obstáculo filmado tiene un `class_id` de `clases_obstaculo` (`[39, 41]`: botella y taza, definitivas desde T12). | |
 | Tiempos | `t_capture_ms` crece por secuencia, `t_emit_ms ≥ t_capture_ms` y la edad `t_emit_ms − t_capture_ms` queda debajo de `max_frame_age_ms` (500 ms). | |
 | Hashes | Un solo `model_sha256` y un solo `config_sha256` por run. | |
 

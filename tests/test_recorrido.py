@@ -30,6 +30,7 @@ EN_EL_CENTRO = {"izq": (0.36, 0.48), "der": (0.52, 0.64)}
 DE_LADO_Y_CENTRO = {"izq": (0.05, 0.50), "der": (0.50, 0.95)}
 SOLO_DE_LADO = {"izq": (0.05, 0.25), "der": (0.75, 0.95)}
 ESPEJO = {"GIRAR_IZQ": "GIRAR_DER", "GIRAR_DER": "GIRAR_IZQ", "AVANZAR": "AVANZAR", "STOP": "STOP"}
+TAZA = 41  # cup: una de las clases_obstaculo de config/control/politica.yaml
 
 
 def secuencia(
@@ -42,7 +43,7 @@ def secuencia(
     bbox = [x1, y1, x2, y2] if formato == "xyxy" else [x1, y1, x2 - x1, y2 - y1]
     eventos = []
     for i in range(6):
-        detecciones = [] if i == 0 else [{"class_id": 1, "confidence": 0.9, "bbox": bbox}]
+        detecciones = [] if i == 0 else [{"class_id": TAZA, "confidence": 0.9, "bbox": bbox}]
         eventos.append(
             {
                 **BASE,
@@ -130,8 +131,17 @@ def test_el_espejo_de_un_cuadro_invierte_el_giro(ancho):
 
 @pytest.fixture
 def corrida(tmp_path):
+    """Corre `flujo.jsonl` con la mochila (1) del ejemplo del contrato cambiada por la taza."""
+    eventos = [json.loads(linea) for linea in FLUJO.read_text(encoding="utf-8").splitlines()]
+    for evento in eventos:
+        for deteccion in evento.get("detections") or []:
+            if deteccion["class_id"] == 1:
+                deteccion.update(class_id=TAZA, class_name="cup")
+    entrada = tmp_path / "flujo.jsonl"
+    entrada.write_text("".join(json.dumps(e) + "\n" for e in eventos), encoding="utf-8")
     salida = tmp_path / "salida"
-    assert correr(["--entrada", str(FLUJO), "--config", str(CONFIG), "--salida", str(salida)]) == 0
+    argumentos = ["--entrada", str(entrada), "--config", str(CONFIG), "--salida", str(salida)]
+    assert correr(argumentos) == 0
     return salida
 
 
