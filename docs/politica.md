@@ -141,11 +141,17 @@ El **supervisor** (`src/control/supervisor.py`, T03/T04) revisa estos casos **an
 a la política, frena por su cuenta y registra la falla en `errores.jsonl`. La política repite
 los mismos chequeos por seguridad, por si alguien la llama sin supervisor.
 
-**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error` o
-STOP de reloj), **solo cambia `nombre` a `DETENIDO`** y conserva las demás claves de la
-política (`esperando_libres`, `libres_seguidos`). Así, tras un bloqueo seguido de un `stale`, el
-carrito sigue esperando N cuadros libres y no reanuda con uno solo
-(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop`).
+**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error`,
+STOP de reloj, emergencia, rearme o cierre), **cambia `nombre` a `DETENIDO`, pone
+`libres_seguidos` en 0 si existe** y conserva las demás claves de la política
+(`esperando_libres`). Así, tras un bloqueo seguido de un `stale`, el carrito sigue esperando N
+cuadros libres, y el `stale` corta la racha igual que cuando la política misma lo ve
+(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop` y
+`test_un_stale_corta_la_racha_de_cuadros_libres`).
+
+**Rearme (C10).** `rearmar()` solo quita la emergencia y manda STOP (`event=rearm`); no le
+pregunta a la política. El carrito avanza hasta que la política decide con el siguiente cuadro
+fresco (`test_emergencia.py::test_rearmar_con_un_cuadro_fresco_y_libre_manda_stop_y_no_avanza`).
 
 ## 7. Estado entre cuadros
 

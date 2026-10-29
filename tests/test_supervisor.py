@@ -176,7 +176,7 @@ def test_state_before_y_after_usan_el_nombre(tmp_path):
     assert validar_comando(comando) == []
 
 
-def test_un_stop_solo_cambia_el_nombre_y_conserva_los_datos_de_la_politica(tmp_path):
+def test_un_stop_cambia_el_nombre_y_pone_libres_seguidos_en_0(tmp_path):
     supervisor = nuevo_supervisor(tmp_path, politica_que_cuenta)
     supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
     assert supervisor.estado["libres_seguidos"] == 1
@@ -185,7 +185,19 @@ def test_un_stop_solo_cambia_el_nombre_y_conserva_los_datos_de_la_politica(tmp_p
 
     assert comando["state_before"] == "AVANZANDO"
     assert comando["state_after"] == "DETENIDO"
-    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 1}
+    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 0}
+
+
+def test_un_stop_conserva_las_demas_claves_y_no_inventa_libres_seguidos(tmp_path):
+    def politica(ev, estado, config):
+        comando = {"action": "AVANZAR", "speed": 0.5, "steering": 0.0, "reason": "libre"}
+        return comando, {"nombre": "AVANZANDO", "esperando_libres": False, "otra": 7}
+
+    supervisor = nuevo_supervisor(tmp_path, politica)
+    supervisor.procesar_evento(evento("vacio.json"), ahora_ms=50.0)
+    supervisor.procesar_evento(roto(), ahora_ms=440.0)
+
+    assert supervisor.estado == {"nombre": "DETENIDO", "esperando_libres": False, "otra": 7}
 
 
 def test_si_la_politica_cambia_el_estado_y_falla_el_guardado_no_se_toca(tmp_path):
@@ -202,8 +214,9 @@ def test_si_la_politica_cambia_el_estado_y_falla_el_guardado_no_se_toca(tmp_path
 
     assert guardado == {"nombre": "AVANZANDO", "libres_seguidos": 1}
     assert comando["action"] == "STOP"
-    # Conserva lo guardado antes de la falla (1), no lo que la política cambió a medias (99).
-    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 1}
+    # Parte de lo guardado antes de la falla, no de lo que la política cambió a medias (99),
+    # y el STOP corta la racha.
+    assert supervisor.estado == {"nombre": "DETENIDO", "libres_seguidos": 0}
 
 
 # --- con la política real: el STOP del supervisor no rompe la histéresis (T11) -------
@@ -242,14 +255,31 @@ def test_libre_bloqueo_libre_stale_libre_sigue_en_stop(tmp_path):
         acciones.append(comando["action"])
 
     assert acciones == ["AVANZAR", "STOP", "STOP", "STOP", "STOP"]
-    ultimo = comando
-    assert ultimo["reason"].startswith("esperando_cuadros_libres")
-    # El STOP por stale solo cambió el nombre: la espera de cuadros libres siguió viva.
+    # El STOP por stale conservó la espera y cortó la racha: el libre de después es el 1 de 3.
+    assert comando["reason"].startswith("esperando_cuadros_libres 1/3")
     assert supervisor.estado["nombre"] == "DETENIDO"
     assert supervisor.estado["esperando_libres"] is True
 
 
-def test_el_stop_por_stale_conserva_la_espera_de_la_politica(tmp_path):
+def test_un_stale_corta_la_racha_de_cuadros_libres(tmp_path):
+    # Dos libres, un stale y un libre: sin cortar la racha serían 3/3 y avanzaría.
+    supervisor = con_politica_real(tmp_path)
+    secuencia = [LIBRE, BLOQUEO, LIBRE, LIBRE, STALE, LIBRE, LIBRE, LIBRE]
+
+    comandos = []
+    for n, nombre in enumerate(secuencia):
+        t = n * 200
+        comandos.append(supervisor.procesar_evento(en_t(nombre, f"f{n}", t), ahora_ms=t + 45))
+
+    assert [c["action"] for c in comandos] == [
+        "AVANZAR", "STOP", "STOP", "STOP", "STOP", "STOP", "STOP", "AVANZAR"
+    ]  # fmt: skip
+    assert comandos[3]["reason"].startswith("esperando_cuadros_libres 2/3")
+    assert comandos[5]["reason"].startswith("esperando_cuadros_libres 1/3")
+    assert comandos[7]["reason"].startswith("Reanuda tras 3/3")
+
+
+def test_el_stop_por_stale_conserva_la_espera_y_corta_la_racha(tmp_path):
     supervisor = con_politica_real(tmp_path)
     for n, nombre in enumerate([LIBRE, BLOQUEO, LIBRE]):
         supervisor.procesar_evento(en_t(nombre, f"f{n}", n * 200), ahora_ms=n * 200 + 45)
@@ -257,7 +287,8 @@ def test_el_stop_por_stale_conserva_la_espera_de_la_politica(tmp_path):
 
     supervisor.procesar_evento(en_t(STALE, "f3", 600), ahora_ms=645)
 
-    assert supervisor.estado == {**antes, "nombre": "DETENIDO"}
+    assert antes["libres_seguidos"] == 1
+    assert supervisor.estado == {**antes, "nombre": "DETENIDO", "libres_seguidos": 0}
     assert [c["reason"] for c in leer(tmp_path / "comandos.jsonl")][-1] == "stale"
 
 
