@@ -17,9 +17,9 @@
   },
   "clases": {
     "archivo": "modelo/clases.json",
-    "archivo_sha256": "76efdc623c08f6fc0b2d299e62f9dcb044dd77297be9abaf7109242dc67aa78e",
-    "class_ids": [24, 39, 41],
-    "class_names": ["backpack", "bottle", "cup"]
+    "archivo_sha256": "5add2bae5d27fbb3d9cef74cda38bca54d5f766c6b94da6b54d3e948af96cf20",
+    "class_ids": [39, 41],
+    "class_names": ["bottle", "cup"]
   },
   "salida_propuesta": {
     "bbox_format": "xyxy",

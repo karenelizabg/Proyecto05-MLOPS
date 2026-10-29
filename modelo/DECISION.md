@@ -1,8 +1,9 @@
 # P5-04 · Selección del detector
 
-**Estado:** selección aprobada por PM A con condiciones y clases/parámetros
-validados por PM B. Pendientes la documentación completa de AGPL-3.0 y la
-prueba de compatibilidad Windows. P5-04 no está cerrado.
+**Estado:** YOLO11n sigue seleccionado condicionalmente. Tras la revisión de
+Andy con el umbral de la política B, ambas PM aprobaron que el dominio de
+obstáculos quede en botella y taza. Pendientes la documentación completa de
+AGPL-3.0 y la prueba de compatibilidad Windows. P5-04 no está cerrado.
 
 ## 1. Contexto
 
@@ -11,8 +12,13 @@ P5-04 debe seleccionar un detector ligero COCO que localice obstáculos en CPU
 ESP32-CAM. Los objetos sugeridos antes en PEND-04 fueron lata, mochila, cajas
 y tenis, pero solo mochila es una clase COCO directa. Karen (PM A) aprobó
 **condicionalmente** YOLO11n y botella, taza y mochila tras revisar los
-experimentos. PM B aprobó `backpack=24`, `bottle=39`, `cup=41`, `conf=0.25`
-e `iou=0.70`. Aceptó `modelo/clases.json` como lista de objetos con
+experimentos. Posteriormente, Andy revisó las detecciones con el umbral de
+decisión de B (0.50) y Karen retiró la mochila del dominio de filmación.
+PM B había aprobado `backpack=24`, `bottle=39`, `cup=41`, `conf=0.25`
+e `iou=0.70`. Ahora confirmó expresamente, según lo comunicado por el usuario:
+«OK de PM B: quitamos backpack y quedan bottle=39 y cup=41». Ambas PM
+aprueban así la reducción de tres clases a dos. PM B aceptó
+`modelo/clases.json` como lista de objetos con
 `class_id` y `name`, o como diccionario ID → nombre. Se eligió la primera
 estructura. Según la confirmación comunicada por el usuario, ambas son
 compatibles con las pruebas de Hannah en PR #64; **no se ha confirmado que
@@ -24,14 +30,22 @@ y el `uv.lock` del repositorio**. La compatibilidad de YOLO11n en ella aún
 no se ha probado.
 
 La selección comunicada es: **YOLO11n principal**, **SSDLite320 MobileNetV3
-de respaldo**, obstáculos `bottle`, `cup` y `backpack`; `chair` queda en reserva
-si mochila falla durante P5-19. Se descarta el estuche blando/maleta. La
-confianza de salida del detector será **0.25** y NMS IoU **0.70**. El Grupo B
-confirmó que necesita recibir detecciones menores que **0.50** para probar
-C6; su política mantiene `umbral_confianza: 0.5`. Esos son **dos umbrales
-distintos**: A emite desde 0.25 y B decide desde 0.50. Una detección entre
+de respaldo**. El dominio definitivo aprobado para la filmación contiene
+solo `bottle=39` y `cup=41`; `backpack=24`, `chair=56` y `suitcase=28`
+quedan descartados como clases activas. Se descarta también el estuche
+blando/maleta. La confianza de salida del detector será **0.25** y NMS IoU
+**0.70**. El Grupo B confirmó que necesita recibir detecciones menores que
+**0.50** para probar C6; su política mantiene `umbral_confianza: 0.5`.
+Esos son **dos umbrales distintos**: A emite desde 0.25 y B decide desde 0.50.
+Una detección entre
 0.25 y menos de 0.50 puede llegar a B y ser ignorada por confianza. No se
 modificó `config/control/politica.yaml`.
+
+Karen aclaró que la guía y la rúbrica no exigen un mínimo de clases distintas:
+E3 exige 60 cuadros, al menos seis secuencias, al menos 20 cuadros con
+obstáculo y al menos 20 despejados. El criterio original de P5-04 mencionaba
+tres o cuatro objetos; la reducción a dos está aprobada por ambas PM, pero
+este documento no declara satisfechos los demás criterios de aceptación.
 
 ## 2. Candidatos
 
@@ -105,6 +119,43 @@ resoluciones y trabajo incluido en cada medición difieren; estas cifras no
 constituyen el benchmark P5-15 ni predicen el rendimiento en la laptop de Ale. Los datos por
 foto, las cajas y el desglose están en los tres experimentos originales.
 
+### Revisión por posición de YOLO11n con el umbral de la política B
+
+La [revisión de Andy en el PR #66](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/66)
+se contrastó con las confianzas de
+[`detecciones.csv`](experimentos-publicados/p5-04-yolo11n/evidencia/detecciones.csv)
+y las asociaciones de
+[`revision_por_imagen.csv`](experimentos-publicados/p5-04-yolo11n/evidencia/revision_por_imagen.csv).
+La tabla usa las fotos individuales de selección; «cerca» y «lejos» solo se
+atribuyen cuando figuran en el nombre del archivo. Las cifras se redondean a
+dos decimales. «Supera 0.50» se refiere a la **clase del obstáculo esperado**,
+no a cualquier caja de otra clase. El detector sigue emitiendo desde
+`conf=0.25`; la política B decide desde `umbral_confianza=0.50`.
+
+| Objeto | Posición | Distancia documentada | Clase detectada (confianza) | Clase esperada ≥0.50 | Observación |
+|---|---|---|---|---|---|
+| Botella | Izquierda | — | `bottle` 0.64 | Sí | Asociación visual con la botella. |
+| Botella | Centro | Cerca | `vase` 0.79; `bottle` 0.29 | No | `bottle` llega a B, pero queda bajo su umbral; también hay confusión con `vase`. |
+| Botella | Derecha | — | `bottle` 0.82 | Sí | Asociación visual con la botella. |
+| Botella | Centro | Lejos | Ninguna | No | Omitida a la distancia documentada. |
+| Taza | Izquierda | — | `chair` 0.32; `cup` 0.30 | No | `cup` queda bajo el umbral; aparece una caja `chair`. |
+| Taza | Centro | Cerca | `cup` 0.96 | Sí | Asociación visual con la taza. |
+| Taza | Derecha | — | `cup` 0.61 | Sí | Asociación visual con la taza. |
+| Taza | Centro | Lejos | Ninguna | No | Omitida a la distancia documentada. |
+| Mochila | Izquierda | — | `suitcase` 0.70; `backpack` 0.52 | Sí | Ambas cajas se superponen sobre la mochila; confusión con `suitcase`. |
+| Mochila | Centro | Cerca | `suitcase` 0.78, 0.77, 0.33 y 0.31; `person` 0.27 | No | Sin `backpack`; varias cajas `suitcase` fragmentan la mochila. |
+| Mochila | Derecha | — | `suitcase` 0.64 | No | Sin `backpack`; no sirve para la posición derecha al umbral de B. |
+| Mochila | Centro | Lejos | `suitcase` 0.57; `backpack` 0.40 | No | `backpack` queda bajo el umbral y se superpone con `suitcase`. |
+| Mochila | Posición no documentada (`mochila_cerca.jpg`) | Cerca | `suitcase` 0.81 | No | Sin `backpack`. |
+| Mochila | Vista lateral (`mochila_lado.jpg`) | — | `backpack` 0.58 | Sí | Asociación visual lateral; el nombre no fija izquierda/centro/derecha. |
+| Mochila | Vista lateral (`mochila_lado_2.jpg`) | — | Ninguna | No | Omisión completa; el nombre no fija izquierda/centro/derecha. |
+
+La clase `suitcase` aparece sobre la mochila en **5 de las 7 fotografías**
+según el CSV publicado. El comentario de Andy dice 6/7; se conserva aquí el
+conteo verificable de los resultados y queda señalada esa discrepancia. En
+`varios_1` solo se reportó `bottle` 0.27 y en `varios_2`, `backpack` 0.51;
+estas tomas no demuestran todavía el caso de dos obstáculos simultáneos.
+
 ## 5. Limitaciones
 
 - No hay anotación completa de cajas de verdad de referencia ni cálculo formal
@@ -127,9 +178,10 @@ foto, las cajas y el desglose están en los tres experimentos originales.
 - Solo se probó CPU en la MacBook Air M3. La laptop Windows de Ale ya está
   identificada, pero falta probar allí YOLO11n para P5-15; las latencias
   locales no acreditan compatibilidad ni rendimiento en esa máquina.
-- P5-19 debe confirmar con video del carro el comportamiento de mochila y la
-  necesidad de activar silla como reserva, junto con las medidas y la
-  configuración de cámara. Las omisiones observadas no se han resuelto.
+- P5-19 debe confirmar con video del carro el comportamiento de botella y taza,
+  junto con las medidas y la configuración de cámara. También debe comprobarse
+  que la taza supera el radio de la llanta (PEND-12). Las omisiones observadas
+  no se han resuelto.
 
 ## 6. Selección condicional y razón
 
@@ -142,28 +194,37 @@ pero sus cajas sobre piso/fondo y mayor latencia son desventajas para este
 escenario. La licencia AGPL-3.0 y las omisiones de YOLO11n son condiciones
 materiales antes de cerrar la adopción.
 
-**SSDLite320 queda como respaldo**, especialmente por sus 5/7 asociaciones
+**SSDLite320 queda como respaldo**; históricamente tuvo 5/7 asociaciones
 visuales de mochila frente a 3/7 de YOLO11n. Sus cajas sobre piso y fondo y
 su mayor latencia local obligan a repetir la revisión si se activa. YOLOX-Nano
 no se selecciona: fue el más rápido y pequeño en esta Mac, pero reconoció
 menos tazas, sillas y mochilas, y tres cajas excedieron el borde superior.
 
-**Botella, taza y mochila** son los obstáculos seleccionados condicionalmente
-por PM A. `chair` queda **en reserva**: se considerará si la mochila falla en
-la validación con video real de P5-19. El estuche blando/maleta se descarta:
+Tras la revisión de Andy, **Karen (PM A) y Ale V. (PM B) aprobaron retirar la
+mochila**. Los obstáculos definitivos para filmar son **botella y taza**.
+La mochila falla en la posición derecha con el umbral de B. La silla tampoco
+resuelve el problema lateral: en `silla_izq.jpg` YOLO11n reportó `tv` 0.35,
+y su asociación visual global fue 3/6. El estuche blando/maleta se descarta:
 `suitcase` se asoció en solo 1–2 de 4 fotos según el modelo y hubo confusiones
-con muebles; `handbag` no aportó detecciones útiles. La activación de silla o
-cualquier cambio de clases exige documentar y aprobar una nueva configuración
-antes de usarla; no se hace de forma silenciosa. PM B ya validó las tres
-clases actuales, no la activación futura de silla. No se define aquí la
+con muebles; `handbag` no aportó detecciones útiles. No se define aquí la
 respuesta de seguridad del sistema ni se implementa P5-05.
+
+Para las secuencias planeadas, Karen asignó **botella a S3/S4** (izquierda y
+derecha) y **taza al centro** donde corresponda. PM B aclaró que **S5/C5 debe
+ocupar las tres zonas** para comprobar «sin zona libre → STOP»: **botella a la
+izquierda, taza al centro y botella a la derecha**, bien separadas. Esta
+distribución sustituye la propuesta anterior de dos objetos en S5. La revisión
+sugiere comenzar a distancia media porque ni botella ni taza se detectaron
+lejos en estas fotos. Andy hará tomas de prueba **antes de filmar**; las
+secuencias finales permanecen separadas de
+estas pruebas (D-06). Esta planificación no acredita todavía los criterios de
+aceptación de S3, S4 o S5.
 
 ### Clases y configuración propuestas para coordinación
 
 El checkpoint real de YOLO11n, con SHA-256 verificado, devuelve
-`backpack=24`, `bottle=39` y `cup=41`. `modelo/clases.json` registra esos
-IDs originales de COCO como **lista de objetos `class_id`/`name` aprobada por
-PM B**; no incluye `chair` mientras siga en reserva. PM B confirmó que esta
+`bottle=39` y `cup=41`. `modelo/clases.json` registra **solo esos dos IDs**
+en la lista de objetos `class_id`/`name` aprobada por PM B. PM B confirmó que esta
 estructura es compatible con las pruebas de Hannah en PR #64, según la
 información comunicada por el usuario; no se presupone su integración. El
 contrato v1 remite a este archivo y exige que las clases enviadas sean del
@@ -172,7 +233,7 @@ esa actualización pertenece al Grupo B y no se hace en P5-04.
 
 `modelo/configuracion.p5-04.propuesta.json` fija YOLO11n/Ultralytics 8.3.0,
 SHA-256 del checkpoint, CPU, `imgsz=640`, `conf=0.25`, `iou=0.70`, batch 1 y
-clases `[24,39,41]`. PM B aprobó ambos parámetros de inferencia. Incluye el
+clases `[39,41]`. PM B aprobó ambos parámetros de inferencia. Incluye el
 SHA-256 de `modelo/clases.json` para vincular el contenido de clases. Su
 propio SHA-256 está en
 `modelo/configuracion.p5-04.propuesta.sha256`, fuera del JSON, sin
@@ -185,29 +246,33 @@ la cámara montada. Esos parámetros de captura no están en este archivo.
 
 ## 7. Condiciones para cerrar la decisión
 
-1. P5-05 usa la selección y clases aprobadas para implementar la inferencia
-   y el filtro del dominio, sin alterar el contrato A → B v1.
+1. P5-05 consume las dos clases definitivas e implementa la inferencia y el
+   filtro del dominio acordado, sin alterar el contrato A → B v1. Hannah
+   actualiza la lista de clases relevantes del Grupo B; este ticket no modifica
+   su política ni el PR #64.
 2. P5-07 documenta origen, alcance y obligaciones de AGPL-3.0 para código y
    pesos YOLO11n, con avisos y forma de entrega; resuelve recuperación
    automatizable y verificación del checkpoint.
-3. P5-09 congela los parámetros de **captura** antes de filmar: resolución,
-   calidad JPEG, orientación y cámara montada, y registra IDs y SHA-256 de
-   cuadros. El responsable de inferencia congela parámetros del **detector**
-   antes de procesar secuencias; si cambian, regenera el hash de configuración.
+3. P5-09 congela la configuración efectiva antes de filmar, incluidos los
+   parámetros de **captura** (resolución, calidad JPEG, orientación y cámara
+   montada), y registra IDs y SHA-256 de cuadros. El responsable de inferencia
+   verifica los parámetros del **detector** antes de procesar secuencias; si
+   cambian, regenera el hash de configuración y documenta el cambio.
 4. P5-15 prueba YOLO11n en la laptop Windows de Ale y registra compatibilidad
    y benchmark formal en esa máquina; PM B autorizó abrir el PR de P5-04
    antes de esta prueba.
-5. P5-19 valida mochila con video real; si falla, Karen y Ale V revisan si
-   activar `chair` y actualizan clases/configuración de manera explícita.
-6. El Grupo B sustituye las clases provisionales por IDs aprobados en T12 y
-   verifica C6 con detecciones recibidas entre 0.25 y menos de 0.50. Esta
-   decisión no modifica su política ni sus tests.
+5. Andy realiza tomas de prueba antes de filmar. P5-19 valida botella y taza
+   con video real, distancia y las tres zonas ocupadas en S5, además de la
+   altura de la taza respecto del radio de la llanta (PEND-12).
+6. El Grupo B sustituye las clases provisionales por `[39,41]` mediante Hannah
+   en T12 y verifica C6 con detecciones recibidas entre 0.25 y menos de 0.50.
+   Esta decisión no modifica su política ni sus tests.
 
 ## 8. Aprobaciones y condiciones
 
 | Persona | Decisión solicitada | Estado |
 |---|---|---|
-| Karen (PM A) | YOLO11n y botella/taza/mochila | **Aprobación condicional comunicada por el usuario**; licencias y pruebas pendientes |
-| Ale V (PM B) | `backpack=24`, `bottle=39`, `cup=41`; `conf=0.25`, `iou=0.70`; estructura `class_id`/`name` | **Aprobado según lo comunicado por el usuario**. Autorizó abrir el PR sin esperar Windows; B necesita detecciones <0.50 para C6. |
+| Karen (PM A) | YOLO11n y, tras la revisión de Andy, solo botella/taza para filmar; mochila retirada | **Aprobado por PM A según su comentario en PR #66**. Aclaró que la rúbrica no exige mínimo de clases. Licencia y pruebas pendientes. |
+| Ale V (PM B) | `bottle=39`, `cup=41`; `conf=0.25`, `iou=0.70`; estructura `class_id`/`name` | **Reducción a dos clases aprobada según lo comunicado por el usuario**: «OK de PM B: quitamos backpack y quedan bottle=39 y cup=41». B exige las tres zonas ocupadas en S5/C5 y mantiene su umbral 0.50. |
 
 Esta tabla registra solo las aprobaciones comunicadas; no declara P5-04 cerrado.
