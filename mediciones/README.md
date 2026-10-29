@@ -82,5 +82,20 @@ argumentos inválidos; no se escribe nada). La medición del entregable debe sal
 
 El detector falso no decodifica, pero rechaza archivos que no sean un JPEG o PNG completo.
 
-El percentil es lineal (posición `(n - 1) * q`, interpolando entre vecinos), igual que en P4. P5-16 contrasta el p95
-y el máximo con los plazos de `config/control/plazos.yaml`.
+El percentil es lineal (posición `(n - 1) * q`, interpolando entre vecinos), igual que en P4.
+
+## Contraste con los plazos (`python -m bench.limites`, P5-16)
+
+```bash
+uv run python -m bench.limites mediciones/<run>/ [--config-control config/control/] [--periodo-ms 200]
+```
+
+Lee el `resumen.json` de la corrida y `plazos.yaml` de B, y escribe junto a la corrida `contraste.json` y
+`contraste.md`: p50/p95/máximo contra cada plazo, con veredicto (**cumple**, **cumple en p95**, **no cumple**),
+margen y razón. `--periodo-ms` es el ritmo de entrada de PEND-09 (200 ms, provisional).
+
+**Código de salida:** `0` todo cumple y la corrida es la del entregable · `1` algo no cumple del todo, o la
+corrida tiene advertencias, quedó incompleta, no midió B o se midió con otros plazos · `2` no se puede leer la
+corrida o los plazos (no se escribe nada).
+
+Qué acredita y qué no el control virtual, y lo que no se midió: [`LIMITES.md`](LIMITES.md).
