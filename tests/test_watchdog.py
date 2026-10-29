@@ -14,6 +14,9 @@ from control import AdaptadorVirtual, Supervisor, politica_de_prueba
 from control.config import cargar_config_politica
 from control.politica import decidir
 
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(cargar_config_politica().clases_obstaculo)
+
 RAIZ = Path(__file__).resolve().parents[1]
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 PLAZOS = yaml.safe_load((RAIZ / "config" / "control" / "plazos.yaml").read_text(encoding="utf-8"))
@@ -154,7 +157,7 @@ def test_tras_un_stop_de_reloj_la_politica_sigue_esperando_cuadros_libres(tmp_pa
     bloqueo.update(frame_id="f1", t_capture_ms=200, t_emit_ms=240)
     # Obstáculos en las tres zonas: no hay hacia dónde girar, la política frena.
     bloqueo["detections"] = [
-        {"class_id": 1, "confidence": 0.9, "bbox": caja}
+        {"class_id": OBSTACULO, "confidence": 0.9, "bbox": caja}
         for caja in ([20, 100, 120, 400], [260, 100, 380, 400], [520, 100, 620, 400])
     ]
 

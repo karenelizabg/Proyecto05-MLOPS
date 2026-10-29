@@ -1,0 +1,30 @@
+archivo,grupo_nombre,objeto_visible,clases_confianzas,detecciones,estado_visual,observacion
+botella_centro_cerca.jpg,botella,botella,vase:0.788; bottle:0.293,2,coincide_con_confusion,La misma botella tiene caja bottle 0.293 y vase 0.788; no son dos objetos.
+botella_centro_lejos.jpg,botella,botella,,0,omitido,Botella visible al fondo; cero detecciones.
+botella_der.jpg,botella,botella,bottle:0.824,1,coincide,Caja bottle sobre la botella derecha.
+botella_izq.jpg,botella,botella,bottle:0.638,1,coincide,Caja bottle sobre la botella izquierda.
+maleta_centro_cerca.jpg,maleta,estuche_blando,suitcase:0.579,1,coincide_suitcase,Caja suitcase sobre el estuche rojo; handbag no aparece.
+maleta_centro_lejos.jpg,maleta,estuche_blando,suitcase:0.336,1,coincide_suitcase,Caja suitcase sobre el estuche rojo lejano; handbag no aparece.
+maleta_der.jpg,maleta,estuche_blando,chair:0.433; couch:0.432; refrigerator:0.285,3,clase_incorrecta,Cajas chair y couch sobre el estuche; refrigerator sobre el fondo. Sin suitcase ni handbag.
+maleta_izq.jpg,maleta,estuche_blando,couch:0.569,1,clase_incorrecta,Caja couch sobre el estuche izquierdo; sin suitcase ni handbag.
+mochila_centro_cerca.jpg,mochila,mochila,suitcase:0.783; suitcase:0.765; suitcase:0.326; suitcase:0.314; person:0.273,5,clase_incorrecta,Varias cajas suitcase fragmentan o duplican la mochila; person aparente falso positivo. Sin backpack.
+mochila_centro_lejos.jpg,mochila,mochila,suitcase:0.572; backpack:0.400,2,coincide_con_confusion,Backpack y suitcase se superponen sobre la misma mochila.
+mochila_cerca.jpg,mochila,mochila,suitcase:0.812,1,clase_incorrecta,Caja suitcase sobre la mochila; sin backpack.
+mochila_der.jpg,mochila,mochila,suitcase:0.643,1,clase_incorrecta,Caja suitcase sobre la mochila derecha; sin backpack.
+mochila_izq.jpg,mochila,mochila,suitcase:0.696; backpack:0.520,2,coincide_con_confusion,Backpack y suitcase se superponen sobre la misma mochila.
+mochila_lado.jpg,mochila,mochila,backpack:0.580,1,coincide,Caja backpack sobre la mochila vista de lado.
+mochila_lado_2.jpg,mochila,mochila,,0,omitido,Mochila vista de lado visible; cero detecciones.
+silla_centro_cerca.jpg,silla,silla,airplane:0.565; airplane:0.559,2,clase_incorrecta,Dos cajas airplane amplias sobre la silla cercana; sin chair.
+silla_centro_der.jpg,silla,silla,,0,omitido,Silla visible; cero detecciones.
+silla_centro_lejos.jpg,silla,silla,chair:0.499,1,coincide,Caja chair sobre la silla lejana.
+silla_der.jpg,silla,silla_y_botella,chair:0.514,1,parcial,Caja chair sobre la silla derecha; botella real visible en el borde izquierdo sin deteccion.
+silla_izq.jpg,silla,silla,tv:0.355,1,clase_incorrecta,Caja tv sobre parte de la silla izquierda; sin chair.
+silla_lado.jpg,silla,silla,chair:0.422; airplane:0.390,2,coincide_con_confusion,Chair y airplane se superponen sobre la misma silla.
+taza_centro_cerca.jpg,taza,taza,cup:0.955,1,coincide,Caja cup sobre la taza central cercana.
+taza_centro_lejos.jpg,taza,taza,,0,omitido,Taza visible al fondo; cero detecciones.
+taza_der.jpg,taza,taza,cup:0.606,1,coincide,Caja cup sobre la taza derecha.
+taza_izq.jpg,taza,taza,chair:0.317; cup:0.301,2,coincide_con_falso_positivo,Caja cup sobre la taza izquierda; chair sobre el bote del fondo.
+vacio_1.jpg,vacio,paso_despejado,,0,sin_detecciones,No hay objetos del dominio en la via; cero detecciones.
+vacio_2.jpg,vacio,paso_despejado,,0,sin_detecciones,No hay objetos del dominio en la via; un bote aparece al fondo; cero detecciones.
+varios_1.jpg,varios,botella_taza_mochila,bottle:0.269,1,parcial,Bottle sobre la botella; taza y mochila visibles sin deteccion.
+varios_2.jpg,varios,botella_taza_mochila,backpack:0.515,1,parcial,Backpack sobre la mochila; botella y taza visibles sin deteccion; taza parcialmente cortada a la izquierda.
