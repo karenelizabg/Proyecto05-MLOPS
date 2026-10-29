@@ -355,15 +355,14 @@ def test_c7_con_un_bloqueo_que_tapa_todo_pasa(copia, tmp_path):
     )
 
 
-def test_c7_un_bloqueo_que_deja_girar_y_un_cuadro_libre_avanza(copia, tmp_path):
-    """Desde #69 la espera de cuadros libres también empieza tras un giro, y al final ya no
-    avanza con el primer cuadro libre. Pero en el cuadro libre suelto la política da STOP, y C7
-    pide repetir la acción anterior (el giro). Si la secuencia real de S6 deja girar, C7 falla."""
+def test_c7_un_bloqueo_que_deja_girar_pasa(copia, tmp_path):
+    """Tras un giro, la espera de N cuadros libres también empieza (#69) y, mientras espera,
+    la política repite la última acción (#72): el cuadro libre suelto sigue girando hacia el
+    lado libre, no avanza ni da STOP. Con un bloqueo que deja girar, C7 pasa completo."""
     armar_caso(copia, "C7", *c7(obstaculo(250, 400)))
     salida = tmp_path / "s"
-    assert correr("C7", "--casos", str(copia), "--salida", str(salida)) == 1
-    fallan = [t["tramo"] for t in veredicto(salida, "C7")["tramos"] if t["motivos"]]
-    assert fallan == ["un_cuadro_libre"]
+    assert correr("C7", "--casos", str(copia), "--salida", str(salida)) == 0
+    assert [t["tramo"] for t in veredicto(salida, "C7")["tramos"] if t["motivos"]] == []
 
 
 # --- cada regla del juez, con órdenes escritas a mano -------------------------------
