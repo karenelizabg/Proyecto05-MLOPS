@@ -96,6 +96,30 @@ def _revisar_huecos(filas: list[Mapping[str, Any]], maximo: int) -> list[str]:
     return errores
 
 
+def _revisar_anotacion(
+    f: Mapping[str, Any],
+    a: Mapping[str, Any],
+    config: ConfigPolitica,
+    clases: set[int] | None,
+) -> list[str]:
+    """Lo que no coincide entre una fila del manifiesto y su anotación."""
+    frame = f["frame_id"]
+    errores: list[str] = []
+    if a["sequence_id"] != f["sequence_id"]:
+        errores.append(f"{frame}: la anotación dice la secuencia {a['sequence_id']}")
+    if (a["image_width"], a["image_height"]) != (f["image_width"], f["image_height"]):
+        errores.append(f"{frame}: la anotación tiene otro tamaño de imagen")
+    estado = "obstaculo" if a["objetos"] else "despejado"
+    if f["estado_esperado"] != estado or f["objetos"] != len(a["objetos"]):
+        errores.append(f"{frame}: el estado esperado no coincide con la anotación")
+    if f["zonas_ocupadas"] != zonas_de(a, config):
+        errores.append(f"{frame}: las zonas ocupadas no coinciden con las cajas anotadas")
+    ajenas = sorted({o["class_id"] for o in a["objetos"]} - clases) if clases is not None else []
+    if ajenas:
+        errores.append(f"{frame}: class_id {ajenas} no está en modelo/clases.json")
+    return errores
+
+
 def _revisar_anotaciones(
     filas: list[Mapping[str, Any]],
     anotaciones: list[Any],
@@ -107,24 +131,11 @@ def _revisar_anotaciones(
         return errores
     por_frame = {a["frame_id"]: a for a in anotaciones}
     for f in filas:
-        frame = f["frame_id"]
-        a = por_frame.get(frame)
+        a = por_frame.get(f["frame_id"])
         if a is None:
-            errores.append(f"{frame}: no tiene anotación")
-            continue
-        if a["sequence_id"] != f["sequence_id"]:
-            errores.append(f"{frame}: la anotación dice la secuencia {a['sequence_id']}")
-        if (a["image_width"], a["image_height"]) != (f["image_width"], f["image_height"]):
-            errores.append(f"{frame}: la anotación tiene otro tamaño de imagen")
-        estado = "obstaculo" if a["objetos"] else "despejado"
-        if f["estado_esperado"] != estado or f["objetos"] != len(a["objetos"]):
-            errores.append(f"{frame}: el estado esperado no coincide con la anotación")
-        if f["zonas_ocupadas"] != zonas_de(a, config):
-            errores.append(f"{frame}: las zonas ocupadas no coinciden con las cajas anotadas")
-        if clases is not None:
-            ajenas = sorted({o["class_id"] for o in a["objetos"]} - clases)
-            if ajenas:
-                errores.append(f"{frame}: class_id {ajenas} no está en modelo/clases.json")
+            errores.append(f"{f['frame_id']}: no tiene anotación")
+        else:
+            errores += _revisar_anotacion(f, a, config, clases)
     sobrantes = sorted(set(por_frame) - {f["frame_id"] for f in filas})
     errores += [
         f"{frame}: anotación de un cuadro que no está en el manifiesto" for frame in sobrantes

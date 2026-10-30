@@ -94,8 +94,10 @@ def test_el_manifiesto_tiene_una_fila_por_cuadro_con_su_estado(tmp_path):
     assert len(filas) == 60
     s05 = next(f for f in filas if f["frame_id"] == "S05_f0001")
     s03 = next(f for f in filas if f["frame_id"] == "S03_f0002")
-    assert s05["estado_esperado"] == "despejado" and s05["zonas_ocupadas"] == []
-    assert s03["estado_esperado"] == "obstaculo" and s03["zonas_ocupadas"] == ["izq"]
+    assert s05["estado_esperado"] == "despejado"
+    assert s05["zonas_ocupadas"] == []
+    assert s03["estado_esperado"] == "obstaculo"
+    assert s03["zonas_ocupadas"] == ["izq"]
     assert s03["ruta"] == "datos/cuadros/S03/S03_f0002.jpg"
     assert s03["t_relativo_ms"] == 200
     assert {f["split"] for f in filas} == {"evaluacion"}
@@ -117,6 +119,21 @@ def test_el_manifiesto_exige_una_anotacion_por_cuadro(tmp_path):
     anotaciones = armar(tmp_path, {"S01": [[], []]})
     with pytest.raises(ErrorManifiesto, match="S01_f0002: el cuadro no tiene anotación"):
         construir(tmp_path / "datos" / "cuadros", anotaciones[:1], tmp_path, CONFIG)
+
+
+@pytest.mark.parametrize(
+    "archivo",
+    ["../S02/S01_f0001.jpg", "..\\S02\\S01_f0001.jpg", "/etc/S01_f0001.jpg", "S01_f0001.png", 7],
+)
+def test_el_manifiesto_rechaza_un_archivo_fuera_de_la_secuencia(tmp_path, archivo):
+    anotaciones = armar(tmp_path, {"S01": [[]]})
+    registro = tmp_path / "datos" / "cuadros" / "S01" / "captura.jsonl"
+    captura = json.loads(registro.read_text(encoding="utf-8"))
+    captura["archivo"] = archivo
+    registro.write_text(json.dumps(captura) + "\n", encoding="utf-8")
+
+    with pytest.raises(ErrorManifiesto, match=r"S01_f0001: archivo .* no es un nombre"):
+        construir(tmp_path / "datos" / "cuadros", anotaciones, tmp_path, CONFIG)
 
 
 # --- verify_dataset: pasa, y falla con cada regla rota (criterios de P5-11) ---------------
