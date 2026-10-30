@@ -15,6 +15,8 @@ hay huecos, el stream falló o se acabó el tiempo) se mueve a SALIDA/_fallidas/
 con `FALLIDA.txt` y sin `captura.jsonl`, para que nadie la tome por una secuencia del conjunto;
 el siguiente intento puede usar la misma secuencia.
 
+`--limite-s` cuenta desde antes de conectar: incluye la conexión y las cabeceras HTTP.
+
 Salida: 0 si se capturaron todos los cuadros sin huecos de `validez_orden_ms` o más, 1 si la
 captura falló (se vuelve a filmar), 2 si no se pudo conectar, escribir o la secuencia ya existe.
 
@@ -36,7 +38,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
@@ -76,28 +78,44 @@ def _url_valida(url: str) -> bool:
 
 
 @contextmanager
-def _abrir(url: str, timeout: float) -> Iterator[tuple[BinaryIO, Callable[[], None]]]:
-    """(respuesta, cortar): `cortar()` cierra el socket desde otro hilo y desbloquea la lectura."""
+def _abrir(
+    url: str, timeout: float, limite_s: float, cortado: threading.Event
+) -> Iterator[BinaryIO]:
+    """La respuesta del stream. Al pasar `limite_s` (más el margen) marca `cortado` y corta.
+
+    El tiempo corre desde antes de conectar: `timeout` es por lectura y un servidor que manda
+    las cabeceras poco a poco nunca lo agota. Cerrar el socket desde el otro hilo desbloquea la
+    lectura; el `timeout` limita la conexión, cuando todavía no hay socket que cerrar.
+    """
     partes = urllib.parse.urlsplit(url)
     clase = http.client.HTTPSConnection if partes.scheme == "https" else http.client.HTTPConnection
     # La URL la da quien corre el comando (la cámara en su red); solo se acepta http(s).
-    conexion = clase(partes.hostname, partes.port, timeout=timeout)  # NOSONAR (S5332)
+    espera = min(timeout, limite_s + MARGEN_CORTE_S)
+    conexion = clase(partes.hostname, partes.port, timeout=espera)  # NOSONAR (S5332)
     respuesta = None
-    try:
-        conexion.connect()
-        sock = conexion.sock
 
-        def cortar() -> None:
+    def cortar() -> None:
+        cortado.set()
+        sock = conexion.sock
+        if sock is not None:
             with suppress(OSError):
                 sock.shutdown(socket.SHUT_RDWR)
 
+    vigilante = threading.Timer(limite_s + MARGEN_CORTE_S, cortar)
+    vigilante.daemon = True
+    vigilante.start()
+    try:
+        conexion.connect()
+        if cortado.is_set():  # venció mientras conectaba: no había socket que cerrar
+            raise TimeoutError("se acabó el tiempo conectando")
         ruta = (partes.path or "/") + (f"?{partes.query}" if partes.query else "")
         conexion.request("GET", ruta)
         respuesta = conexion.getresponse()
         if respuesta.status != 200:
             raise OSError(f"HTTP {respuesta.status} {respuesta.reason}")
-        yield respuesta, cortar
+        yield respuesta
     finally:
+        vigilante.cancel()
         if respuesta is not None:
             respuesta.close()
         conexion.close()
@@ -205,33 +223,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if not args.sin_pausa:
         input(f"Secuencia {args.secuencia}: Enter para empezar a capturar...")
+    cortado = threading.Event()
     try:
-        with _abrir(args.url, timeout=10) as (respuesta, cortar):
-            # Respaldo de `limite_ms` para un stream que se queda a medio cuadro.
-            cortado = threading.Event()
-            vigilante = threading.Timer(
-                args.limite_s + MARGEN_CORTE_S, lambda: (cortado.set(), cortar())
+        with _abrir(args.url, 10, args.limite_s, cortado) as respuesta:
+            captura = capturar(
+                leer_partes(respuesta),
+                reloj_ms=lambda: time.monotonic_ns() / 1e6,
+                cuadros=args.cuadros,
+                cada_ms=args.cada_ms,
+                tamano=(args.ancho, args.alto),
+                descartar=args.descartar,
+                limite_ms=args.limite_s * 1000,
             )
-            vigilante.daemon = True
-            vigilante.start()
-            try:
-                captura = capturar(
-                    leer_partes(respuesta),
-                    reloj_ms=lambda: time.monotonic_ns() / 1e6,
-                    cuadros=args.cuadros,
-                    cada_ms=args.cada_ms,
-                    tamano=(args.ancho, args.alto),
-                    descartar=args.descartar,
-                    limite_ms=args.limite_s * 1000,
-                )
-            finally:
-                vigilante.cancel()
-            if cortado.is_set():
-                captura.tiempo_agotado = True
-                captura.error = None  # el error de lectura lo causó el corte
+        if cortado.is_set():
+            captura.tiempo_agotado = True
+            captura.error = None  # el error de lectura lo causó el corte
     except (OSError, http.client.HTTPException) as exc:
         url_segura = _sin_credenciales(args.url)
-        print(f"no se pudo leer el stream {url_segura}: {exc}", file=sys.stderr)
+        motivo = f"se acabó el tiempo límite ({args.limite_s:g} s)" if cortado.is_set() else exc
+        print(f"no se pudo leer el stream {url_segura}: {motivo}", file=sys.stderr)
         return 2
 
     problemas = _problemas(captura, args.cuadros, maximo, args.secuencia)

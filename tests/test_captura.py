@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import io
 import json
+import random
+import socket
+import threading
+import time
 from contextlib import contextmanager
 
 import pytest
@@ -42,6 +46,19 @@ def sin_scan(ancho: int = 640, alto: int = 480) -> bytes:
     return b"\xff\xd8" + sof + b"\xff\xd9"
 
 
+def con_ruido(semilla: int = 1) -> bytes:
+    """JPEG con mucho detalle, como un cuadro real: el scan ocupa casi todo el archivo."""
+    azar = random.Random(semilla)
+    salida = io.BytesIO()
+    Image.frombytes("RGB", (640, 480), azar.randbytes(640 * 480 * 3)).save(salida, "JPEG")
+    return salida.getvalue()
+
+
+def truncado_con_eoi(datos: bytes, fraccion: float) -> bytes:
+    """El caso de Heri en #67: solo una parte de los bytes y un EOI agregado al final."""
+    return datos[: int(len(datos) * fraccion)] + b"\xff\xd9"
+
+
 def stream(*partes: bytes) -> bytes:
     """Lo que manda el firmware por cada cuadro: encabezado, JPEG y separador."""
     return b"".join(
@@ -64,10 +81,48 @@ def test_leer_partes_devuelve_cada_jpeg_completo():
     assert list(leer_partes(io.BytesIO(stream(a, b)))) == [a, b]
 
 
-def test_leer_partes_devuelve_lo_que_llego_del_ultimo_cortado():
+def test_el_stream_puede_cortarse_justo_despues_de_un_cuadro():
+    a = jpeg(n=1)
+    for corte in (len(SEPARADOR), len(SEPARADOR) - 2):
+        assert list(leer_partes(io.BytesIO(stream(a)[:-corte]))) == [a]
+
+
+def test_cuerpo_cortado_es_error_y_conserva_lo_que_llego():
     a, b = jpeg(n=1), jpeg(n=2)
     cortado = stream(a, b)[: -len(SEPARADOR) - 5]  # el segundo JPEG llega a medias
-    assert list(leer_partes(io.BytesIO(cortado))) == [a, b[:-5]]
+    partes = leer_partes(io.BytesIO(cortado))
+    assert next(partes) == a
+    with pytest.raises(StreamDefectuoso, match="Content-Length") as error:
+        next(partes)
+    assert error.value.datos == b[:-5]
+
+
+@pytest.mark.parametrize("sobran", [5, 40])
+def test_content_length_mayor_que_el_cuerpo_es_error_aunque_decodifique(sobran):
+    # Caso de Heri en #67: JPEG válido de 5429 bytes y el encabezado anuncia 5434.
+    a = jpeg(n=1)
+    mal = b"Content-Length: %d\r\n\r\n" % (len(a) + sobran) + a + SEPARADOR + b"X" * 100
+    captura = capturar(leer_partes(io.BytesIO(mal)), reloj(), 1, 200, (640, 480), descartar=0)
+    assert captura.cuadros == []
+    assert "Content-Length" in captura.error
+    assert [motivo for motivo, _ in captura.rechazados] == ["content_length"]
+
+
+def test_content_length_mayor_y_el_stream_termina_es_error_aunque_decodifique():
+    a = jpeg(n=1)
+    mal = b"Content-Length: %d\r\n\r\n" % (len(a) + 5) + a
+    captura = capturar(leer_partes(io.BytesIO(mal)), reloj(), 1, 200, (640, 480), descartar=0)
+    assert captura.cuadros == []
+    assert "Content-Length" in captura.error
+    assert captura.rechazados == [("content_length", a)]
+
+
+def test_content_length_menor_que_el_cuerpo_es_error():
+    a = jpeg(n=1)
+    mal = b"Content-Length: %d\r\n\r\n" % (len(a) - 5) + a + SEPARADOR
+    captura = capturar(leer_partes(io.BytesIO(mal)), reloj(), 1, 200, (640, 480), descartar=0)
+    assert captura.cuadros == []
+    assert "separador" in captura.error
 
 
 @pytest.mark.parametrize(
@@ -102,6 +157,43 @@ def test_jpeg_sin_scan_no_cuenta_aunque_traiga_sof_y_eoi():
     assert motivo_rechazo(sin_scan(), (640, 480)) == "jpeg_no_decodifica"
 
 
+@pytest.mark.parametrize("fraccion", [0.25, 0.5, 0.9, 0.999])
+@pytest.mark.parametrize("original", [con_ruido(), jpeg(n=3)], ids=["ruido", "plano"])
+def test_jpeg_truncado_con_eoi_no_cuenta_aunque_pillow_lo_decodifique(original, fraccion):
+    datos = truncado_con_eoi(original, fraccion)
+    Image.open(io.BytesIO(datos)).load()  # Pillow no se queja: rellena de gris
+    assert not jpeg_completo(datos)
+    assert motivo_rechazo(datos, (640, 480)) == "jpeg_truncado"
+
+
+@pytest.mark.parametrize(
+    "datos",
+    [con_ruido(), con_ruido(2) + b"\x00\x00", jpeg(n=4)],
+    ids=["ruido", "relleno_tras_eoi", "plano"],
+)
+def test_jpeg_completo_se_acepta(datos):
+    assert motivo_rechazo(datos, (640, 480)) is None
+
+
+@pytest.mark.parametrize("subsampling", [0, 1, 2], ids=["444", "422", "420"])
+def test_el_conteo_sirve_con_cualquier_muestreo_de_color(subsampling):
+    # Una imagen toda gris es válida: el relleno de Pillow se le parece, pero no le faltan datos.
+    salida = io.BytesIO()
+    Image.new("RGB", (640, 480), (128, 128, 128)).save(salida, "JPEG", subsampling=subsampling)
+    datos = salida.getvalue()
+    assert jpeg_completo(datos)
+    assert not jpeg_completo(truncado_con_eoi(datos, 0.9))
+
+
+def test_jpeg_progresivo_o_con_reinicios_no_es_del_firmware():
+    salida = io.BytesIO()
+    Image.new("RGB", (640, 480), (1, 2, 3)).save(salida, "JPEG", progressive=True)
+    assert not jpeg_completo(salida.getvalue())
+    salida = io.BytesIO()
+    Image.new("RGB", (640, 480), (1, 2, 3)).save(salida, "JPEG", restart_marker_blocks=4)
+    assert not jpeg_completo(salida.getvalue())
+
+
 # --- selección de cuadros --------------------------------------------------------------
 
 
@@ -127,6 +219,13 @@ def test_rechaza_incompletos_sin_scan_otro_tamano_y_duplicados():
         "tamano_320x240",
     ]
     assert captura.duplicados == 1
+
+
+def test_rechaza_truncado_con_eoi_y_sigue_con_el_siguiente():
+    bueno, truncado = jpeg(n=1), truncado_con_eoi(con_ruido(), 0.25)
+    captura = capturar([truncado, bueno], reloj(0, 300), 1, 200, (640, 480), descartar=0)
+    assert [c.datos for c in captura.cuadros] == [bueno]
+    assert [motivo for motivo, _ in captura.rechazados] == ["jpeg_truncado"]
 
 
 def test_guarda_pocos_rechazados_y_cuenta_los_demas():
@@ -188,8 +287,8 @@ def camara(monkeypatch):
         crudo = partes if isinstance(partes, bytes) else stream(*partes)
 
         @contextmanager
-        def abrir(url, timeout):
-            yield io.BytesIO(crudo), lambda: None
+        def abrir(url, timeout, limite_s, cortado):
+            yield io.BytesIO(crudo)
 
         ns = iter(t * 1_000_000 for t in [0, *tiempos_ms])
         monkeypatch.setattr(cli, "_abrir", abrir)
@@ -261,6 +360,49 @@ def test_comando_con_stream_defectuoso_termina_con_diagnostico(tmp_path, camara,
     assert not (tmp_path / "S01").exists()
 
 
+def test_comando_con_content_length_incumplido_aparta_la_captura(tmp_path, camara, capsys):
+    a = jpeg(n=1)
+    camara(b"Content-Length: %d\r\n\r\n" % (len(a) + 5) + a + SEPARADOR + b"X" * 50, [0])
+
+    assert correr(tmp_path, "--cuadros", "1") == 1
+    assert "Content-Length" in capsys.readouterr().err
+    assert not (tmp_path / "S01").exists()
+    [intento] = fallidas(tmp_path)
+    assert [p.name for p in (intento / "rechazados").iterdir()] == ["001_content_length.bin"]
+
+
+def test_el_limite_incluye_las_cabeceras_lentas(tmp_path, monkeypatch, capsys):
+    # Servidor real en localhost: manda un byte de cabecera a cada rato, sin llegar al stream.
+    monkeypatch.setattr(cli, "MARGEN_CORTE_S", 0)
+    servidor = socket.create_server(("127.0.0.1", 0))
+    fin = threading.Event()
+
+    def goteo():
+        conexion, _ = servidor.accept()
+        with conexion:
+            for byte in b"HTTP/1.1 200 OK\r\n" + b"X" * 1000:
+                if fin.wait(0.05):
+                    return
+                conexion.sendall(bytes([byte]))
+
+    hilo = threading.Thread(target=goteo, daemon=True)
+    hilo.start()
+    url = f"http://127.0.0.1:{servidor.getsockname()[1]}/stream"
+    args = ["--url", url, "--secuencia", "S01", "--sin-pausa", "--salida", str(tmp_path)]
+    inicio = time.monotonic()
+    try:
+        resultado = cli.main([*args, "--limite-s", "0.3"])
+    finally:
+        fin.set()
+        hilo.join(5)
+        servidor.close()
+
+    assert resultado == 2
+    assert time.monotonic() - inicio < 5
+    assert "tiempo límite" in capsys.readouterr().err
+    assert not (tmp_path / "S01").exists()
+
+
 def test_una_falla_al_escribir_no_deja_nada_a_medias(tmp_path, camara, monkeypatch, capsys):
     camara([jpeg(n=n) for n in range(3)], [0, 200, 400])
     escritos = []
@@ -288,7 +430,7 @@ def test_comando_no_sobrescribe_una_secuencia(tmp_path, camara):
 
 def test_el_error_de_conexion_no_muestra_la_contrasena(tmp_path, monkeypatch, capsys):
     @contextmanager
-    def abrir(url, timeout):
+    def abrir(url, timeout, limite_s, cortado):
         raise OSError("conexión rechazada")
         yield
 

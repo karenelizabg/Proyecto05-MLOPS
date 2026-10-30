@@ -5,6 +5,10 @@ El firmware del carro manda, por cada cuadro, un encabezado con `Content-Length`
 JPEG y una línea con el separador (`--123456789000000000000987654321`). Los bytes se guardan tal
 como llegan, sin recomprimir, para que el SHA-256 sea estable (P5-09).
 
+Pillow no avisa si al JPEG le faltan datos y aun así trae EOI: rellena lo que falta de gris. Por
+eso `_scan_completo` recorre el scan con las tablas de Huffman y cuenta los bloques, sin calcular
+la imagen. Solo acepta lo que manda el firmware: baseline, un scan y sin marcadores de reinicio.
+
 Un stream defectuoso no puede colgar la filmación: los encabezados y los cuadros tienen un tamaño
 máximo y la captura entera un tiempo máximo.
 """
@@ -13,6 +17,8 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
+import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import BinaryIO
@@ -25,10 +31,20 @@ _SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 
 MAX_LINEA = 1024  # una línea de encabezado o el separador
 MAX_ENCABEZADO = 8 * 1024  # todo lo que va entre un JPEG y el siguiente
 MAX_CUADRO = 1024 * 1024  # un VGA del ESP32 pesa entre 20 y 60 KB
+_INICIO_SEPARADOR = b"\r\n--"  # lo que debe venir justo después de los bytes de cada cuadro
+_MARCADOR_EN_SCAN = re.compile(rb"\xff[^\x00]")
+_COEFICIENTES = 64  # por bloque de 8x8
 
 
 class StreamDefectuoso(ValueError):
-    """El stream no sigue el formato del firmware; la captura se detiene con este motivo."""
+    """El stream no sigue el formato del firmware; la captura se detiene con este motivo.
+
+    `datos` son los bytes del cuadro donde se detectó, si hay, para guardarlos como rechazados.
+    """
+
+    def __init__(self, mensaje: str, datos: bytes = b"") -> None:
+        super().__init__(mensaje)
+        self.datos = datos
 
 
 def _leer_encabezado(flujo: BinaryIO) -> int | None:
@@ -58,9 +74,10 @@ def _leer_encabezado(flujo: BinaryIO) -> int | None:
 def leer_partes(flujo: BinaryIO, max_cuadro: int = MAX_CUADRO) -> Iterator[bytes]:
     """Devuelve los bytes de cada JPEG del stream, en orden, y termina si el stream se corta.
 
-    Si el último cuadro llega a medias también se devuelve lo que llegó, para que quede
-    registrado entre los rechazados. Un encabezado demasiado largo, un `Content-Length` no
-    numérico o mayor que `max_cuadro` lanzan `StreamDefectuoso`.
+    Un encabezado demasiado largo, un `Content-Length` no numérico o mayor que `max_cuadro`
+    lanzan `StreamDefectuoso`. También un cuerpo que no mide lo anunciado, aunque el JPEG se
+    decodifique: si llega de menos, o si después de sus bytes no sigue el separador. Ese cuadro
+    no se devuelve; va en `StreamDefectuoso.datos`.
     """
     while True:
         largo = _leer_encabezado(flujo)
@@ -69,9 +86,16 @@ def leer_partes(flujo: BinaryIO, max_cuadro: int = MAX_CUADRO) -> Iterator[bytes
         if largo > max_cuadro:
             raise StreamDefectuoso(f"Content-Length de {largo} bytes (máximo {max_cuadro})")
         datos = flujo.read(largo)
-        yield datos
         if len(datos) < largo:
-            return
+            raise StreamDefectuoso(
+                f"el cuerpo trae {len(datos)} bytes y Content-Length anuncia {largo}", datos
+            )
+        # Puede terminar aquí mismo (o a medio separador) si se corta después del cuadro.
+        if not _INICIO_SEPARADOR.startswith(flujo.read(len(_INICIO_SEPARADOR))):
+            raise StreamDefectuoso(
+                f"después de los {largo} bytes de Content-Length no sigue el separador", datos
+            )
+        yield datos
 
 
 def dimensiones_jpeg(datos: bytes) -> tuple[int, int] | None:
@@ -112,9 +136,116 @@ def _decodifica(datos: bytes) -> bool:
     return True
 
 
+def _tablas_huffman(cuerpo: bytes) -> dict[int, dict[str, int]]:
+    """Las tablas de un segmento DHT, por clase e id: {código en bits como texto: símbolo}."""
+    tablas = {}
+    i = 0
+    while i < len(cuerpo):
+        tabla = {}
+        codigo = 0
+        simbolo = i + 17
+        for largo, cuantos in enumerate(cuerpo[i + 1 : i + 17], start=1):
+            for _ in range(cuantos):
+                tabla[format(codigo, f"0{largo}b")] = cuerpo[simbolo]
+                codigo += 1
+                simbolo += 1
+            codigo <<= 1
+        tablas[cuerpo[i]] = tabla
+        i = simbolo
+    return tablas
+
+
+def _segmentos_hasta_scan(datos: bytes) -> tuple[dict, bytes, bytes, int] | None:
+    """(tablas de Huffman, cuerpo del SOF0, cuerpo del SOS, dónde empieza el scan).
+
+    None si no es baseline o trae marcadores de reinicio.
+    """
+    tablas: dict[int, dict[str, int]] = {}
+    sof = b""
+    i = 2
+    while True:
+        marcador = datos[i + 1]
+        fin = i + 2 + int.from_bytes(datos[i + 2 : i + 4], "big")
+        cuerpo = datos[i + 4 : fin]
+        if marcador == 0xDA:
+            return tablas, sof, cuerpo, fin
+        if marcador == 0xC4:
+            tablas |= _tablas_huffman(cuerpo)
+        elif marcador == 0xC0:
+            sof = cuerpo
+        elif marcador in _SOF or (marcador == 0xDD and any(cuerpo)):
+            return None
+        i = fin
+
+
+def _bloques_y_mcus(tablas: dict, sof: bytes, sos: bytes) -> tuple[list[tuple[dict, dict]], int]:
+    """(tablas DC y AC de cada bloque de un MCU, cuántos MCU tiene la imagen)."""
+    alto, ancho = int.from_bytes(sof[1:3], "big"), int.from_bytes(sof[3:5], "big")
+    muestreo = {sof[j]: sof[j + 1] for j in range(6, 6 + 3 * sof[5], 3)}
+    max_h = max(m >> 4 for m in muestreo.values())
+    max_v = max(m & 15 for m in muestreo.values())
+    bloques = []
+    for j in range(1, 1 + 2 * sos[0], 2):
+        dc, ac = tablas[sos[j + 1] >> 4], tablas[0x10 | (sos[j + 1] & 15)]
+        bloques += [(dc, ac)] * ((muestreo[sos[j]] >> 4) * (muestreo[sos[j]] & 15))
+    return bloques, math.ceil(ancho / (8 * max_h)) * math.ceil(alto / (8 * max_v))
+
+
+def _simbolo(bits: str, pos: int, tabla: dict[str, int]) -> tuple[int, int]:
+    """(símbolo, siguiente posición). KeyError si los bits no forman un código."""
+    for largo in range(1, 17):
+        simbolo = tabla.get(bits[pos : pos + largo])
+        if simbolo is not None:
+            return simbolo, pos + largo
+    raise KeyError(pos)
+
+
+def _saltar_bloque(bits: str, pos: int, dc: dict[str, int], ac: dict[str, int]) -> int:
+    """Posición después de un bloque; sus valores no se calculan, solo se saltan."""
+    categoria, pos = _simbolo(bits, pos, dc)
+    pos += categoria
+    k = 1
+    while k < _COEFICIENTES:
+        simbolo, pos = _simbolo(bits, pos, ac)
+        ceros, categoria = simbolo >> 4, simbolo & 15
+        if categoria:
+            k += ceros + 1
+            pos += categoria
+        elif ceros == 15:
+            k += 16
+        else:
+            break  # fin de bloque: el resto son ceros
+    if k > _COEFICIENTES:
+        raise KeyError(pos)
+    return pos
+
+
+def _scan_completo(datos: bytes) -> bool:
+    """El scan trae todos los bloques de la imagen, antes del primer marcador (EOI)."""
+    try:
+        segmentos = _segmentos_hasta_scan(datos)
+        if segmentos is None:
+            return False
+        tablas, sof, sos, inicio = segmentos
+        if not sof or sos[0] != sof[5]:  # sin SOF0, o más de un scan
+            return False
+        bloques, mcus = _bloques_y_mcus(tablas, sof, sos)
+        marcador = _MARCADOR_EN_SCAN.search(datos, inicio)
+        scan = datos[inicio : marcador.start() if marcador else len(datos)]
+        scan = scan.replace(b"\xff\x00", b"\xff")
+        bits = format(int.from_bytes(scan, "big"), f"0{8 * len(scan)}b") if scan else ""
+        pos = 0
+        for _ in range(mcus):
+            for dc, ac in bloques:
+                pos = _saltar_bloque(bits, pos, dc, ac)
+        return pos <= len(bits)
+    except (IndexError, KeyError):
+        return False
+
+
 def jpeg_completo(datos: bytes) -> bool:
-    """Empieza con SOI, trae EOI y se decodifica completo."""
-    return _tiene_soi_y_eoi(datos) and _decodifica(datos)
+    """Empieza con SOI, trae EOI, se decodifica y su scan trae todos los bloques."""
+    return _tiene_soi_y_eoi(datos) and _decodifica(datos) and _scan_completo(datos)
 
 
 def motivo_rechazo(datos: bytes, tamano: tuple[int, int]) -> str | None:
@@ -130,6 +261,8 @@ def motivo_rechazo(datos: bytes, tamano: tuple[int, int]) -> str | None:
         return f"tamano_{dims[0]}x{dims[1]}" if dims else "sin_sof"
     if not _decodifica(datos):
         return "jpeg_no_decodifica"
+    if not _scan_completo(datos):
+        return "jpeg_truncado"
     return None
 
 
@@ -182,6 +315,13 @@ def capturar(
     """
     captura = Captura()
     vistos: set[str] = set()
+
+    def rechazar(motivo: str, datos: bytes) -> None:
+        if len(captura.rechazados) < max_rechazados:
+            captura.rechazados.append((motivo, datos))
+        else:
+            captura.rechazados_sin_guardar += 1
+
     arranque = reloj_ms()
     inicio = ultimo = None
     try:
@@ -194,10 +334,7 @@ def capturar(
                 continue
             motivo = motivo_rechazo(datos, tamano)
             if motivo:
-                if len(captura.rechazados) < max_rechazados:
-                    captura.rechazados.append((motivo, datos))
-                else:
-                    captura.rechazados_sin_guardar += 1
+                rechazar(motivo, datos)
                 continue
             cuadro_sha = hashlib.sha256(datos).hexdigest()
             if cuadro_sha in vistos:
@@ -210,7 +347,11 @@ def capturar(
             captura.cuadros.append(Cuadro(datos, ahora - inicio, *tamano))
             if len(captura.cuadros) == cuadros:
                 break
-    except (StreamDefectuoso, OSError) as exc:
+    except StreamDefectuoso as exc:
+        captura.error = str(exc)
+        if exc.datos:
+            rechazar("content_length", exc.datos)
+    except OSError as exc:
         captura.error = str(exc) or type(exc).__name__
     return captura
 
