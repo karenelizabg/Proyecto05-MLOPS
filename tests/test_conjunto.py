@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 import conjunto.__main__ as cli
 from conjunto import ErrorManifiesto, construir, verificar, zonas_de
@@ -21,11 +25,19 @@ CENTRO = [250.0, 220.0, 390.0, 460.0]
 DER = [540.0, 10.0, 635.0, 310.0]
 
 
-def jpeg(n: int, ancho: int = 640, alto: int = 480) -> bytes:
-    """JPEG mínimo con tamaño y contenido distinto por cuadro."""
-    sof = b"\xff\xc0\x00\x11\x08" + alto.to_bytes(2, "big") + ancho.to_bytes(2, "big")
-    sof += b"\x03\x01\x22\x00\x02\x11\x01\x03\x11\x01"
-    return b"\xff\xd8" + sof + b"\xff\xda\x00\x02" + n.to_bytes(4, "big") + b"\xff\xd9"
+@lru_cache
+def jpeg(n: int) -> bytes:
+    """JPEG real de 640x480, con un color distinto por cuadro."""
+    salida = io.BytesIO()
+    color = ((n * 37) % 256, (n * 91) % 256, (n * 13) % 256)
+    Image.new("RGB", (640, 480), color).save(salida, "JPEG")
+    return salida.getvalue()
+
+
+def sin_datos() -> bytes:
+    """SOI, SOF con el tamaño correcto y EOI, sin datos de imagen (caso de Heri en #68)."""
+    sof = b"\xff\xc0\x00\x11\x08" + (480).to_bytes(2, "big") + (640).to_bytes(2, "big")
+    return b"\xff\xd8" + sof + b"\x03\x01\x22\x00\x02\x11\x01\x03\x11\x01\xff\xd9"
 
 
 def armar(raiz: Path, secuencias: dict[str, list[list[tuple[int, list[float]]]]], paso_ms=200):
@@ -136,6 +148,50 @@ def test_el_manifiesto_rechaza_un_archivo_fuera_de_la_secuencia(tmp_path, archiv
         construir(tmp_path / "datos" / "cuadros", anotaciones, tmp_path, CONFIG)
 
 
+def test_el_manifiesto_rechaza_una_anotacion_repetida(tmp_path):
+    anotaciones = armar(tmp_path, {"S01": [[], []]})
+    with pytest.raises(ErrorManifiesto, match=r"frame_id 'S01_f0001' repetido"):
+        construir(tmp_path / "datos" / "cuadros", [*anotaciones, anotaciones[0]], tmp_path, CONFIG)
+
+
+def test_el_manifiesto_rechaza_un_cuadro_repetido_en_la_captura(tmp_path):
+    anotaciones = armar(tmp_path, {"S01": [[], []]})
+    registro = tmp_path / "datos" / "cuadros" / "S01" / "captura.jsonl"
+    registro.write_text(registro.read_text() + registro.read_text().splitlines()[0] + "\n")
+    with pytest.raises(ErrorManifiesto, match="S01_f0001: frame_id repetido en la captura"):
+        construir(tmp_path / "datos" / "cuadros", anotaciones, tmp_path, CONFIG)
+
+
+def test_el_manifiesto_rechaza_una_caja_fuera_de_la_imagen(tmp_path):
+    anotaciones = armar(tmp_path, {"S01": [[(TAZA, CENTRO)]]})
+    anotaciones[0]["objetos"][0]["bbox"] = [600.0, 10.0, 900.0, 50.0]
+    with pytest.raises(ErrorManifiesto, match="la caja sale de la imagen"):
+        construir(tmp_path / "datos" / "cuadros", anotaciones, tmp_path, CONFIG)
+
+
+def test_el_manifiesto_rechaza_cuadros_fuera_de_la_raiz(tmp_path):
+    raiz = tmp_path / "raiz"
+    raiz.mkdir()
+    anotaciones = armar(tmp_path, {"S01": [[]]})
+    with pytest.raises(ErrorManifiesto, match="S01_f0001: el cuadro queda fuera de la raíz"):
+        construir(tmp_path / "datos" / "cuadros", anotaciones, raiz, CONFIG)
+
+
+def test_el_manifiesto_rechaza_un_enlace_a_un_cuadro_externo(tmp_path):
+    raiz = tmp_path / "raiz"
+    anotaciones = armar(raiz, {"S01": [[]]})
+    cuadro = raiz / "datos" / "cuadros" / "S01" / "S01_f0001.jpg"
+    externo = tmp_path / "externo.jpg"
+    externo.write_bytes(cuadro.read_bytes())
+    cuadro.unlink()
+    try:
+        os.symlink(externo, cuadro)
+    except OSError:
+        pytest.skip("este sistema no permite crear enlaces simbólicos")
+    with pytest.raises(ErrorManifiesto, match="S01_f0001: el cuadro queda fuera de la raíz"):
+        construir(raiz / "datos" / "cuadros", anotaciones, raiz, CONFIG)
+
+
 # --- verify_dataset: pasa, y falla con cada regla rota (criterios de P5-11) ---------------
 
 
@@ -192,6 +248,40 @@ def test_falla_si_un_archivo_cambio(tmp_path):
     assert any("S01_f0004: el SHA-256" in e for e in errores(filas, anotaciones, tmp_path))
 
 
+@pytest.mark.parametrize("como", ["relativa", "absoluta"])
+def test_falla_con_una_ruta_fuera_de_la_raiz(tmp_path, como):
+    raiz = tmp_path / "raiz"
+    raiz.mkdir()
+    filas, anotaciones = conjunto_valido(raiz)
+    externo = tmp_path / "externo.jpg"
+    externo.write_bytes(jpeg(999))
+    filas[0]["sha256"] = hashlib.sha256(jpeg(999)).hexdigest()
+    filas[0]["ruta"] = "../externo.jpg" if como == "relativa" else externo.as_posix()
+
+    assert errores(filas, anotaciones, raiz) == [
+        f"S01_f0001: la ruta {filas[0]['ruta']!r} debe ser relativa y estar dentro de la raíz"
+    ]
+
+
+def test_falla_con_un_jpeg_sin_datos_de_imagen(tmp_path):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    (tmp_path / filas[0]["ruta"]).write_bytes(sin_datos())
+    filas[0]["sha256"] = hashlib.sha256(sin_datos()).hexdigest()
+
+    assert errores(filas, anotaciones, tmp_path) == [
+        f"S01_f0001: {filas[0]['ruta']} no es un cuadro válido (jpeg_no_decodifica)"
+    ]
+
+
+def test_falla_con_un_jpeg_truncado(tmp_path):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    truncado = jpeg(1)[: len(jpeg(1)) // 2] + b"\xff\xd9"
+    (tmp_path / filas[0]["ruta"]).write_bytes(truncado)
+    filas[0]["sha256"] = hashlib.sha256(truncado).hexdigest()
+
+    assert any("(jpeg_truncado)" in e for e in errores(filas, anotaciones, tmp_path))
+
+
 def test_falla_si_el_estado_no_coincide_con_las_cajas(tmp_path):
     filas, anotaciones = conjunto_valido(tmp_path)
     filas[0]["estado_esperado"] = "obstaculo"
@@ -236,3 +326,58 @@ def test_comando_arma_verifica_y_congela(tmp_path, capsys):
     congelado = [*raiz, "verificar", "--manifiesto", str(manifiesto), *comunes, "--sha256"]
     assert cli.main([*congelado, sha]) == 0
     assert cli.main([*congelado, "0" * 64]) == 1
+
+
+def _argumentos_manifiesto(raiz: Path, anotaciones) -> list[str]:
+    ruta = raiz / "anotaciones.jsonl"
+    ruta.write_text("".join(json.dumps(a) + "\n" for a in anotaciones))
+    return [
+        "--raiz",
+        str(raiz),
+        "manifiesto",
+        "--cuadros",
+        str(raiz / "datos" / "cuadros"),
+        "--anotaciones",
+        str(ruta),
+        "--salida",
+        str(raiz / "manifiesto.jsonl"),
+    ]
+
+
+def test_comando_no_sobrescribe_el_manifiesto_sin_permiso(tmp_path, capsys):
+    _, anotaciones = conjunto_valido(tmp_path)
+    args = _argumentos_manifiesto(tmp_path, anotaciones)
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    manifiesto.write_text("congelado")
+
+    assert cli.main(args) == 2
+    assert "--sobrescribir" in capsys.readouterr().err
+    assert manifiesto.read_text() == "congelado"
+
+    assert cli.main([*args, "--sobrescribir"]) == 0
+    assert manifiesto.read_text() != "congelado"
+
+
+def test_una_falla_al_escribir_no_toca_el_manifiesto(tmp_path, monkeypatch, capsys):
+    _, anotaciones = conjunto_valido(tmp_path)
+    args = _argumentos_manifiesto(tmp_path, anotaciones)
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    manifiesto.write_text("congelado")
+
+    def falla(self, destino):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(Path, "replace", falla)
+
+    assert cli.main([*args, "--sobrescribir"]) == 2
+    assert "disco lleno" in capsys.readouterr().err
+    assert manifiesto.read_text() == "congelado"
+    assert not (tmp_path / "manifiesto.jsonl.parcial").exists()
+
+
+def test_el_sha_impreso_es_el_del_archivo(tmp_path, capsys):
+    _, anotaciones = conjunto_valido(tmp_path)
+
+    assert cli.main(_argumentos_manifiesto(tmp_path, anotaciones)) == 0
+    sha = hashlib.sha256((tmp_path / "manifiesto.jsonl").read_bytes()).hexdigest()
+    assert sha in capsys.readouterr().out

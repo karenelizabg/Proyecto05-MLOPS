@@ -4,8 +4,8 @@ Cada regla rota es un error y el comando sale con código distinto de 0:
 
 - Mínimos de E3: 60 cuadros, 6 secuencias, 20 con obstáculo y 20 despejados (los mismos de
   `metricas`, que limitan el criterio 1.4).
-- Cuadros únicos: ningún SHA-256 repetido; cada archivo existe y su SHA-256 y su tamaño coinciden
-  con el manifiesto.
+- Cuadros únicos: ningún SHA-256 repetido; cada archivo existe dentro de la raíz, su SHA-256 y su
+  tamaño coinciden con el manifiesto y es un JPEG completo (el mismo criterio de la captura).
 - `split`: todos `evaluacion` (D-06, no hubo ajuste).
 - Huecos: dentro de una secuencia el tiempo crece y dos cuadros seguidos están separados por
   **menos** de `validez_orden_ms` (config/control/plazos.yaml). Un hueco armado a propósito se
@@ -25,11 +25,11 @@ from typing import Any
 
 import yaml
 
-from captura import dimensiones_jpeg
+from captura import motivo_rechazo
 from control.config import ConfigPolitica, cargar_config_politica
 from metricas.evaluacion import MINIMOS_E3, validar_anotaciones
 
-from .manifiesto import RAIZ, SPLIT, zonas_de
+from .manifiesto import RAIZ, SPLIT, ruta_relativa, zonas_de
 
 RUTA_PLAZOS = RAIZ / "config" / "control" / "plazos.yaml"
 
@@ -55,23 +55,33 @@ def max_hueco_ms() -> int:
     return int(plazos["validez_orden_ms"])
 
 
+def _revisar_archivo(f: Mapping[str, Any], raiz: Path) -> list[str]:
+    frame, ruta = f["frame_id"], f["ruta"]
+    # Debe ser ya la ruta relativa y resuelta: ni absoluta, ni con `..`, ni un enlace a otro lado.
+    if not isinstance(ruta, str) or ruta_relativa(raiz / ruta, raiz) != ruta:
+        return [f"{frame}: la ruta {ruta!r} debe ser relativa y estar dentro de la raíz"]
+    try:
+        datos = (raiz / ruta).read_bytes()  # NOSONAR (S8707)
+    except OSError:
+        return [f"{frame}: no existe {ruta}"]
+    errores: list[str] = []
+    if hashlib.sha256(datos).hexdigest() != f["sha256"]:
+        errores.append(f"{frame}: el SHA-256 de {ruta} no coincide con el manifiesto")
+    motivo = motivo_rechazo(datos, (f["image_width"], f["image_height"]))
+    if motivo:
+        errores.append(f"{frame}: {ruta} no es un cuadro válido ({motivo})")
+    return errores
+
+
 def _revisar_archivos(filas: list[Mapping[str, Any]], raiz: Path) -> list[str]:
     errores: list[str] = []
     por_sha: dict[str, str] = {}
     for f in filas:
-        frame, ruta = f["frame_id"], raiz / f["ruta"]
+        frame = f["frame_id"]
         if f["sha256"] in por_sha:
             errores.append(f"{frame}: misma imagen que {por_sha[f['sha256']]} (SHA-256 repetido)")
         por_sha.setdefault(f["sha256"], frame)
-        try:
-            datos = ruta.read_bytes()  # NOSONAR (S8707)
-        except OSError:
-            errores.append(f"{frame}: no existe {f['ruta']}")
-            continue
-        if hashlib.sha256(datos).hexdigest() != f["sha256"]:
-            errores.append(f"{frame}: el SHA-256 de {f['ruta']} no coincide con el manifiesto")
-        if dimensiones_jpeg(datos) != (f["image_width"], f["image_height"]):
-            errores.append(f"{frame}: el tamaño de la imagen no coincide con el manifiesto")
+        errores += _revisar_archivo(f, raiz)
     return errores
 
 

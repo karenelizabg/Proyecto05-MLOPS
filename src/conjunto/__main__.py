@@ -2,16 +2,18 @@
 
 Uso:
     python -m conjunto manifiesto [--cuadros datos/cuadros] \
-        [--anotaciones datos/anotaciones.jsonl] [--salida datos/manifiesto.jsonl]
+        [--anotaciones datos/anotaciones.jsonl] [--salida datos/manifiesto.jsonl] [--sobrescribir]
     python -m conjunto verificar [--manifiesto datos/manifiesto.jsonl] \
         [--anotaciones datos/anotaciones.jsonl] [--sha256 HASH_CONGELADO]
 
-`manifiesto` junta la captura (P5-09) y las anotaciones (P5-10) en una fila por cuadro.
+`manifiesto` junta la captura (P5-09) y las anotaciones (P5-10) en una fila por cuadro. Si
+`--salida` ya existe no la toca, salvo con `--sobrescribir`: puede ser el manifiesto congelado.
 `verificar` es el `verify_dataset` del ticket: revisa mínimos de E3, cuadros únicos, hashes,
 `split`, huecos menores que `validez_orden_ms` y anotaciones, e imprime el SHA-256 del manifiesto
 para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado.
 
-Salida: 0 si todo cumple, 1 si alguna regla se rompe, 2 si una entrada no se puede leer.
+Salida: 0 si todo cumple, 1 si alguna regla se rompe, 2 si una entrada no se puede leer o la salida
+no se puede escribir.
 Las rutas las elige quien corre el comando; por eso las lecturas y escrituras llevan
 `NOSONAR (S8707)`, como en `python -m metricas`.
 """
@@ -38,7 +40,23 @@ def _clases() -> set[int] | None:
     return {c["class_id"] for c in json.loads(RUTA_CLASES.read_text(encoding="utf-8"))}
 
 
+def _escribir(salida: Path, texto: str) -> None:
+    """Escribe en un temporal y lo renombra: un error no deja un manifiesto a medias.
+
+    `newline` fija el fin de línea: si no, en Windows el SHA-256 del archivo no sería el impreso.
+    """
+    temporal = salida.with_name(salida.name + ".parcial")
+    try:
+        temporal.write_text(texto, encoding="utf-8", newline="\n")  # NOSONAR (S8707)
+        temporal.replace(salida)  # NOSONAR (S8707)
+    finally:
+        temporal.unlink(missing_ok=True)  # NOSONAR (S8707)
+
+
 def _manifiesto(args: argparse.Namespace) -> int:
+    if args.salida.exists() and not args.sobrescribir:
+        print(f"{args.salida.as_posix()} ya existe: usa --sobrescribir", file=sys.stderr)
+        return 2
     try:
         anotaciones = leer_jsonl(args.anotaciones)
         filas = construir(args.cuadros, anotaciones, args.raiz)
@@ -49,7 +67,11 @@ def _manifiesto(args: argparse.Namespace) -> int:
         print("\n".join(exc.errores), file=sys.stderr)
         return 1
     texto = "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in filas)
-    args.salida.write_text(texto, encoding="utf-8")  # NOSONAR (S8707)
+    try:
+        _escribir(args.salida, texto)
+    except OSError as exc:
+        print(f"no se pudo escribir el manifiesto: {exc}", file=sys.stderr)
+        return 2
     sha = hashlib.sha256(texto.encode("utf-8")).hexdigest()
     print(f"{len(filas)} cuadros -> {args.salida.as_posix()} (SHA-256 {sha})")
     return 0
@@ -102,6 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--cuadros", type=Path, default=Path("datos/cuadros"))
     p.add_argument("--anotaciones", type=Path, default=Path("datos/anotaciones.jsonl"))
     p.add_argument("--salida", type=Path, default=Path("datos/manifiesto.jsonl"))
+    p.add_argument("--sobrescribir", action="store_true", help="Reemplaza --salida si ya existe.")
 
     v = sub.add_parser("verificar", help="verify_dataset: revisa el conjunto antes de congelar.")
     v.add_argument("--manifiesto", type=Path, default=Path("datos/manifiesto.jsonl"))
