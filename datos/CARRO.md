@@ -120,8 +120,10 @@ arduino-cli compile --upload -p COM9 \
 
 ## Alimentación
 
-**No hay baterías** (PEND-13 sigue abierto): el kit no trae las 18650 ni el cargador y todavía no
-se consiguen. Sin ellas los motores no se mueven, y la placa de la cámara se alimenta por USB-C:
+**Ya tenemos las baterías, pero no se usan:** el control del proyecto es virtual y el firmware no
+tiene paro automático ni control de velocidad. Para no cambiar las condiciones entre secuencias,
+el carro se sigue empujando a mano (decisión del PM A, 2026-10-30). Los motores no se mueven y la
+placa de la cámara se alimenta por USB-C:
 
 - Desde la laptop (es el único cable que hay, y el mismo sirve para cargar el firmware).
 - O desde un cargador de teléfono o una batería portátil con ese mismo cable: así la cámara
