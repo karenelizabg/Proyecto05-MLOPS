@@ -15,7 +15,9 @@ hay huecos, el stream falló o se acabó el tiempo) se mueve a SALIDA/_fallidas/
 con `FALLIDA.txt` y sin `captura.jsonl`, para que nadie la tome por una secuencia del conjunto;
 el siguiente intento puede usar la misma secuencia.
 
-`--limite-s` cuenta desde antes de conectar: incluye la conexión y las cabeceras HTTP.
+`--limite-s` cuenta desde antes de conectar: incluye la conexión y las cabeceras HTTP. Si el
+stream deja de avanzar, a más tardar 2 s después del límite (`MARGEN_CORTE_S`) se corta la
+conexión, también a media lectura del cuerpo.
 
 Salida: 0 si se capturaron todos los cuadros sin huecos de `validez_orden_ms` o más, 1 si la
 captura falló (se vuelve a filmar), 2 si no se pudo conectar, escribir o la secuencia ya existe.
@@ -93,19 +95,23 @@ def _abrir(
     espera = min(timeout, limite_s + MARGEN_CORTE_S)
     conexion = clase(partes.hostname, partes.port, timeout=espera)  # NOSONAR (S5332)
     respuesta = None
+    sock = None
 
     def cortar() -> None:
         cortado.set()
-        sock = conexion.sock
-        if sock is not None:
+        # `getresponse()` puede dejar `conexion.sock` en None mientras la respuesta sigue leyendo
+        # del mismo socket: por eso se guarda al conectar.
+        actual = sock or conexion.sock
+        if actual is not None:
             with suppress(OSError):
-                sock.shutdown(socket.SHUT_RDWR)
+                actual.shutdown(socket.SHUT_RDWR)
 
     vigilante = threading.Timer(limite_s + MARGEN_CORTE_S, cortar)
     vigilante.daemon = True
     vigilante.start()
     try:
         conexion.connect()
+        sock = conexion.sock
         if cortado.is_set():  # venció mientras conectaba: no había socket que cerrar
             raise TimeoutError("se acabó el tiempo conectando")
         ruta = (partes.path or "/") + (f"?{partes.query}" if partes.query else "")
@@ -198,7 +204,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--cuadros", type=int, default=12, help="Cuántos cuadros (12).")
     parser.add_argument("--cada-ms", type=int, default=200, help="Separación mínima (200 ms).")
     parser.add_argument(
-        "--limite-s", type=float, default=30, help="Duración máxima de la captura (30 s)."
+        "--limite-s",
+        type=float,
+        default=30,
+        help="Duración máxima, con conexión y cabeceras (30 s; corte a más tardar 2 s después).",
     )
     parser.add_argument("--salida", type=Path, default=Path("datos/cuadros"))
     parser.add_argument("--ancho", type=int, default=640)

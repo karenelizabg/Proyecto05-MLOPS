@@ -16,6 +16,7 @@ máximo y la captura entera un tiempo máximo.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import io
 import math
 import re
@@ -351,7 +352,10 @@ def capturar(
         captura.error = str(exc)
         if exc.datos:
             rechazar("content_length", exc.datos)
-    except OSError as exc:
+    except (
+        OSError,
+        http.client.HTTPException,
+    ) as exc:  # un cuerpo chunked cortado es HTTPException
         captura.error = str(exc) or type(exc).__name__
     return captura
 
