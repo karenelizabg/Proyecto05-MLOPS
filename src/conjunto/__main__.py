@@ -7,7 +7,8 @@ Uso:
         [--anotaciones datos/anotaciones.jsonl] [--sha256 HASH_CONGELADO]
 
 `manifiesto` junta la captura (P5-09) y las anotaciones (P5-10) en una fila por cuadro. Si
-`--salida` ya existe no la toca, salvo con `--sobrescribir`: puede ser el manifiesto congelado.
+`--salida` ya existe, aunque sea un enlace roto, no la toca, salvo con `--sobrescribir`: puede
+ser el manifiesto congelado. Con `--sobrescribir` se reemplaza la ruta, sin seguir enlaces.
 `verificar` es el `verify_dataset` del ticket: revisa mínimos de E3, cuadros únicos, hashes,
 `split`, huecos menores que `validez_orden_ms` y anotaciones, e imprime el SHA-256 del manifiesto
 para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado.
@@ -23,6 +24,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import secrets
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -40,22 +43,31 @@ def _clases() -> set[int] | None:
     return {c["class_id"] for c in json.loads(RUTA_CLASES.read_text(encoding="utf-8"))}
 
 
-def _escribir(salida: Path, texto: str) -> None:
-    """Escribe en un temporal y lo renombra: un error no deja un manifiesto a medias.
+def _escribir(salida: Path, texto: str, sobrescribir: bool) -> None:
+    """Escribe en un temporal y lo publica en `salida`: un error no deja un manifiesto a medias.
 
+    El temporal lleva un nombre impredecible y se crea con `x`, que falla si ya existe: no sigue un
+    enlace preparado de antemano ni pisa otro archivo. Publicar tampoco sigue enlaces: `link` falla
+    si `salida` apareció mientras tanto (también un enlace roto) y `replace` cambia la ruta misma.
     `newline` fija el fin de línea: si no, en Windows el SHA-256 del archivo no sería el impreso.
     """
-    temporal = salida.with_name(salida.name + ".parcial")
+    temporal = salida.with_name(f".{salida.name}.{secrets.token_hex(8)}.parcial")
+    archivo = temporal.open("x", encoding="utf-8", newline="\n")  # NOSONAR (S8707)
     try:
-        temporal.write_text(texto, encoding="utf-8", newline="\n")  # NOSONAR (S8707)
-        temporal.replace(salida)  # NOSONAR (S8707)
+        with archivo:
+            archivo.write(texto)
+        if sobrescribir:
+            temporal.replace(salida)  # NOSONAR (S8707)
+        else:
+            os.link(temporal, salida)  # NOSONAR (S8707)
     finally:
         temporal.unlink(missing_ok=True)  # NOSONAR (S8707)
 
 
 def _manifiesto(args: argparse.Namespace) -> int:
-    if args.salida.exists() and not args.sobrescribir:
-        print(f"{args.salida.as_posix()} ya existe: usa --sobrescribir", file=sys.stderr)
+    ya_existe = f"{args.salida.as_posix()} ya existe: usa --sobrescribir"
+    if os.path.lexists(args.salida) and not args.sobrescribir:
+        print(ya_existe, file=sys.stderr)
         return 2
     try:
         anotaciones = leer_jsonl(args.anotaciones)
@@ -68,7 +80,10 @@ def _manifiesto(args: argparse.Namespace) -> int:
         return 1
     texto = "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in filas)
     try:
-        _escribir(args.salida, texto)
+        _escribir(args.salida, texto, args.sobrescribir)
+    except FileExistsError:
+        print(ya_existe, file=sys.stderr)
+        return 2
     except OSError as exc:
         print(f"no se pudo escribir el manifiesto: {exc}", file=sys.stderr)
         return 2

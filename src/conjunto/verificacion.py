@@ -10,6 +10,8 @@ Cada regla rota es un error y el comando sale con código distinto de 0:
 - Huecos: dentro de una secuencia el tiempo crece y dos cuadros seguidos están separados por
   **menos** de `validez_orden_ms` (config/control/plazos.yaml). Un hueco armado a propósito se
   marca con `hueco_intencional: true` en el cuadro que llega tarde.
+- Tipos: los campos de los que dependen estas reglas tienen el tipo exacto; `"false"` no es
+  un booleano y con un tiempo NaN ninguna comparación de hueco se cumple.
 - Anotaciones: válidas (esquema v1), una por cuadro, con la misma secuencia y el mismo tamaño, y
   el estado esperado y las zonas del manifiesto coinciden con las cajas.
 """
@@ -55,10 +57,24 @@ def max_hueco_ms() -> int:
     return int(plazos["validez_orden_ms"])
 
 
+def _revisar_tipos(n: int, f: Mapping[str, Any]) -> list[str]:
+    errores = [
+        f"fila {n}: {campo} debe ser texto, llegó {f[campo]!r}"
+        for campo in ("frame_id", "sequence_id", "sha256")
+        if not isinstance(f[campo], str)
+    ]
+    if type(f["t_relativo_ms"]) is not int:
+        errores.append(f"fila {n}: t_relativo_ms debe ser entero, llegó {f['t_relativo_ms']!r}")
+    if type(f["hueco_intencional"]) is not bool:
+        errores.append(f"fila {n}: hueco_intencional debe ser booleano")
+    return errores
+
+
 def _revisar_archivo(f: Mapping[str, Any], raiz: Path) -> list[str]:
     frame, ruta = f["frame_id"], f["ruta"]
     # Debe ser ya la ruta relativa y resuelta: ni absoluta, ni con `..`, ni un enlace a otro lado.
-    if not isinstance(ruta, str) or ruta_relativa(raiz / ruta, raiz) != ruta:
+    # `\\` solo es separador en Windows: en otro sistema sería parte del nombre y no se reproduce.
+    if not isinstance(ruta, str) or "\\" in ruta or ruta_relativa(raiz / ruta, raiz) != ruta:
         return [f"{frame}: la ruta {ruta!r} debe ser relativa y estar dentro de la raíz"]
     try:
         datos = (raiz / ruta).read_bytes()  # NOSONAR (S8707)
@@ -176,6 +192,8 @@ def verificar(
         faltan = [c for c in CAMPOS if c not in f]
         if faltan:
             errores.append(f"fila {n}: faltan {faltan}")
+        else:
+            errores += _revisar_tipos(n, f)
     if errores:
         return errores
 

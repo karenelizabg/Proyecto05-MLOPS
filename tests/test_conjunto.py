@@ -263,6 +263,44 @@ def test_falla_con_una_ruta_fuera_de_la_raiz(tmp_path, como):
     ]
 
 
+def test_falla_con_una_ruta_con_diagonal_invertida(tmp_path):
+    # En Windows sería un separador y en otro sistema parte del nombre: no se reproduce igual.
+    filas, anotaciones = conjunto_valido(tmp_path)
+    ruta = filas[0]["ruta"].replace("/", "\\")
+    filas[0]["ruta"] = ruta
+
+    assert errores(filas, anotaciones, tmp_path) == [
+        f"S01_f0001: la ruta {ruta!r} debe ser relativa y estar dentro de la raíz"
+    ]
+
+
+@pytest.mark.parametrize("valor", ["false", "true", 1, 0, None])
+def test_falla_si_hueco_intencional_no_es_booleano(tmp_path, valor):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    filas[5]["hueco_intencional"] = valor
+
+    assert errores(filas, anotaciones, tmp_path) == ["fila 6: hueco_intencional debe ser booleano"]
+
+
+@pytest.mark.parametrize("valor", [float("nan"), float("inf"), 300.5, "300", None, True])
+def test_falla_si_el_tiempo_no_es_entero(tmp_path, valor):
+    # Con NaN ninguna comparación se cumple: el hueco pasaba sin error.
+    filas, anotaciones = conjunto_valido(tmp_path)
+    filas[5]["t_relativo_ms"] = valor
+
+    assert errores(filas, anotaciones, tmp_path) == [
+        f"fila 6: t_relativo_ms debe ser entero, llegó {valor!r}"
+    ]
+
+
+@pytest.mark.parametrize("campo", ["frame_id", "sequence_id", "sha256"])
+def test_falla_sin_romperse_si_un_identificador_no_es_texto(tmp_path, campo):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    filas[5][campo] = ["x"]
+
+    assert errores(filas, anotaciones, tmp_path) == [f"fila 6: {campo} debe ser texto, llegó ['x']"]
+
+
 def test_falla_con_un_jpeg_sin_datos_de_imagen(tmp_path):
     filas, anotaciones = conjunto_valido(tmp_path)
     (tmp_path / filas[0]["ruta"]).write_bytes(sin_datos())
@@ -372,7 +410,143 @@ def test_una_falla_al_escribir_no_toca_el_manifiesto(tmp_path, monkeypatch, caps
     assert cli.main([*args, "--sobrescribir"]) == 2
     assert "disco lleno" in capsys.readouterr().err
     assert manifiesto.read_text() == "congelado"
-    assert not (tmp_path / "manifiesto.jsonl.parcial").exists()
+    assert _temporales(tmp_path) == []
+
+
+def _temporales(carpeta: Path) -> list[Path]:
+    return list(carpeta.glob("*.parcial"))
+
+
+def _enlazar(destino: Path, enlace: Path) -> None:
+    try:
+        os.symlink(destino, enlace)
+    except OSError:
+        pytest.skip("este sistema no permite crear enlaces simbólicos")
+
+
+def test_un_temporal_viejo_con_el_nombre_anterior_no_se_toca(tmp_path):
+    # Revisión de Heri en #68: el nombre fijo pisaba lo que hubiera en `<salida>.parcial`.
+    _, anotaciones = conjunto_valido(tmp_path)
+    ajeno = tmp_path / "manifiesto.jsonl.parcial"
+    ajeno.write_text("ajeno")
+
+    assert cli.main(_argumentos_manifiesto(tmp_path, anotaciones)) == 0
+    assert ajeno.read_text() == "ajeno"
+    assert (tmp_path / "manifiesto.jsonl").read_text() != "ajeno"
+
+
+def test_un_enlace_con_el_nombre_anterior_no_se_sigue(tmp_path):
+    _, anotaciones = conjunto_valido(tmp_path)
+    externo = tmp_path / "externo.txt"
+    externo.write_text("intacto")
+    _enlazar(externo, tmp_path / "manifiesto.jsonl.parcial")
+
+    assert cli.main(_argumentos_manifiesto(tmp_path, anotaciones)) == 0
+    assert externo.read_text() == "intacto"
+
+
+def test_el_temporal_no_sigue_un_enlace_aunque_adivinen_su_nombre(tmp_path, monkeypatch):
+    externo = tmp_path / "externo.txt"
+    externo.write_text("intacto")
+    salida = tmp_path / "manifiesto.jsonl"
+    monkeypatch.setattr(cli.secrets, "token_hex", lambda _: "fijo")
+    _enlazar(externo, tmp_path / ".manifiesto.jsonl.fijo.parcial")
+
+    with pytest.raises(FileExistsError):
+        cli._escribir(salida, "nuevo", sobrescribir=False)
+    assert externo.read_text() == "intacto"
+    assert not salida.exists()
+
+
+def test_un_temporal_que_ya_existe_no_se_borra(tmp_path, monkeypatch):
+    ajeno = tmp_path / ".manifiesto.jsonl.fijo.parcial"
+    ajeno.write_text("ajeno")
+    monkeypatch.setattr(cli.secrets, "token_hex", lambda _: "fijo")
+
+    with pytest.raises(FileExistsError):
+        cli._escribir(tmp_path / "manifiesto.jsonl", "nuevo", sobrescribir=False)
+    assert ajeno.read_text() == "ajeno"
+
+
+def test_sin_permiso_no_se_pisa_una_salida_que_aparecio_a_medio_camino(tmp_path):
+    # `_manifiesto` ya revisó que no existía; aquí aparece después de esa revisión.
+    salida = tmp_path / "manifiesto.jsonl"
+    salida.write_text("congelado")
+
+    with pytest.raises(FileExistsError):
+        cli._escribir(salida, "nuevo", sobrescribir=False)
+    assert salida.read_text() == "congelado"
+    assert _temporales(tmp_path) == []
+
+
+def test_una_salida_que_aparece_a_medio_camino_da_error_en_el_comando(
+    tmp_path, monkeypatch, capsys
+):
+    _, anotaciones = conjunto_valido(tmp_path)
+    args = _argumentos_manifiesto(tmp_path, anotaciones)
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    original = cli._escribir
+
+    def aparece_antes(salida, texto, sobrescribir):
+        manifiesto.write_text("congelado")
+        original(salida, texto, sobrescribir)
+
+    monkeypatch.setattr(cli, "_escribir", aparece_antes)
+
+    assert cli.main(args) == 2
+    assert "--sobrescribir" in capsys.readouterr().err
+    assert manifiesto.read_text() == "congelado"
+
+
+def test_un_enlace_roto_en_la_salida_cuenta_como_existente(tmp_path, capsys):
+    _, anotaciones = conjunto_valido(tmp_path)
+    args = _argumentos_manifiesto(tmp_path, anotaciones)
+    externo = tmp_path / "todavia_no_existe.txt"
+    _enlazar(externo, tmp_path / "manifiesto.jsonl")
+
+    assert cli.main(args) == 2
+    assert "--sobrescribir" in capsys.readouterr().err
+    assert not externo.exists()
+    assert (tmp_path / "manifiesto.jsonl").is_symlink()
+
+
+def test_sobrescribir_reemplaza_el_enlace_sin_tocar_su_destino(tmp_path):
+    _, anotaciones = conjunto_valido(tmp_path)
+    externo = tmp_path / "externo.txt"
+    externo.write_text("intacto")
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    _enlazar(externo, manifiesto)
+
+    assert cli.main([*_argumentos_manifiesto(tmp_path, anotaciones), "--sobrescribir"]) == 0
+    assert externo.read_text() == "intacto"
+    assert not manifiesto.is_symlink()
+
+
+def test_una_falla_al_publicar_sin_sobrescribir_no_deja_nada(tmp_path, monkeypatch, capsys):
+    _, anotaciones = conjunto_valido(tmp_path)
+    args = _argumentos_manifiesto(tmp_path, anotaciones)
+
+    def falla(origen, destino):
+        raise OSError("sin enlaces duros")
+
+    monkeypatch.setattr(cli.os, "link", falla)
+
+    assert cli.main(args) == 2
+    assert "sin enlaces duros" in capsys.readouterr().err
+    assert not (tmp_path / "manifiesto.jsonl").exists()
+    assert _temporales(tmp_path) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="los permisos POSIX no aplican en Windows")
+@pytest.mark.parametrize("extra", [[], ["--sobrescribir"]])
+def test_el_manifiesto_queda_con_los_permisos_de_un_archivo_normal(tmp_path, extra):
+    _, anotaciones = conjunto_valido(tmp_path)
+    normal = tmp_path / "normal.txt"
+    normal.write_text("x")
+
+    assert cli.main([*_argumentos_manifiesto(tmp_path, anotaciones), *extra]) == 0
+    modo = (tmp_path / "manifiesto.jsonl").stat().st_mode
+    assert modo == normal.stat().st_mode
 
 
 def test_el_sha_impreso_es_el_del_archivo(tmp_path, capsys):
