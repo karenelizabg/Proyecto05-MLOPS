@@ -8,7 +8,6 @@ que usa la política del grupo B (`config/control/politica.yaml`), para que no h
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import re
 from collections.abc import Mapping
@@ -43,11 +42,11 @@ def zonas_de(anotacion: Mapping[str, Any], config: ConfigPolitica) -> list[str]:
     if not objetos:
         return []
     # Las cajas anotadas son la verdad: cuentan todas sus clases y con confianza 1.
-    config_anotadas: ConfigPolitica = dataclasses.replace(
-        config,
-        clases_obstaculo=frozenset(o["class_id"] for o in objetos),
-        umbral_confianza=0.0,
-    )
+    cambios = {
+        "clases_obstaculo": frozenset(o["class_id"] for o in objetos),
+        "umbral_confianza": 0.0,
+    }
+    config_anotadas = ConfigPolitica(**{**vars(config), **cambios})
     evento = {
         "status": "ok",
         "image_width": anotacion["image_width"],
