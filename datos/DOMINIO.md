@@ -1,15 +1,20 @@
 # Dominio de obstáculos y plan de filmación (P5-03)
 
-Qué ve el carro, qué cuenta como obstáculo, qué no cubre el sistema y cómo se filman las 8
-secuencias de evaluación (E3). Las medidas del carro y la configuración de la cámara están en
+Qué ve el carro, qué cuenta como obstáculo, qué no cubre el sistema y cómo se filman las 10
+secuencias: S1–S8 son la evaluación (E3) y S9–S10 son solo para las pruebas del grupo B. Las medidas del carro y la configuración de la cámara están en
 [`CARRO.md`](CARRO.md); aquí solo se resumen.
 
 ## Sin ajuste (D-06)
 
 **No hay partición de ajuste.** El detector es preentrenado y no se reentrena; el umbral de
 confianza y el NMS se fijan en la configuración del detector **antes** de correrlo sobre los
-cuadros, y su hash queda en `config_sha256`. Las **8 secuencias son de evaluación** y las métricas
-se reportan sobre todas.
+cuadros, y su hash queda en `config_sha256`. **S1–S8 son de evaluación** y las métricas se reportan
+sobre todas ellas.
+
+**S9 y S10 no son de evaluación** (decisión del PM A, 2026-10-30): la regla de la política ya se
+probó con esas posiciones, así que no son independientes, y dejar S1–S8 igual mantiene comparables
+los resultados. Se reportan aparte. Si A1 o el grupo B piden que cuenten, se incluyen mostrando el
+resultado con y sin ellas.
 
 Las fotos que se usaron para escoger detector y objetos (P5-04, P5-19) **no** forman parte de
 las secuencias ni se guardan en `datos/`.
@@ -32,8 +37,9 @@ Resumen de [`CARRO.md`](CARRO.md):
 - Kit Carrito ESP32-CAM 4WD (el que recomendó el profe), sensor OV2640 con **lente fijo**.
 - Cámara a **10 cm del piso, mirando al frente (0°)**. Cuadros de **640×480 en JPEG** (calidad 10),
   derechos desde el firmware. La configuración no cambia entre secuencias.
-- **Sin baterías** (PEND-13): los motores no se mueven. El carro se **empuja a mano** con la
-  cámara alimentada por USB-C.
+- **Ya tenemos las baterías, pero no se usan:** el control es virtual y el firmware no tiene paro
+  automático ni control de velocidad. El carro se **empuja a mano** con la cámara alimentada por
+  USB-C, en todas las secuencias.
 
 Lo que eso implica para los cuadros:
 
@@ -101,7 +107,7 @@ S8 usa el **borrador, la tapa y el cable**, los transitables que nombra la expec
 (`casos/C1/expectativa.yaml`), para que el plan y el caso coincidan. La cajita y el cuaderno
 quedan como transitables comprobados, pero no se filman.
 
-Se comprobó empujando el carro a mano (2026-10-28). Sin baterías las llantas giran duro, porque
+Se comprobó empujando el carro a mano (2026-10-28). Con los motores sin alimentar las llantas giran duro, porque
 arrastran la reducción de los motores; esa resistencia es del motor, no del objeto.
 
 Un transitable puede salir en el detector con una clase de COCO que no está entre las elegidas
@@ -132,7 +138,7 @@ llantas no los pasan, no son transitables.
 
 ## Plan de filmación
 
-Las 8 secuencias, todas de evaluación. Los casos C8 y C9 (sin cuadros, cuadro viejo, errores del
+Son 10 secuencias: S1–S8 de evaluación y S9–S10 solo para las pruebas del grupo B. Los casos C8 y C9 (sin cuadros, cuadro viejo, errores del
 detector) no salen de video: son entradas fallidas que arma P5-12. C10 (emergencia) es del grupo
 B y puede usar cualquier secuencia.
 
@@ -146,9 +152,11 @@ B y puede usar cualquier secuencia.
 | S6 | Libre → bloqueo → libre | Taza que entra al centro, sale un cuadro, vuelve y sale (≈ 15 cuadros; ver abajo) | C7 | Libre, bloqueo, libre (un cuadro), bloqueo, libre (≥ 5 cuadros) |
 | S7 | Cerca del umbral de confianza | Taza al centro: empieza lejos (baja o sin detección) y el carro se acerca hasta que pasa de 0.50 | C6 | Lo que dé el detector; P5-12 marca qué cuadros quedan bajo y sobre el umbral |
 | S8 | Otro cuarto, con transitables | El borrador, la tapa y el cable en la vía (los de C1) | C1, negativos | Despejado en todos los cuadros |
+| S9 | Solo pruebas de B: taza cargada a la izquierda | Taza tocando el centro, cargada hacia la izquierda | Ninguno de E3 | Obstáculo al centro; la política gira a la derecha |
+| S10 | Solo pruebas de B: taza cargada a la derecha | Taza tocando el centro, cargada hacia la derecha (espejo de S9) | Ninguno de E3 | Obstáculo al centro; la política gira a la izquierda |
 
 Cobertura: C1 (S1, S8), C2 (S2), C3 (S3), C4 (S4), C5 (S5), C6 (S7) y C7 (S6). Cada caso C1–C7
-tiene al menos una secuencia.
+tiene al menos una secuencia de evaluación.
 
 El reparto sigue lo que se detectó mejor en P5-04: la botella a los lados y la taza al centro.
 S5 es el más arriesgado: en las fotos con varios objetos el detector solo encontró uno, y C5
@@ -170,11 +178,28 @@ tramo de cada cuadro lo da su anotación (taza al centro o no), y P5-12 lo regis
 `MAPA_CASOS.md`. Si el hueco libre del medio sale de cero o de dos cuadros, la secuencia se vuelve
 a filmar.
 
+**S9 y S10** (pedidas por el grupo B). S3 y S4 no sirven para probar el giro: el centro queda libre
+y la política avanza recto. Aquí la taza ocupa el centro y su caja queda cargada hacia un lado. Con
+la imagen de 640 px, el centro de la caja debe caer en **x ≈ 240–290** en S9 y en **x ≈ 350–400** en
+S10, sin acercarse a x = 320, donde la política rompe el empate hacia la izquierda. La taza se queda
+en su posición toda la toma. **S9 es la más arriesgada:** en P5-04 la taza a la izquierda quedó en
+0.30, debajo del umbral de 0.50.
+
+S9 y S10 se anotan igual que las demás, pero se guardan **fuera de `datos/cuadros/`**, porque el
+manifiesto y el benchmark toman todo lo que hay ahí:
+
+```bash
+python -m captura --url http://<ip>:81/stream --secuencia S09 --salida datos/pruebas-b
+python -m captura --url http://<ip>:81/stream --secuencia S10 --salida datos/pruebas-b
+```
+
+Los intentos fallidos quedan en `datos/pruebas-b/_fallidas/` y no se suben.
+
 ### Tomas de prueba
 
 Antes de filmar se hacen **tomas de prueba aparte**, con la misma cámara y el mismo lugar, para
 comprobar que botella y taza se detectan con 0.50 o más en la posición y la distancia de cada
-secuencia, y en S5 las tres a la vez. Para S7 (C6) se comprueba además que, acercando la taza, sale
+secuencia, en S5 las tres a la vez y en S9 y S10 la taza en la posición de cada una. Para S7 (C6) se comprueba además que, acercando la taza, sale
 **al menos un cuadro con `cup` entre 0.25 y 0.50** (el detector la emite, la política la ignora) y
 otro con **0.50 o más**; si no, se cambia la distancia o la luz de S7, sin tocar los umbrales
 congelados. Estas tomas son de selección como las de P5-04: **no**
@@ -185,19 +210,19 @@ o la separación y se vuelve a probar antes de filmar.
 
 | Dato | Valor |
 |---|---|
-| Cuadros por secuencia | 10 a 12, y unos 15 en S6 (≈ 85 a 100 en total; el mínimo de E3 es 60) |
+| Cuadros por secuencia | 10 a 12, y unos 15 en S6 (S1–S8: ≈ 85 a 100 en total; el mínimo de E3 es 60). S9 y S10 no cuentan para ese mínimo |
 | Con obstáculo / despejados | S2–S6 casi todos con obstáculo, S1 y S8 despejados: ≈ 50 y ≈ 30 (mínimo 20 y 20) |
 | Ritmo | ≈ 5 cuadros por segundo (uno cada 200 ms), el ritmo que supone el grupo B |
 | Hueco máximo entre cuadros | **Menos de 400 ms** (`validez_orden_ms`); una secuencia con un hueco mayor se vuelve a filmar |
 | Cómo se capturan | Script que lee el stream de la ESP32-CAM (`:81/stream`) y guarda los bytes JPEG como llegan, sin recomprimir, con la hora real de recepción (P5-09) |
 | Distancia | Las secuencias empiezan a distancia media, no lejos: ni botella ni taza se detectaron lejos (salvo S7, que lo usa a propósito) |
-| Movimiento | El carro se empuja a mano, despacio y en línea recta, hacia los objetos. Como las llantas giran duro sin baterías, se empuja parejo para que no avance a saltos (un salto desenfoca el cuadro) |
+| Movimiento | El carro se empuja a mano, despacio y en línea recta, hacia los objetos. Como las llantas giran duro con los motores sin alimentar, se empuja parejo para que no avance a saltos (un salto desenfoca el cuadro) |
 | Quién filma | A2 (Andy), que tiene el carro; **pendiente** quién ayuda a empujar y a mover los objetos |
 | Cuándo | **pendiente** |
 
 - Ningún nombre de archivo lleva la clase ni el caso (P5-09).
 - Los cuadros casi iguales se revisan con su SHA-256: un duplicado exacto se descarta.
-- La cámara, el lugar y la luz no cambian entre S1 y S7; solo S8 cambia de cuarto.
+- La cámara, el lugar y la luz no cambian entre S1 y S7, ni en S9 y S10; solo S8 cambia de cuarto.
 
 ## Pendiente
 
@@ -205,5 +230,5 @@ o la separación y se vuelve a probar antes de filmar.
 - [ ] Conseguir una segunda botella para S5.
 - [ ] Medir el borrador y la tapa de S8 y comprobarlos con el carro.
 - [ ] Grupo B: `clases_obstaculo: [39, 41]` en la política (PR #64 de Hannah).
-- [ ] Tomas de prueba de cada posición y de S5 antes de filmar.
+- [ ] Tomas de prueba de cada posición, de S5, de S9 y de S10 antes de filmar.
 - [ ] Quién ayuda a filmar y cuándo.
