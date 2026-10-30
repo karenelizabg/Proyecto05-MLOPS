@@ -43,12 +43,12 @@ def zonas_de(anotacion: Mapping[str, Any], config: ConfigPolitica) -> list[str]:
     if not objetos:
         return []
     # Las cajas anotadas son la verdad: cuentan todas sus clases y con confianza 1.
-    config = dataclasses.replace(
+    config_anotadas: ConfigPolitica = dataclasses.replace(
         config,
         clases_obstaculo=frozenset(o["class_id"] for o in objetos),
         umbral_confianza=0.0,
     )
-    evento: dict[str, Any] = {
+    evento = {
         "status": "ok",
         "image_width": anotacion["image_width"],
         "bbox_format": "xyxy",
@@ -56,7 +56,7 @@ def zonas_de(anotacion: Mapping[str, Any], config: ConfigPolitica) -> list[str]:
             {"class_id": o["class_id"], "confidence": 1.0, "bbox": o["bbox"]} for o in objetos
         ],
     }
-    ocupadas = zonas_ocupadas(evento, config)
+    ocupadas = zonas_ocupadas(evento, config_anotadas)
     return [z for z in ZONAS if z in ocupadas]
 
 
