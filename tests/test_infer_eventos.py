@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 import pytest
 
+import infer.eventos as modulo_eventos
 from contrato.validador import leer_eventos, validar_evento, validar_flujo
 from infer.__main__ import main
 from infer.config import cargar_config_detector
@@ -190,6 +191,79 @@ def test_directorio_sin_capturas_o_secuencia_se_rechaza(tmp_path):
     _jpeg(carpeta / "a.jpg")
     with pytest.raises(ErrorRunInfer):
         ejecutar_run(DetectorFalso(), carpeta, tmp_path / "x.jsonl", run_id="r")
+
+
+def test_salida_existente_no_se_sobrescribe(tmp_path):
+    entrada = _jpeg(tmp_path / "cuadro.jpg")
+    salida = tmp_path / "salida.jsonl"
+    previo = b"resultado anterior\n"
+    salida.write_bytes(previo)
+    with pytest.raises(FileExistsError):
+        ejecutar_run(DetectorFalso(), entrada, salida, run_id="r")
+    assert salida.read_bytes() == previo
+
+
+@pytest.mark.parametrize("enlace_roto", [False, True])
+def test_enlace_final_de_salida_no_se_sobrescribe(tmp_path, enlace_roto):
+    entrada = _jpeg(tmp_path / "cuadro.jpg")
+    destino = tmp_path / "destino.jsonl"
+    if not enlace_roto:
+        destino.write_bytes(b"intacto")
+    enlace = tmp_path / "enlace.jsonl"
+    try:
+        enlace.symlink_to(destino)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"el entorno no permite crear enlaces simbólicos: {exc}")
+    with pytest.raises(FileExistsError):
+        ejecutar_run(DetectorFalso(), entrada, enlace, run_id="r")
+    assert enlace.is_symlink()
+    if enlace_roto:
+        assert not destino.exists()
+    else:
+        assert destino.read_bytes() == b"intacto"
+
+
+def test_directorio_padre_de_salida_enlazado_se_sigue(tmp_path):
+    entrada = _jpeg(tmp_path / "cuadro.jpg")
+    destino_real = tmp_path / "destino-real"
+    destino_real.mkdir()
+    enlace_padre = tmp_path / "enlace-padre"
+    try:
+        enlace_padre.symlink_to(destino_real, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"el entorno no permite crear enlaces simbólicos: {exc}")
+    salida, cantidad, errores = ejecutar_run(
+        DetectorFalso(), entrada, enlace_padre / "salida.jsonl", run_id="r"
+    )
+    assert (cantidad, errores) == (1, 0)
+    assert salida.is_file()
+    assert (destino_real / "salida.jsonl").is_file()
+
+
+def test_fallo_durante_procesamiento_deja_solo_eventos_completos(tmp_path, monkeypatch):
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    _jpeg(entrada / "a.jpg")
+    _jpeg(entrada / "b.jpg")
+    salida = tmp_path / "parcial.jsonl"
+    original = modulo_eventos._serializar_evento
+
+    def fallar_en_segundo(evento, anteriores):
+        if anteriores:
+            raise ErrorRunInfer("fallo posterior al primer cuadro")
+        return original(evento, anteriores)
+
+    monkeypatch.setattr(modulo_eventos, "_serializar_evento", fallar_en_segundo)
+    with pytest.raises(ErrorRunInfer, match="fallo posterior"):
+        ejecutar_run(
+            DetectorFalso(),
+            entrada,
+            salida,
+            run_id="r",
+            sequence_id="S01",
+            capture_ms=[0, 1],
+        )
+    assert [evento["frame_id"] for evento in leer_eventos(salida)] == ["f000001"]
 
 
 def test_id_repetido_y_hash_cambiante_se_rechazan(tmp_path):

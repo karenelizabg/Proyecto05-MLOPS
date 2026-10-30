@@ -107,9 +107,32 @@ def test_ruta_no_regular_y_enlace_simbolico(tmp_path: Path):
     archivo = tmp_path / "archivo.pt"
     archivo.write_bytes(b"contenido")
     enlace = tmp_path / "enlace.pt"
-    enlace.symlink_to(archivo)
+    try:
+        enlace.symlink_to(archivo)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"el entorno no permite crear enlaces simbólicos: {exc}")
     with pytest.raises(pesos.ErrorCargaPesos, match="enlace simbólico"):
         pesos.cargar_pesos(enlace, config)
+
+
+def test_checkpoint_en_directorio_padre_enlazado_conserva_hash(tmp_path: Path, monkeypatch):
+    contenido = b"checkpoint local aprobado en la prueba"
+    directorio = tmp_path / "real"
+    directorio.mkdir()
+    (directorio / "checkpoint.pt").write_bytes(contenido)
+    enlace_padre = tmp_path / "enlace-padre"
+    try:
+        enlace_padre.symlink_to(directorio, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"el entorno no permite crear enlaces simbólicos: {exc}")
+
+    def construir(copia, _config):
+        assert copia.read_bytes() == contenido
+        return object()
+
+    _carga_falsa(monkeypatch, construir)
+    cargado = pesos.cargar_pesos(enlace_padre / "checkpoint.pt", _config_para(contenido))
+    assert cargado.model_sha256 == hashlib.sha256(contenido).hexdigest()
 
 
 def test_cambio_del_original_entre_hash_y_carga_no_cambia_la_copia(tmp_path: Path, monkeypatch):

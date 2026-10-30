@@ -114,6 +114,36 @@ predictor CPU dentro del proceso. Una interrupción externa puede dejar un
 archivo con los eventos completos ya emitidos; esta fase no implementa
 transacciones del archivo entero ni la política temporal P5-06.
 
+## Rutas locales y límite de confianza
+
+`infer` es un CLI local: el operador elige explícitamente las rutas de
+`--config`, `--weights`, `--input` y `--output`. Deben proceder de ubicaciones
+confiables. Se admiten rutas absolutas y relativas; una ruta relativa se
+interpreta desde el directorio de ejecución, salvo la configuración
+predeterminada que está anclada al repositorio. No existe una raíz de archivos
+permitidos ni se debe tratar este CLI como un servicio que acepta rutas de
+terceros sin validación adicional.
+
+La configuración y los JPEG pueden leerse a través de enlaces simbólicos. El
+checkpoint rechaza un enlace simbólico final y solo se deserializa después de
+copiar y verificar sus bytes mediante el SHA-256 aprobado. Los directorios
+padres enlazados pueden redirigir lecturas y escrituras; esta limitación depende
+de quién controle esos directorios. El JSONL se crea de forma exclusiva: una
+salida existente, incluso un enlace simbólico final, no se reemplaza. Un fallo
+durante el run puede dejar el prefijo de eventos completos ya escritos.
+
+El script de benchmark también crea su JSON de salida de forma exclusiva. No
+se debe reutilizar el mismo nombre para una nueva medición. Calcula el SHA-256
+del JPEG después de las inferencias; si otro proceso cambia la imagen durante
+la prueba, ese hash podría no describir todos los bytes inferidos. La copia
+verificada del checkpoint todavía no tiene un límite explícito de tamaño: un
+archivo local desmesurado podría consumir disco y tiempo antes de fallar por
+SHA-256. Estas dos limitaciones requieren decisiones separadas.
+
+Una integración futura que reciba rutas de terceros deberá imponer una raíz
+autorizada y controlar los enlaces de sus directorios antes de invocar el CLI;
+las garantías de una herramienta local no sustituyen ese límite de confianza.
+
 ## Parámetros efectivos
 
 El objeto `effective` completo participa en `config_sha256`:

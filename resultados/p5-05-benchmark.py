@@ -17,6 +17,18 @@ from infer.detector import DetectorJPEG
 from infer.pesos import cargar_pesos
 
 
+def _guardar_resultado(ruta: Path, datos: dict) -> None:
+    """Crea un JSON nuevo sin truncar destinos existentes ni seguir un enlace final."""
+    contenido = json.dumps(datos, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    try:
+        with ruta.open("x", encoding="utf-8") as archivo:
+            archivo.write(contenido)
+    except FileExistsError as exc:
+        raise SystemExit(f"benchmark: la salida ya existe: {ruta}") from exc
+    except OSError as exc:
+        raise SystemExit(f"benchmark: no se pudo crear la salida {ruta}: {exc}") from exc
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--weights", type=Path, required=True)
@@ -79,10 +91,7 @@ def main() -> None:
         "stats": {nombre: resumen(valores) for nombre, valores in series.items()},
         "samples_ms": series,
     }
-    args.output.write_text(
-        json.dumps(datos, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-        encoding="utf-8",
-    )
+    _guardar_resultado(args.output, datos)
     print(json.dumps(datos["stats"], ensure_ascii=False, indent=2))
 
 

@@ -49,6 +49,38 @@ def test_carga_config_valida_y_argumentos_efectivos():
     assert "rect" not in config.effective["preprocess"]
 
 
+def test_config_admite_rutas_absoluta_y_relativa_legitimas(tmp_path, monkeypatch, datos):
+    ruta = tmp_path / "detector.json"
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    absoluto = cargar_config_detector(ruta)
+    monkeypatch.chdir(tmp_path)
+    relativo = cargar_config_detector(Path("detector.json"))
+    assert absoluto.config_sha256 == relativo.config_sha256
+
+
+def test_config_inexistente_y_directorio_dan_error_controlado(tmp_path):
+    with pytest.raises(ErrorConfigDetector, match="no se pudo leer config"):
+        cargar_config_detector(tmp_path / "inexistente.json")
+    directorio = tmp_path / "directorio.json"
+    directorio.mkdir()
+    with pytest.raises(ErrorConfigDetector, match="no se pudo leer config"):
+        cargar_config_detector(directorio)
+
+
+def test_config_sigue_enlace_simbolico_a_json_valido(tmp_path, datos):
+    destino = tmp_path / "detector-real.json"
+    destino.write_text(json.dumps(datos), encoding="utf-8")
+    enlace = tmp_path / "detector-enlace.json"
+    try:
+        enlace.symlink_to(destino)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"el entorno no permite crear enlaces simbólicos: {exc}")
+    assert (
+        cargar_config_detector(enlace).config_sha256
+        == cargar_config_detector(destino).config_sha256
+    )
+
+
 @pytest.mark.parametrize(
     ("seccion", "clave", "valor"),
     [

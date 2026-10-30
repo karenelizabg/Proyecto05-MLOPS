@@ -4,7 +4,7 @@
 
 ## Bloqueos previos
 
-1. La rama p5-05-detector-infer existe solo en un worktree local de Heri y sus cambios no están publicados. Un clon limpio **todavía no puede ejecutar** los comandos de abajo. Heri debe publicar la rama mediante el flujo de revisión autorizado en una etapa posterior; esta guía no autoriza commit, push ni PR.
+1. La rama `p5-05-detector-infer` está publicada en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75). Clonar esa rama y registrar el commit exacto antes de la revisión; no cambiar modelo, umbrales ni dependencias.
 2. Los 29 JPEG de P5-04 están fuera del repositorio. Ale necesita recibir los bytes originales por un medio acordado o elegir sus propios cuatro JPEG. Para revisar específicamente varios_1 y varios_2 necesita esos dos archivos, con los SHA-256 indicados más abajo. Las anotaciones y los manifiestos no son entrada de inferencia.
 3. El checkpoint no está en el repositorio. P5-04 lo obtuvo de la [release oficial de Ultralytics v8.3.0](https://github.com/ultralytics/assets/releases/tag/v8.3.0); la release contiene el artefacto yolo11n.pt de 5 613 764 bytes. La URL de abajo es la del procedimiento ya usado. Si GitHub está inaccesible, obtener una copia del mismo archivo aprobado mediante un medio acordado y comprobar su hash; no usar otro modelo ni permitir una descarga automática de infer.
 
@@ -12,7 +12,7 @@
 
 Requisitos: Windows x86_64, Git, conexión **solo para obtener uv/dependencias/checkpoint**, espacio suficiente para el entorno PyTorch y cuatro JPEG. Python 3.12 está fijado en .python-version y pyproject.toml. El lockfile fija Ultralytics 8.3.0, PyTorch 2.9.0, Torchvision 0.24.0, OpenCV 4.11.0.86 y NumPy 1.26.4. Estas instrucciones son para PowerShell, no Git Bash. El comando de instalación de uv sigue la [documentación oficial de Astral](https://docs.astral.sh/uv/getting-started/installation/).
 
-**Este bloque de clonación solo funcionará cuando la rama esté publicada.** En un directorio nuevo:
+En un directorio nuevo:
 
 ~~~powershell
 $Repo = Join-Path $HOME 'Proyecto05-MLOPS-P5-05'
@@ -175,6 +175,11 @@ Si Ale mide rendimiento en esa laptop, guardar **10 calentamientos y al menos 30
 ~~~powershell
 & $Python .\resultados\p5-05-benchmark.py --weights $Weights --image $Central --output (Join-Path $ReviewDir 'latencia-windows.json')
 ~~~
+
+El benchmark exige un nombre de salida nuevo y rechaza un archivo o enlace
+final existente; para repetirlo, usar otro nombre. Los directorios padres
+enlazados pueden redirigir la salida y deben ser confiables. Registrar el
+SHA-256 de la imagen antes y después de medir; si cambia, descartar esa serie.
 
 Entregar: (1) commit revisado, SO/CPU/RAM y versiones; (2) SHA-256 de pesos, config y cada JPEG; (3) cuatro JSONL y resultado de python -m contrato; (4) PNG con cajas y juicio visual, incluida la escena vacía; (5) resultados específicos de varios_1/varios_2 y conclusión de aceptabilidad; (6) diferencias numéricas frente a macOS, si son los mismos bytes; (7) transcript/captura del comando; (8) latencia Windows si se ejecutó. El registro puede añadirse a una copia de este archivo o en un documento nuevo, **sin modificar la evidencia macOS**.
 
