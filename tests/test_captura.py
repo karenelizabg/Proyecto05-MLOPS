@@ -403,6 +403,53 @@ def test_el_limite_incluye_las_cabeceras_lentas(tmp_path, monkeypatch, capsys):
     assert not (tmp_path / "S01").exists()
 
 
+@pytest.mark.parametrize(
+    ("cabeceras", "inicio_cuerpo"),
+    [
+        (b"", b""),
+        (b"Transfer-Encoding: chunked\r\n", b"FFFFF\r\n"),  # como manda el firmware
+    ],
+    ids=["sin_longitud", "chunked"],
+)
+def test_el_limite_corta_una_lectura_lenta_del_cuerpo(
+    tmp_path, monkeypatch, capsys, cabeceras, inicio_cuerpo
+):
+    # Caso de Heri en #67: cabeceras completas y luego el JPEG a un byte cada rato. El servidor
+    # cierra hasta los 3 s; si el comando acaba antes de 2 s, fue porque él cortó.
+    monkeypatch.setattr(cli, "MARGEN_CORTE_S", 0.2)
+    servidor = socket.create_server(("127.0.0.1", 0))
+    fin = threading.Event()
+    datos = jpeg(n=1)
+
+    def goteo():
+        conexion, _ = servidor.accept()
+        with conexion:
+            conexion.sendall(b"HTTP/1.1 200 OK\r\n" + cabeceras + b"\r\n" + inicio_cuerpo)
+            conexion.sendall(b"Content-Length: %d\r\n\r\n" % len(datos))
+            for byte in datos[:60]:
+                if fin.wait(0.05):
+                    return
+                conexion.sendall(bytes([byte]))
+
+    hilo = threading.Thread(target=goteo, daemon=True)
+    hilo.start()
+    url = f"http://127.0.0.1:{servidor.getsockname()[1]}/stream"
+    args = ["--url", url, "--secuencia", "S01", "--sin-pausa", "--salida", str(tmp_path)]
+    inicio = time.monotonic()
+    try:
+        resultado = cli.main([*args, "--limite-s", "0.3"])
+        duracion = time.monotonic() - inicio
+    finally:
+        fin.set()
+        hilo.join(5)
+        servidor.close()
+
+    assert resultado == 1
+    assert duracion < 2
+    assert "tiempo límite" in capsys.readouterr().err
+    assert not (tmp_path / "S01").exists()
+
+
 def test_una_falla_al_escribir_no_deja_nada_a_medias(tmp_path, camara, monkeypatch, capsys):
     camara([jpeg(n=n) for n in range(3)], [0, 200, 400])
     escritos = []
