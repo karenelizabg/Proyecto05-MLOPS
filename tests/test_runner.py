@@ -102,6 +102,19 @@ def test_tabla_de_los_diez_casos_y_sale_1_si_alguno_falla(tmp_path, capsys):
         assert (salida / caso / "veredicto.json").is_file()
 
 
+def test_el_detalle_apunta_a_la_carpeta_de_salida_que_se_uso(tmp_path, capsys):
+    """T18: con --salida fuera del repo, el aviso no manda a buscar en resultados/casos/."""
+    salida = tmp_path / "salida"
+    correr("C1", "--salida", str(salida))
+    assert f"(detalle en {salida / 'Cn' / 'veredicto.json'}):" in capsys.readouterr().out
+
+
+def test_dentro_del_repo_el_detalle_va_relativo():
+    """Así resumen.txt, que se sube, no trae la ruta de la máquina de quien lo corrió."""
+    fallo = {"caso": "C1", "entrada": None, "tramos": [], "pasa": False, "motivos": ["x"]}
+    assert "(detalle en resultados/casos/Cn/veredicto.json):" in runner.tabla([fallo])
+
+
 def test_los_registros_quedan_en_resultados_casos_cn(tmp_path):
     salida = tmp_path / "salida"
     correr("C10", "--salida", str(salida))
