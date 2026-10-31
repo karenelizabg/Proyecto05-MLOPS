@@ -13,7 +13,8 @@ salen de la corrida final de P5-15 (`python -m bench`) y de `python -m bench.lim
   plazos de B, con p50, p95 y máximo medidos sobre 100 ejecuciones después de 10 calentamientos.
 - Que cada cuadro de las secuencias produce un evento del contrato v1 y que B responde con el comando que
   dicta su política, incluidos los casos de cuadro viejo, timeout del detector y ausencia de cuadros (C8, C9).
-- Que todo lo anterior se reproduce desde los archivos del repositorio con los hashes registrados.
+- Que todo lo anterior se reproduce desde los archivos del repositorio con los hashes registrados:
+  `bench.limites` comprueba que los CSV de la corrida tengan el SHA-256 que registró `resumen.json`.
 
 ## Qué no acredita
 
@@ -43,6 +44,20 @@ El intervalo es el mayor entre el periodo de entrada y `total_ms`. Cada fila lle
 (hasta el máximo queda dentro), **cumple en p95** (el máximo lo pasa: algún cuadro se pierde o llega tarde) o
 **no cumple** (el p95 lo pasa).
 
+Las filas no son independientes:
+
+- **La edad depende de la cola.** Si procesar tarda más que el periodo de entrada, cada cuadro espera a que
+  termine el anterior, así que su edad pasa de `total_ms`. Por eso la fila de la edad nunca sale mejor que la
+  del periodo: si el p95 pasa el periodo, la cola crece sin límite y la edad **no cumple** aunque `total_ms`
+  esté lejos de 500 ms.
+- **El intervalo no cambia con la cola.** Con cola, los eventos salen uno tras otro, cada `total_ms`, así que
+  la validez de la orden y el watchdog se comparan igual.
+
+**Para salir con `0` debe cumplir el máximo, no solo el p95.** `plazos.yaml` pide contrastar el p95, y la
+tabla lo hace (con su margen), pero B decide cuadro por cuadro: un solo cuadro que pasa `max_frame_age_ms` o
+`detector_timeout_ms` ya es un STOP. Un **cumple en p95** se reporta tal cual, con salida `1`, para que se vea
+y se explique en vez de esconderlo en un percentil.
+
 **Resultado:** *Pendiente* — enlazar `mediciones/<run>/contraste.md` de la corrida final.
 
 ## Declarado y reproducido
@@ -54,8 +69,9 @@ El intervalo es el mayor entre el periodo de entrada y `total_ms`. Cada fila lle
 | **Reproducido** | p50/p95/máximo por etapa, fallos aparte, hardware y energía de la corrida. | `mediciones/<run>/resumen.json`, `ejecuciones.csv`, `fallos.csv` |
 | **Reproducido** | Veredicto de cada plazo. | `mediciones/<run>/contraste.md` y `contraste.json` |
 
-`bench.limites` avisa (y no sale con `0`) si la corrida tiene advertencias, quedó incompleta, no midió la etapa
-de B, o si `plazos.yaml` cambió desde que se midió.
+`bench.limites` avisa (y no sale con `0`) si la corrida tiene advertencias, quedó incompleta, tuvo fallos
+(aunque no entren en p50/p95), no midió la etapa de B, se contrasta con otro periodo que el de PEND-09, o si
+`plazos.yaml` o los CSV cambiaron desde que se midió.
 
 ## Lo que ya se vio (antes de la medición final)
 
@@ -73,13 +89,23 @@ Lo que deja: en batería no se cumplen los plazos, así que la corrida final va 
 lo advierte). El número de hilos cambia el resultado a casi la mitad, así que el detector de P5-05 debe fijarlo y
 `resumen.json` registrarlo.
 
+Otros dos hallazgos, ya reportados en la revisión de P5-05 (#75):
+
+- **El reloj de `infer`:** en el primer recorrido real (T16, `docs/recorrido-real.md`) los cuadros llegaron a
+  B con unos 35 s de edad y todos terminaron en STOP por `cuadro_viejo`, porque la carga y el calentamiento
+  del modelo entraban en el reloj del run. El benchmark los deja fuera; `infer` también debe hacerlo.
+- **Los hilos de `infer`:** `config/detector.json` pide 1 hilo, pero Ultralytics lo cambia a 7 al preparar el
+  predictor. El adaptador del benchmark (`bench.yolo`) vuelve a fijar el de la configuración y registra el
+  que de verdad quedó.
+
 ## Conjunto, umbrales y condiciones
 
-- **Conjunto:** *Pendiente* (P5-09 a P5-11). Es chico: 8 secuencias, del orden de 60 cuadros, todas de
-  evaluación (D-06). Las métricas tienen la incertidumbre de una muestra así de chica.
+- **Conjunto:** 8 secuencias (S01–S08), todas de evaluación (D-06), con 107 cuadros anotados en P5-10. E3
+  pide al menos 60. *Pendiente:* la cifra y el hash finales al congelar (P5-11). Es un conjunto chico: las
+  métricas tienen la incertidumbre de una muestra así. S09 y S10 son solo para las pruebas de B y no cuentan.
 - **Umbrales:** `conf` 0.25 e `iou` 0.70, propuestos en P5-04 (`modelo/configuracion.p5-04.propuesta.json`),
   fijados antes de correr sobre los cuadros. *Pendiente:* el hash de la configuración congelada de P5-05.
-- **Objetos y escena (PEND-04):** interior, piso plano, buena luz. *Pendiente:* los objetos elegidos finalmente.
+- **Objetos y escena (PEND-04):** botella (39) y taza (41), según P5-03; interior, piso plano, buena luz.
 - **Iluminación:** solo luz de interior. No se probó con poca luz, contraluz ni exteriores.
 
 ## Lo que el equipo no pudo probar

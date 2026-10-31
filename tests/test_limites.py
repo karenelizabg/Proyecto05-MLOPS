@@ -54,6 +54,13 @@ def resumen_de(inferencia, total, advertencias=(), sha_plazos=None):
 @pytest.fixture
 def corrida(tmp_path):
     def escribir(resumen):
+        # Como el arnés: los CSV junto a la corrida y su SHA-256 en resumen.json.
+        if isinstance(resumen, dict) and "archivos" not in resumen:
+            for nombre in ("ejecuciones.csv", "fallos.csv"):
+                (tmp_path / nombre).write_text(nombre, encoding="utf-8")
+            resumen["archivos"] = {
+                n: sha256_archivo(tmp_path / n) for n in ("ejecuciones.csv", "fallos.csv")
+            }
         (tmp_path / "resumen.json").write_text(json.dumps(resumen), encoding="utf-8")
         return tmp_path
 
@@ -99,7 +106,21 @@ def test_maximo_sobre_el_periodo_es_cumple_en_p95(corrida):
     filas = {f["id"]: f for f in leer(carpeta)["contraste"]}
     assert filas["total_vs_periodo"]["veredicto"] == CUMPLE_EN_P95
     assert filas["total_vs_periodo"]["margen_p95_ms"] == pytest.approx(21)
-    assert filas["total_vs_edad"]["veredicto"] == CUMPLE
+    # 210 ms está lejos de los 500 de edad, pero el cuadro que llega detrás del lento espera.
+    assert filas["total_vs_edad"]["veredicto"] == CUMPLE_EN_P95
+    assert "cola" in filas["total_vs_edad"]["razon"]
+
+
+def test_con_cola_que_crece_la_edad_no_cumple(corrida):
+    # total_ms nunca pasa los 500 ms de edad, pero el p95 pasa el periodo: la cola no tiene fin.
+    carpeta = corrida(resumen_de(inferencia=(200, 300, 350), total=(250, 300, 480)))
+    assert main([str(carpeta)]) == 1
+    filas = {f["id"]: f for f in leer(carpeta)["contraste"]}
+    assert filas["total_vs_periodo"]["veredicto"] == NO_CUMPLE
+    assert filas["total_vs_edad"]["veredicto"] == NO_CUMPLE
+    assert "crece sin límite" in filas["total_vs_edad"]["razon"]
+    # Con cola, los eventos salen uno tras otro: el intervalo sigue siendo total_ms.
+    assert filas["intervalo_vs_watchdog"]["veredicto"] == CUMPLE
 
 
 def test_en_bateria_no_cumple(corrida):
@@ -110,10 +131,53 @@ def test_en_bateria_no_cumple(corrida):
     assert filas["total_vs_edad"]["veredicto"] == NO_CUMPLE
 
 
-def test_otro_periodo_de_entrada(corrida):
+def test_otro_periodo_de_entrada_se_advierte(corrida):
+    # A 250 ms todo cumpliría, pero no es el periodo declarado: no puede salir con 0.
     carpeta = corrida(resumen_de(inferencia=(134, 167, 203), total=(142, 179, 210)))
-    assert main([str(carpeta), "--periodo-ms", "250"]) == 0
-    assert leer(carpeta)["plazos"]["periodo_entrada_ms"] == 250
+    assert main([str(carpeta), "--periodo-ms", "250"]) == 1
+    contraste = leer(carpeta)
+    assert {f["veredicto"] for f in contraste["contraste"]} == {CUMPLE}
+    assert contraste["plazos"]["periodo_entrada_ms"] == 250
+    assert "PEND-09 declara 200" in contraste["plazos"]["fuente_periodo"]
+    assert any("--periodo-ms" in a for a in contraste["advertencias"])
+
+
+def test_fallos_no_salen_con_cero(corrida):
+    resumen = resumen_de((80, 100, 155), (87, 113, 162))
+    resumen["conteos"]["fallos"] = 10
+    carpeta = corrida(resumen)
+    assert main([str(carpeta)]) == 1
+    assert any("10 ejecuciones fallaron" in a for a in leer(carpeta)["advertencias"])
+
+
+def test_incompleta_sin_mediciones_advierte(corrida):
+    resumen = resumen_de((80, 100, 155), (87, 113, 162))
+    resumen["estado"], resumen["etapas"] = "incompleto", {}
+    resumen["conteos"].update(mediciones=0, fallos=11)
+    carpeta = corrida(resumen)
+    assert main([str(carpeta)]) == 1
+    contraste = leer(carpeta)
+    assert contraste["contraste"] == []
+    assert any("incompleta" in a for a in contraste["advertencias"])
+    assert any("sin mediciones de" in a for a in contraste["advertencias"])
+
+
+def test_un_csv_que_cambio(corrida):
+    carpeta = corrida(resumen_de((80, 100, 155), (87, 113, 162)))
+    (carpeta / "fallos.csv").write_text("otro", encoding="utf-8")
+    (carpeta / "ejecuciones.csv").unlink()
+    assert main([str(carpeta)]) == 1
+    advertencias = leer(carpeta)["advertencias"]
+    assert any("fallos.csv cambió" in a for a in advertencias)
+    assert any("falta ejecuciones.csv" in a for a in advertencias)
+
+
+def test_sin_hashes_de_los_csv(corrida):
+    resumen = resumen_de((80, 100, 155), (87, 113, 162))
+    resumen["archivos"] = {}
+    carpeta = corrida(resumen)
+    assert main([str(carpeta)]) == 1
+    assert any("no registra el SHA-256" in a for a in leer(carpeta)["advertencias"])
 
 
 def test_corrida_con_advertencias_no_es_la_del_entregable(corrida):
@@ -171,10 +235,70 @@ def test_resumen_que_no_es_json(tmp_path):
         cargar_resumen(tmp_path)
 
 
-def test_periodo_invalido(corrida):
+@pytest.mark.parametrize("periodo", ["0", "-5", "nan", "inf", "abc"])
+def test_periodo_invalido(corrida, periodo):
     carpeta = corrida(resumen_de((80, 100, 155), (87, 113, 162)))
-    with pytest.raises(SystemExit):
-        main([str(carpeta), "--periodo-ms", "0"])
+    with pytest.raises(SystemExit) as salida:
+        main([str(carpeta), "--periodo-ms", periodo])
+    assert salida.value.code == 2
+
+
+def _nan_en_etapas(r):
+    r["etapas"]["total_ms"]["p95"] = float("nan")
+
+
+def _bool_en_etapas(r):
+    r["etapas"]["inferencia_ms"]["maximo"] = True
+
+
+def _conteos_null(r):
+    r["conteos"] = None
+
+
+def _fallos_negativos(r):
+    r["conteos"]["fallos"] = -1
+
+
+def _config_b_texto(r):
+    r["procedencia"]["config_b"] = "plazos"
+
+
+def _sin_estado(r):
+    del r["estado"]
+
+
+def _no_es_objeto(r):
+    r.clear()
+
+
+@pytest.mark.parametrize(
+    "romper",
+    [
+        _nan_en_etapas,
+        _bool_en_etapas,
+        _conteos_null,
+        _fallos_negativos,
+        _config_b_texto,
+        _sin_estado,
+        _no_es_objeto,
+    ],
+)
+def test_entradas_invalidas_salen_con_dos(corrida, romper, capsys):
+    resumen = resumen_de((80, 100, 155), (87, 113, 162))
+    romper(resumen)
+    carpeta = corrida(resumen)
+    assert main([str(carpeta)]) == 2
+    assert "no se contrasta" in capsys.readouterr().err
+    assert not (carpeta / "contraste.json").exists()
+
+
+def test_salida_dos_borra_el_contraste_anterior(corrida):
+    carpeta = corrida(resumen_de((80, 100, 155), (87, 113, 162)))
+    assert main([str(carpeta)]) == 0
+    (carpeta / "resumen.json").write_text("{", encoding="utf-8")
+    assert main([str(carpeta)]) == 2
+    assert not (carpeta / "contraste.json").exists()
+    assert not (carpeta / "contraste.md").exists()
 
 
 def test_sobre_una_corrida_real_del_arnes(tmp_path, monkeypatch):

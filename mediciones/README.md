@@ -92,10 +92,13 @@ uv run python -m bench.limites mediciones/<run>/ [--config-control config/contro
 
 Lee el `resumen.json` de la corrida y `plazos.yaml` de B, y escribe junto a la corrida `contraste.json` y
 `contraste.md`: p50/p95/máximo contra cada plazo, con veredicto (**cumple**, **cumple en p95**, **no cumple**),
-margen y razón. `--periodo-ms` es el ritmo de entrada de PEND-09 (200 ms, provisional).
+margen y razón. `--periodo-ms` es el ritmo de entrada de PEND-09 (200 ms, provisional); con otro valor se
+contrasta igual, pero queda como advertencia. La fila de la edad tiene en cuenta la cola (ver
+[`LIMITES.md`](LIMITES.md#contraste-con-los-plazos)).
 
-**Código de salida:** `0` todo cumple y la corrida es la del entregable · `1` algo no cumple del todo, o la
-corrida tiene advertencias, quedó incompleta, no midió B o se midió con otros plazos · `2` no se puede leer la
-corrida o los plazos (no se escribe nada).
+**Código de salida:** `0` todo cumple hasta el máximo y la corrida es la del entregable · `1` algo no cumple
+del todo, o la corrida tiene advertencias o fallos, quedó incompleta, no midió B, usa otro periodo que el de
+PEND-09, o sus plazos o CSV cambiaron · `2` no se puede leer la corrida, los plazos o los argumentos (valores
+no finitos, tipos inválidos); no queda ningún `contraste.*`, ni siquiera uno anterior.
 
 Qué acredita y qué no el control virtual, y lo que no se midió: [`LIMITES.md`](LIMITES.md).
