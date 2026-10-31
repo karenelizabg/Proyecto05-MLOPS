@@ -7,11 +7,13 @@ offline, en CPU y **sin mover motores**: el comando solo queda escrito en `coman
 cuadro real → infer (A, P5-05) → eventos .jsonl → python -m contrato → python -m control → comandos.jsonl
 ```
 
-> **Estado (2026-10-31):** ya corrió la secuencia de **izquierda** (S09) con el detector real.
-> El detector y las zonas salen bien, pero todos los cuadros llegan a B con unos 35 s de edad y
-> terminan en STOP por `cuadro_viejo`: es un problema de tiempos de `infer` (ver
-> [Diferencias encontradas](#diferencias-encontradas)). Faltan las secuencias de **derecha** y
-> **centro**. Lo de [Ya comprobado](#ya-comprobado) se probó con secuencias armadas.
+> **Estado (2026-10-31):** ya corrieron **izquierda** (S09) y **derecha** (S10) con el detector
+> real. El detector y las zonas salen bien, y la política da giros opuestos en las dos, pero todos
+> los cuadros llegan a B con más de 30 s de edad y terminan en STOP por `cuadro_viejo`: es un
+> problema de tiempos de `infer` (ver [Diferencias encontradas](#diferencias-encontradas)). Cuando
+> entre el arreglo en `infer`, se vuelven a correr S09 y S10 y se actualiza el commit citado (hoy
+> `bfe7644`). Falta **centro**. Lo de [Ya comprobado](#ya-comprobado) se probó con secuencias
+> armadas.
 
 ## Qué hace falta de A1
 
@@ -20,8 +22,12 @@ cuadro real → infer (A, P5-05) → eventos .jsonl → python -m contrato → p
 - [x] Los pesos `yolo11n.pt` (release v8.3.0 de Ultralytics) con el SHA-256 que exige
   `config/detector.json`, y su `config_sha256`.
 - [ ] Que `infer` caliente el predictor antes de arrancar el reloj del run (ver
-  [Tiempos](#diferencias-encontradas)).
-- [ ] Tres secuencias reales: **izquierda** (S09, lista), **derecha** y **centro**.
+  [Tiempos](#diferencias-encontradas)). Cuando entre, se vuelven a correr S09 y S10.
+- [ ] Tres secuencias reales: **izquierda** (S09, lista), **derecha** (S10, lista) y **centro**.
+  - S09 y S10 son las secuencias de prueba del grupo B de `datos/DOMINIO.md`: la taza toca el
+    centro, cargada a la izquierda y a la derecha.
+  - Para **centro** se usa una **toma de prueba aparte**: S02 a S08 no se usan hasta que se
+    congelen.
   - En las de izquierda y derecha, el obstáculo debe **tocar el centro**, cargado hacia un lado.
     Un obstáculo que solo está a un lado deja el centro libre y la política avanza recto en los
     dos casos, así que no habría comandos opuestos que comparar (ver
@@ -46,6 +52,10 @@ uv run --locked python -m infer --input <carpeta con los JPEG de S09> \
     --capture-ms 0 --capture-ms 203 --capture-ms 484 --capture-ms 687 \
     --capture-ms 906 --capture-ms 1140 --capture-ms 1390 --capture-ms 1593 \
     --capture-ms 1812 --capture-ms 2031 --capture-ms 2297 --capture-ms 2531
+
+#    Para der (S10): --output resultados/recorrido-real/der/detector.jsonl
+#    --run-id recorrido-real-der --sequence-id S10 y los t_capture_ms de su captura.jsonl:
+#    0 250 500 750 985 1188 1391 1688 1954 2157 2360 2563
 
 # 2. Validar la salida del detector contra el contrato v1. Debe salir 0.
 PYTHONPATH=src python -m contrato resultados/recorrido-real/izq/detector.jsonl
@@ -80,18 +90,19 @@ Los archivos de cada corrida están en `resultados/recorrido-real/<secuencia>/`:
 | Secuencia | `run_id` | Cuadros | `contrato` | `control` | Acciones por cuadro |
 |---|---|---|---|---|---|
 | izq (S09) | `recorrido-real-izq` | 12 | 0 (12 eventos OK) | 0 (13 comandos, 12 errores) | STOP 12, todos por `cuadro_viejo` |
-| der | PENDIENTE | | | | |
-| centro | PENDIENTE | | | | |
+| der (S10) | `recorrido-real-der` | 12 | 0 (12 eventos OK) | 0 (13 comandos, 12 errores) | STOP 12, todos por `cuadro_viejo` |
+| centro | PENDIENTE (toma de prueba aparte) | | | | |
 
 - `model_sha256`: `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1`
 - `config_sha256`: `bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf`
-- Código: `infer` en `bfe7644` (`p5-05-detector-infer`); B en la rama `p5-t16-recorrido-real`.
-- Los JPEG de S09 y su `captura.jsonl` no están en el repo: son de A (P5-09). Antes de correr se
-  comprobó que el SHA-256 de cada JPEG coincide con el de `captura.jsonl`.
+- Código: `infer` en `bfe7644` (`p5-05-detector-infer`), el mismo en S09 y S10; B en `main`.
+- Los JPEG de S09 y S10, su `captura.jsonl` y sus anotaciones no están en el repo: son de A
+  (P5-09; van en `datos/pruebas-b/` cuando entren). Antes de correr se comprobó que el SHA-256 de cada JPEG coincide
+  con el de `captura.jsonl`.
 
 **`frame_id`:** `infer` numera los cuadros `f000001` a `f000012` en el orden de los nombres de
 los JPEG, sin usar el nombre (`config/DETECTOR.md`, paso 4). En S09, `f000001` es `S09_f0001.jpg`
-y así hasta `f000012`. Los mismos `frame_id` siguen en `detecciones.jsonl`, `decisiones.jsonl`,
+y así hasta `f000012`; en S10, igual con `S10_f0001.jpg`. Los mismos `frame_id` siguen en `detecciones.jsonl`, `decisiones.jsonl`,
 `comandos.jsonl` y `errores.jsonl`: los 12 llegan a su comando.
 
 ### Izquierda y derecha: ¿comandos opuestos?
@@ -107,7 +118,14 @@ deshacer el *letterbox*).
   cuadros porque llegan viejos. Como diagnóstico (fuera de los registros), las mismas
   detecciones pasadas directo a `control.politica.decidir` dan **`GIRAR_DER` con
   `steering 0.5` en los 12 cuadros**: es lo que saldrá cuando `infer` entregue cuadros frescos.
-- **Derecha:** PENDIENTE, falta la secuencia.
+- **Derecha (S10):** la taza aparece a la derecha del centro, y la caja también: `x` de 220 a
+  473 en el primer cuadro (`centro` y `der`) y de 208 a 466 en el último (`centro`). El centro
+  de la caja queda entre x = 337 y 347, a la derecha de 320. Con el mismo diagnóstico, la
+  política da **`GIRAR_IZQ` con `steering -0.5` en los 12 cuadros**.
+
+Los comandos salen **opuestos**: `GIRAR_DER` en S09 y `GIRAR_IZQ` en S10, con `steering` del
+mismo tamaño y signo contrario. Las `x` no están invertidas. Se confirma en los registros cuando
+los cuadros lleguen frescos.
 
 ### Un cuadro seguido de punta a punta
 
@@ -123,23 +141,26 @@ f000012 · run recorrido-real-izq · status ok · captura 2531.0 ms · llegada 3
 
 ## Diferencias encontradas
 
-| Qué | Cómo se revisa | Encontrado (izq, S09) |
+| Qué | Cómo se revisa | Encontrado (izq S09 y der S10) |
 |---|---|---|
-| Coordenadas | Las cajas están en píxeles del cuadro **original**, con `image_width` e `image_height` reales; la caja cae del lado en que se ve el objeto en la foto. | Sin diferencia: 640×480, `xyxy` en píxeles, y la caja cae donde se ve la taza. |
-| Clases | Cada `class_id` está en `modelo/clases.json`, y el obstáculo filmado tiene un `class_id` de `clases_obstaculo` (`[39, 41]`: botella y taza, definitivas desde T12). | Sin diferencia: `cup` (41) en los 12 cuadros, con confianza de 0.76 a 0.93. |
-| Tiempos | `t_capture_ms` crece por secuencia, `t_emit_ms ≥ t_capture_ms` y la edad `t_emit_ms − t_capture_ms` queda debajo de `max_frame_age_ms` (500 ms). | **Diferencia.** La edad es de unos 35 000 ms en todos los cuadros (ver abajo). |
-| Hashes | Un solo `model_sha256` y un solo `config_sha256` por run. | Sin diferencia. |
+| Coordenadas | Las cajas están en píxeles del cuadro **original**, con `image_width` e `image_height` reales; la caja cae del lado en que se ve el objeto en la foto. | Sin diferencia: 640×480, `xyxy` en píxeles, y la caja cae donde se ve la taza. Contra las anotaciones de A, el IoU va de 0.87 a 0.96 en S09 y de 0.91 a 0.98 en S10. |
+| Clases | Cada `class_id` está en `modelo/clases.json`, y el obstáculo filmado tiene un `class_id` de `clases_obstaculo` (`[39, 41]`: botella y taza, definitivas desde T12). | Sin diferencia: `cup` (41) en los 12 cuadros de cada una, con confianza de 0.76 a 0.93 en S09 y de 0.88 a 0.95 en S10. |
+| Tiempos | `t_capture_ms` crece por secuencia, `t_emit_ms ≥ t_capture_ms` y la edad `t_emit_ms − t_capture_ms` queda debajo de `max_frame_age_ms` (500 ms). | **Diferencia.** La edad es de unos 35 000 ms en S09 y de unos 32 000 ms en S10, en todos los cuadros (ver abajo). |
+| Hashes | Un solo `model_sha256` y un solo `config_sha256` por run. | Sin diferencia, y los mismos en las dos. |
 
 **Tiempos.** El primer cuadro sale con `t_emit_ms` de 35 797 ms. Después cada inferencia tarda
 unos 150 ms, pero toda la secuencia ya va atrasada: el último cuadro se capturó a los 2 531 ms y
-salió a los 37 562 ms. Al repetir el mismo comando, el atraso fue de unos 18 s. La causa está en
+salió a los 37 562 ms. Al repetir el mismo comando, el atraso fue de unos 18 s. En S10 pasa lo
+mismo: el primer cuadro sale a los 32 422 ms y el último (capturado a los 2 563 ms) a los
+34 156 ms. La causa está en
 `src/infer/eventos.py` (`ejecutar_run`): el origen del reloj se fija después de cargar los pesos,
 pero **antes de la primera inferencia**, que prepara el predictor de Ultralytics y en esta laptop
 Windows tarda decenas de segundos. B hace lo que debe: rechaza los cuadros por edad (más de
 500 ms) y manda STOP.
 
 No toca el contrato, y no se corrige a mano ni en B: se arregla en `infer` (P5-05), por ejemplo
-con una inferencia de calentamiento antes de fijar el origen. Después se vuelve a correr S09.
+con una inferencia de calentamiento antes de fijar el origen. Después se vuelven a correr S09 y
+S10 con el commit nuevo, y se actualiza aquí el commit citado.
 
 Si aparece una diferencia, **no se corrige a mano** en los archivos de salida ni en el código de B
 para que cuadre. Se corrige donde está el problema, y si toca al contrato, con el contrato

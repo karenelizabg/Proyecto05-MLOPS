@@ -1,0 +1,12 @@
+{"run_id": "recorrido-real-der", "frame_id": "f000001", "t_ms": 32422.00000002049, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32422.00000002049 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000002", "t_ms": 32594.00000004098, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32344.00000004098 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000003", "t_ms": 32813.00000008196, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32313.000000081956 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000004", "t_ms": 32952.99999997951, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32202.99999997951 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000005", "t_ms": 33125.0, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32140.0 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000006", "t_ms": 33313.00000008196, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32125.000000081956 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000007", "t_ms": 33484.00000017136, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 32093.000000171363 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000008", "t_ms": 33625.0, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 31937.0 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000009", "t_ms": 33734.00000017136, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 31780.000000171363 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000010", "t_ms": 33859.00000017136, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 31702.000000171363 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000011", "t_ms": 34016.00000006147, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 31656.000000061467 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "f000012", "t_ms": 34156.00000019185, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 31593.000000191852 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
