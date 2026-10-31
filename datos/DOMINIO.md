@@ -189,9 +189,18 @@ en su posición toda la toma. **S9 es la más arriesgada:** en P5-04 la taza a l
 
 La caja de la taza debe medir **menos de 350 px de ancho**. Si es muy ancha, también ocupa los dos
 lados y la política da STOP en lugar de girar: con la política de `main`, desde 398 px con el centro
-en x = 290 o x = 350, y desde 354 px en x = 305. S10 se filmó con el centro en **x = 337–347**
-según el detector, debajo de los 350 del plan; ahí sigue dando GIRAR_IZQ con cajas de menos de
-360 px. Cada una lleva **12 cuadros**.
+en x = 290 o x = 350, y desde 354 px en x = 305. El margen depende del centro: con 349 px hay STOP
+si cae entre x = 307 y 333, y con menos de 311 px no hay STOP en ninguna posición.
+
+Cada una lleva **12 cuadros**. Medido con YOLO11n (`conf` 0.25, `iou` 0.7, `imgsz` 640) en todos:
+
+| Secuencia | Confianza | Ancho de la caja | Centro de la caja | Política de `main` |
+|---|---|---|---|---|
+| S9 | 0.76–0.93 | 149–166 px | x = 260–296 | GIRAR_DER en los 12 |
+| S10 | 0.88–0.95 | 253–264 px | x = 337–347 | GIRAR_IZQ en los 12 |
+
+Las dos quedan debajo de 311 px. S9 llega a x = 296, arriba de los 290 del plan, y S10 queda debajo
+de los 350; se conservan porque la política gira hacia el lado esperado en todos los cuadros.
 
 S9 y S10 se anotan con el mismo criterio que las demás, pero sus anotaciones van en
 **`datos/pruebas-b/anotaciones.jsonl`**, no en `datos/anotaciones.jsonl`: `conjunto manifiesto`
@@ -214,7 +223,8 @@ se comprueba además que, acercando la taza, sale **al menos un cuadro con `cup`
 0.50** (el detector la emite, la política la ignora) y otro con **0.50 o más**; si no, se cambia la
 distancia o la luz de S7, sin tocar los umbrales congelados. Estas tomas son de selección como las
 de P5-04: **no** entran a `datos/` ni a las métricas (D-06). Si una posición no se detecta, se
-ajusta la distancia o la separación y se vuelve a probar antes de filmar.
+ajusta la distancia o la separación y se vuelve a probar antes de filmar. **S7 no se refilma por lo
+que diga el detector:** una vez filmada, esa toma es la definitiva (PM A, 2026-10-31).
 
 ### Cómo se filma
 
@@ -240,5 +250,6 @@ ajusta la distancia o la separación y se vuelve a probar antes de filmar.
 - [ ] Conseguir una segunda botella para S5.
 - [ ] Medir el borrador y la tapa de S8 y comprobarlos con el carro.
 - [ ] Grupo B: `clases_obstaculo: [39, 41]` en la política (PR #64 de Hannah).
-- [ ] Tomas de prueba de cada posición, de S5, de S9 y de S10 antes de filmar.
+- [x] Tomas de prueba de cada posición, de S5, de S7 (C6), de S9 y de S10 antes de filmar. En S7, `cup`
+  salió entre 0.30 y 0.42 en cuatro fotos y entre 0.51 y 0.57 en dos.
 - [ ] Quién ayuda a filmar y cuándo.
