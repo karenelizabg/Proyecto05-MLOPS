@@ -1,8 +1,9 @@
 # Dominio de obstáculos y plan de filmación (P5-03)
 
 Qué ve el carro, qué cuenta como obstáculo, qué no cubre el sistema y cómo se filman las 10
-secuencias: S1–S8 son la evaluación (E3) y S9–S10 son solo para las pruebas del grupo B. Las medidas del carro y la configuración de la cámara están en
-[`CARRO.md`](CARRO.md); aquí solo se resumen.
+secuencias: S1–S8 son la evaluación (E3) y S9–S10 son solo para las pruebas del grupo B. Las
+medidas del carro y la configuración de la cámara están en [`CARRO.md`](CARRO.md); aquí solo se
+resumen.
 
 ## Sin ajuste (D-06)
 
@@ -107,8 +108,9 @@ S8 usa el **borrador, la tapa y el cable**, los transitables que nombra la expec
 (`casos/C1/expectativa.yaml`), para que el plan y el caso coincidan. La cajita y el cuaderno
 quedan como transitables comprobados, pero no se filman.
 
-Se comprobó empujando el carro a mano (2026-10-28). Con los motores sin alimentar las llantas giran duro, porque
-arrastran la reducción de los motores; esa resistencia es del motor, no del objeto.
+Se comprobó empujando el carro a mano (2026-10-28). Con los motores sin alimentar las llantas
+giran duro, porque arrastran la reducción de los motores; esa resistencia es del motor, no del
+objeto.
 
 Un transitable puede salir en el detector con una clase de COCO que no está entre las elegidas
 (el cuaderno como `book`): esa detección no cuenta como obstáculo para la política, y el detector
@@ -138,9 +140,9 @@ llantas no los pasan, no son transitables.
 
 ## Plan de filmación
 
-Son 10 secuencias: S1–S8 de evaluación y S9–S10 solo para las pruebas del grupo B. Los casos C8 y C9 (sin cuadros, cuadro viejo, errores del
-detector) no salen de video: son entradas fallidas que arma P5-12. C10 (emergencia) es del grupo
-B y puede usar cualquier secuencia.
+Son 10 secuencias: S1–S8 de evaluación y S9–S10 solo para las pruebas del grupo B. Los casos C8 y
+C9 (sin cuadros, cuadro viejo, errores del detector) no salen de video: son entradas fallidas que
+arma P5-12. C10 (emergencia) es del grupo B y puede usar cualquier secuencia.
 
 | Seq | Escena | Objetos | Casos | Estado esperado |
 |---|---|---|---|---|
@@ -185,8 +187,16 @@ S10, sin acercarse a x = 320, donde la política rompe el empate hacia la izquie
 en su posición toda la toma. **S9 es la más arriesgada:** en P5-04 la taza a la izquierda quedó en
 0.30, debajo del umbral de 0.50.
 
-S9 y S10 se anotan igual que las demás, pero se guardan **fuera de `datos/cuadros/`**, porque el
-manifiesto y el benchmark toman todo lo que hay ahí:
+La caja de la taza debe medir **menos de 350 px de ancho**. Si es muy ancha, también ocupa los dos
+lados y la política da STOP en lugar de girar: con la política de `main`, desde 398 px con el centro
+en x = 290 o x = 350, y desde 354 px en x = 305. S10 se filmó con el centro en **x = 337–347**
+según el detector, debajo de los 350 del plan; ahí sigue dando GIRAR_IZQ con cajas de menos de
+360 px. Cada una lleva **12 cuadros**.
+
+S9 y S10 se anotan con el mismo criterio que las demás, pero sus anotaciones van en
+**`datos/pruebas-b/anotaciones.jsonl`**, no en `datos/anotaciones.jsonl`: `conjunto manifiesto`
+falla si hay una anotación sin cuadro capturado. Sus cuadros se guardan **fuera de
+`datos/cuadros/`**, porque el manifiesto y el benchmark toman todo lo que hay ahí:
 
 ```bash
 python -m captura --url http://<ip>:81/stream --secuencia S09 --salida datos/pruebas-b
@@ -199,8 +209,8 @@ Los intentos fallidos quedan en `datos/pruebas-b/_fallidas/` y no se suben.
 
 Antes de filmar se hacen **tomas de prueba aparte**, con la misma cámara y el mismo lugar, para
 comprobar que botella y taza se detectan con 0.50 o más en la posición y la distancia de cada
-secuencia, en S5 las tres a la vez y en S9 y S10 la taza en la posición de cada una. Para S7 (C6) se comprueba además que, acercando la taza, sale
-**al menos un cuadro con `cup` entre 0.25 y 0.50** (el detector la emite, la política la ignora) y
+secuencia, en S5 las tres a la vez y en S9 y S10 la taza en la posición de cada una. Para S7 (C6)
+se comprueba además que, acercando la taza, sale **al menos un cuadro con `cup` entre 0.25 y 0.50** (el detector la emite, la política la ignora) y
 otro con **0.50 o más**; si no, se cambia la distancia o la luz de S7, sin tocar los umbrales
 congelados. Estas tomas son de selección como las de P5-04: **no**
 entran a `datos/` ni a las métricas (D-06). Si una posición no se detecta, se ajusta la distancia
