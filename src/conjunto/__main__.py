@@ -11,7 +11,9 @@ Uso:
 ser el manifiesto congelado. Con `--sobrescribir` se reemplaza la ruta, sin seguir enlaces.
 `verificar` es el `verify_dataset` del ticket: revisa mínimos de E3, cuadros únicos, hashes,
 `split`, huecos menores que `validez_orden_ms` y anotaciones, e imprime el SHA-256 del manifiesto
-para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado.
+para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado. Cada
+`hueco_intencional` sale como aviso por stderr, con su cuadro y su hueco, y la última línea dice
+`OK con N excepciones`. La regla es cero excepciones, salvo las que apruebe el PM A en #13.
 
 Salida: 0 si todo cumple, 1 si alguna regla se rompe, 2 si una entrada no se puede leer o la salida
 no se puede escribir.
@@ -31,7 +33,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .manifiesto import RAIZ, ErrorManifiesto, construir, leer_jsonl
-from .verificacion import conteo, verificar
+from .verificacion import conteo, excepciones_de_hueco, verificar
 
 RUTA_CLASES = RAIZ / "modelo" / "clases.json"
 
@@ -114,7 +116,10 @@ def _verificar(args: argparse.Namespace) -> int:
         print("aviso: no existe modelo/clases.json; no se revisaron los class_id", file=sys.stderr)
     for error in errores:
         print(f"error: {error}", file=sys.stderr)
-    print("NO cumple" if errores else "OK: el conjunto cumple y se puede congelar")
+    excepciones = [] if errores else excepciones_de_hueco(filas)
+    for excepcion in excepciones:
+        print(f"aviso: {excepcion}; requiere aprobación del PM A en #13", file=sys.stderr)
+    print("NO cumple" if errores else f"OK con {len(excepciones)} excepciones")
     return 1 if errores else 0
 
 

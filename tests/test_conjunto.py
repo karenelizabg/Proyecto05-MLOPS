@@ -359,11 +359,47 @@ def test_comando_arma_verifica_y_congela(tmp_path, capsys):
     assert cli.main([*raiz, "verificar", "--manifiesto", str(manifiesto), *comunes]) == 0
     salida = capsys.readouterr().out
     assert "cuadros: 60, secuencias: 6, con_objetos: 30, sin_objetos: 30" in salida
+    assert salida.splitlines()[-1] == "OK con 0 excepciones"
 
     sha = hashlib.sha256(manifiesto.read_bytes()).hexdigest()
     congelado = [*raiz, "verificar", "--manifiesto", str(manifiesto), *comunes, "--sha256"]
     assert cli.main([*congelado, sha]) == 0
     assert cli.main([*congelado, "0" * 64]) == 1
+
+
+def test_comando_avisa_cada_hueco_intencional_y_cuenta_las_excepciones(tmp_path, capsys):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    for f in filas[5:10]:
+        f["t_relativo_ms"] += 600
+    filas[5]["hueco_intencional"] = True
+    filas[6]["hueco_intencional"] = True  # marcado, pero su hueco es normal: no es excepción
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    manifiesto.write_text("".join(json.dumps(f) + "\n" for f in filas), encoding="utf-8")
+    ruta_anotaciones = tmp_path / "anotaciones.jsonl"
+    ruta_anotaciones.write_text("".join(json.dumps(a) + "\n" for a in anotaciones))
+
+    argumentos = ["--raiz", str(tmp_path), "verificar", "--manifiesto", str(manifiesto)]
+    assert cli.main([*argumentos, "--anotaciones", str(ruta_anotaciones)]) == 0
+
+    salida = capsys.readouterr()
+    assert salida.out.splitlines()[-1] == "OK con 1 excepciones"
+    assert salida.err.splitlines() == [
+        "aviso: S01_f0006: hueco intencional de 800 ms desde S01_f0005; "
+        "requiere aprobación del PM A en #13"
+    ]
+
+
+def test_comando_no_dice_ok_si_otra_regla_se_rompe(tmp_path, capsys):
+    filas, anotaciones = conjunto_valido(tmp_path)
+    filas[0]["split"] = "ajuste"
+    manifiesto = tmp_path / "manifiesto.jsonl"
+    manifiesto.write_text("".join(json.dumps(f) + "\n" for f in filas), encoding="utf-8")
+    ruta_anotaciones = tmp_path / "anotaciones.jsonl"
+    ruta_anotaciones.write_text("".join(json.dumps(a) + "\n" for a in anotaciones))
+
+    argumentos = ["--raiz", str(tmp_path), "verificar", "--manifiesto", str(manifiesto)]
+    assert cli.main([*argumentos, "--anotaciones", str(ruta_anotaciones)]) == 1
+    assert capsys.readouterr().out.splitlines()[-1] == "NO cumple"
 
 
 def _argumentos_manifiesto(raiz: Path, anotaciones) -> list[str]:

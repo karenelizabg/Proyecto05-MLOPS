@@ -9,7 +9,8 @@ Cada regla rota es un error y el comando sale con código distinto de 0:
 - `split`: todos `evaluacion` (D-06, no hubo ajuste).
 - Huecos: dentro de una secuencia el tiempo crece y dos cuadros seguidos están separados por
   **menos** de `validez_orden_ms` (config/control/plazos.yaml). Un hueco armado a propósito se
-  marca con `hueco_intencional: true` en el cuadro que llega tarde.
+  marca con `hueco_intencional: true` en el cuadro que llega tarde. Es una excepción: el comando
+  la avisa con su cuadro y su hueco, y solo vale si el PM A la aprobó en #13 (cuadro y motivo).
 - Tipos: los campos de los que dependen estas reglas tienen el tipo exacto; `"false"` no es
   un booleano y con un tiempo NaN ninguna comparación de hueco se cumple.
 - Anotaciones: válidas (esquema v1), una por cuadro, con la misma secuencia y el mismo tamaño, y
@@ -20,7 +21,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -101,25 +102,44 @@ def _revisar_archivos(filas: list[Mapping[str, Any]], raiz: Path) -> list[str]:
     return errores
 
 
-def _revisar_huecos(filas: list[Mapping[str, Any]], maximo: int) -> list[str]:
-    errores: list[str] = []
+def _seguidos(
+    filas: list[Mapping[str, Any]],
+) -> Iterator[tuple[str, Mapping[str, Any], Mapping[str, Any]]]:
+    """Cada par de cuadros seguidos de una misma secuencia, con el id de la secuencia."""
     por_secuencia: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for f in filas:
         por_secuencia[f["sequence_id"]].append(f)
     for secuencia, cuadros in por_secuencia.items():
         for antes, despues in pairwise(cuadros):
-            hueco = despues["t_relativo_ms"] - antes["t_relativo_ms"]
-            if hueco <= 0:
-                errores.append(
-                    f"{despues['frame_id']}: el tiempo no crece respecto a "
-                    f"{antes['frame_id']} en la secuencia {secuencia}"
-                )
-            elif hueco >= maximo and not despues["hueco_intencional"]:
-                errores.append(
-                    f"{despues['frame_id']}: hueco de {hueco} ms desde {antes['frame_id']} "
-                    f"(debe ser menor que {maximo}; se vuelve a filmar la secuencia)"
-                )
+            yield secuencia, antes, despues
+
+
+def _revisar_huecos(filas: list[Mapping[str, Any]], maximo: int) -> list[str]:
+    errores: list[str] = []
+    for secuencia, antes, despues in _seguidos(filas):
+        hueco = despues["t_relativo_ms"] - antes["t_relativo_ms"]
+        if hueco <= 0:
+            errores.append(
+                f"{despues['frame_id']}: el tiempo no crece respecto a "
+                f"{antes['frame_id']} en la secuencia {secuencia}"
+            )
+        elif hueco >= maximo and not despues["hueco_intencional"]:
+            errores.append(
+                f"{despues['frame_id']}: hueco de {hueco} ms desde {antes['frame_id']} "
+                f"(debe ser menor que {maximo}; se vuelve a filmar la secuencia)"
+            )
     return errores
+
+
+def excepciones_de_hueco(filas: list[Mapping[str, Any]], maximo_ms: int | None = None) -> list[str]:
+    """Los huecos que solo pasan por `hueco_intencional`: uno por cuadro, con su hueco."""
+    maximo = max_hueco_ms() if maximo_ms is None else maximo_ms
+    return [
+        f"{despues['frame_id']}: hueco intencional de {hueco} ms desde {antes['frame_id']}"
+        for _, antes, despues in _seguidos(filas)
+        if despues["hueco_intencional"]
+        and (hueco := despues["t_relativo_ms"] - antes["t_relativo_ms"]) >= maximo
+    ]
 
 
 def _revisar_anotacion(
