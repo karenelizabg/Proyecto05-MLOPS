@@ -250,6 +250,6 @@ que diga el detector:** una vez filmada, esa toma es la definitiva (PM A, 2026-1
 - [ ] Conseguir una segunda botella para S5.
 - [ ] Medir el borrador y la tapa de S8 y comprobarlos con el carro.
 - [ ] Grupo B: `clases_obstaculo: [39, 41]` en la política (PR #64 de Hannah).
-- [x] Tomas de prueba de cada posición, de S5, de S7 (C6), de S9 y de S10 antes de filmar. En S7, `cup`
-  salió entre 0.30 y 0.42 en cuatro fotos y entre 0.51 y 0.57 en dos.
+- [x] Tomas de prueba de cada posición, de S5, de S7 (C6), de S9 y de S10 antes de filmar. En S7,
+  `cup` salió entre 0.30 y 0.42 en cuatro fotos y entre 0.51 y 0.57 en dos.
 - [ ] Quién ayuda a filmar y cuándo.
