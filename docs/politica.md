@@ -15,7 +15,7 @@ el comando va al adaptador virtual, que solo lo registra.
 | Obstáculo al centro y un lado libre | **GIRAR** hacia el lado libre | C2 |
 | Obstáculo al centro sin lado libre, o con el giro desactivado | **STOP** | C2, C5 |
 | Obstáculo con confianza debajo del umbral | Se ignora y queda en `reason` | C6 |
-| Después de un STOP o un giro por obstáculo | No avanza hasta ver N cuadros libres seguidos | C7 |
+| Después de un STOP o un giro por obstáculo | Repite la última acción hasta ver N cuadros libres seguidos | C7 |
 
 Cada comando explica en `reason` qué regla se aplicó y qué detecciones la activaron
 (`class_id` y confianza).
@@ -105,9 +105,11 @@ Sirve para no arrancar y frenar a cada cuadro cuando la detección parpadea.
 
 1. Un **STOP por obstáculo** o un **giro por obstáculo al centro** empieza la espera. El giro
    se manda igual; lo que cambia es que el siguiente cuadro libre ya no basta para avanzar.
-2. Mientras espera, la política da **STOP** con `reason` `esperando_cuadros_libres k/N`. Si
-   venía girando y el centro sigue ocupado con un lado libre, **sigue girando** (un desvío de
-   varios cuadros no se corta); después de un STOP no arranca a girar.
+2. Mientras espera, **repite la última acción**, con `reason` `esperando_cuadros_libres k/N`
+   (C7 pide `mantener_accion_cuadros: 1`):
+   - si venía en **STOP**, sigue en STOP, aunque se abra un lado libre;
+   - si venía **girando** y ese mismo lado sigue libre, sigue girando hacia allá;
+   - si el lado del giro ya no está libre, **STOP** (no cambia de lado), y desde ahí repite STOP.
 3. Cada cuadro con el centro libre suma 1. Un cuadro con el centro ocupado regresa la cuenta
    a 0: **un solo cuadro libre en medio de un bloqueo no reanuda.**
 4. Al llegar a `cuadros_libres_para_reanudar` (N = 3) cuadros libres seguidos → **AVANZAR**,
@@ -120,15 +122,15 @@ cuadro:  L  L  B     B     L     B     L     L     L
 acción:  ▶  ▶  ■     ■     ■ 1/3 ■ 0/3 ■ 1/3 ■ 2/3 ▶ reanuda
 ```
 
-Con un lado libre (G = obstáculo al centro con la derecha libre, gira a la izquierda):
+Con un lado libre (B = obstáculo al centro y a la derecha; la izquierda queda libre):
 
 ```
-cuadro:  L  G     L     B     L     L     L
-acción:  ▶  ↰     ■ 1/3 ■ 0/3 ■ 1/3 ■ 2/3 ▶ reanuda
+cuadro:  L  B  L     B     L     L     L
+acción:  ▶  ↰  ↰ 1/3 ↰ 0/3 ↰ 1/3 ↰ 2/3 ▶ reanuda
 ```
 
 Antes, un giro no activaba la espera y ese primer cuadro libre suelto hacía avanzar (lo
-encontró Luis en C7). Al arrancar el run se avanza con el primer cuadro libre: no hay nada que
+encontró Luis en C7); luego daba STOP, que tampoco repetía la acción anterior. Al arrancar el run se avanza con el primer cuadro libre: no hay nada que
 esperar.
 
 ## 6. Pérdida de percepción: `stale` y `error`

@@ -1,0 +1,9 @@
+{
+  "caso": "C6",
+  "entrada": null,
+  "tramos": [],
+  "pasa": false,
+  "motivos": [
+    "falta entrada.jsonl"
+  ]
+}

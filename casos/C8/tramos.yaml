@@ -1,0 +1,10 @@
+# C8 · Qué cuadros de entrada.jsonl le tocan a cada tramo de expectativa.yaml (T17).
+# Formato: casos/README.md, "Cómo se corren los casos".
+#
+# Eventos armados (el caso no pide secuencias de A): tres cuadros libres a 5 fps, un hueco de
+# 1000 ms sin cuadros (watchdog_ms es 600), un cuadro stale y un cuadro ok con 540 ms de edad
+# (max_frame_age_ms es 500). El tramo `hueco` no lleva cuadros: son las órdenes de reloj.
+entrada: armada
+tramos:
+  antes_del_hueco: [X01_f0001, X01_f0002, X01_f0003]
+  cuadro_viejo: [X01_f0004, X01_f0005]

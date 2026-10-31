@@ -1,0 +1,9 @@
+{
+  "caso": "C2",
+  "entrada": null,
+  "tramos": [],
+  "pasa": false,
+  "motivos": [
+    "falta entrada.jsonl (pide una secuencia real de A: datos/MAPA_CASOS.md)"
+  ]
+}

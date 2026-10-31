@@ -1,0 +1,66 @@
+{
+  "run_ids": [
+    "casos-c10-armado"
+  ],
+  "entrada": {
+    "ruta": "casos/C10/entrada.jsonl",
+    "sha256": "2f4d3b79167354f04d974b2da66516315013d436e91bc9abfb1acc0d47890348"
+  },
+  "acciones": {
+    "archivo": {
+      "ruta": "casos/C10/acciones.yaml",
+      "sha256": "8cad9efb634a6da1fd081932b50415057a3010a818a48fe2032188ae097af00b"
+    },
+    "hechas": [
+      {
+        "accion": "emergencia",
+        "t_ms": 300.0,
+        "comando": 2
+      },
+      {
+        "accion": "rearmar",
+        "t_ms": 700.0,
+        "comando": 5
+      },
+      {
+        "accion": "cerrar",
+        "t_ms": 1800.0,
+        "comando": 10
+      }
+    ]
+  },
+  "config": {
+    "plazos.yaml": {
+      "ruta": "config/control/plazos.yaml",
+      "sha256": "bd51e1c1d97d4d196eb476fbaefc37baf627c8de769b2aad0d9213a56b561e22"
+    },
+    "politica.yaml": {
+      "ruta": "config/control/politica.yaml",
+      "sha256": "847209f797953c397cc754cb82aee24a304161defbdc190ed6d2319963a85f65"
+    }
+  },
+  "detector": {
+    "model_sha256": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "config_sha256": [
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+  },
+  "contratos": {
+    "percepcion": "1",
+    "comando": "1"
+  },
+  "conteos": {
+    "eventos": 8,
+    "comandos": 11,
+    "comandos_fuera_de_contrato": 0,
+    "errores": 1
+  },
+  "archivos": [
+    "detecciones.jsonl",
+    "decisiones.jsonl",
+    "comandos.jsonl",
+    "errores.jsonl"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "caso": "C10",
+  "entrada": "armada",
+  "tramos": [
+    {
+      "tramo": "antes_de_la_emergencia",
+      "ordenes": [
+        1,
+        2
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "emergencia",
+      "ordenes": [
+        3
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "enclavada",
+      "ordenes": [
+        4,
+        5
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "rearme",
+      "ordenes": [
+        6
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "rearme_con_cuadro_viejo",
+      "ordenes": [
+        7
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "rearme_con_cuadro_fresco",
+      "ordenes": [
+        8,
+        9,
+        10
+      ],
+      "motivos": []
+    },
+    {
+      "tramo": "cierre",
+      "ordenes": [
+        11
+      ],
+      "motivos": []
+    }
+  ],
+  "pasa": true,
+  "motivos": []
+}
