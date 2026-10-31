@@ -30,36 +30,32 @@
       "ordenes": [
         6
       ],
-      "motivos": [
-        "orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida"
-      ]
+      "motivos": []
     },
     {
       "tramo": "rearme_con_cuadro_viejo",
       "ordenes": [
-        8
+        7
       ],
       "motivos": []
     },
     {
       "tramo": "rearme_con_cuadro_fresco",
       "ordenes": [
+        8,
         9,
-        10,
-        11
+        10
       ],
       "motivos": []
     },
     {
       "tramo": "cierre",
       "ordenes": [
-        12
+        11
       ],
       "motivos": []
     }
   ],
-  "pasa": false,
-  "motivos": [
-    "rearme: orden 6 (AVANZAR, event=rearm, frame_id=X03_f0004): AVANZAR está prohibida"
-  ]
+  "pasa": true,
+  "motivos": []
 }

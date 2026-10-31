@@ -14,7 +14,8 @@ from control.politica import caja_a_xyxy, zonas_ocupadas
 CONFIG = cargar_config_politica()
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 
-CLASE_OBSTACULO = 1  # mochila en los ejemplos del contrato
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+CLASE_OBSTACULO = min(CONFIG.clases_obstaculo)
 CLASE_NO_RELEVANTE = 7  # cualquier class_id que no esté en clases_obstaculo
 
 
@@ -176,7 +177,11 @@ def test_stale_y_error_no_son_via_libre(archivo):
 
 def test_ejemplos_del_contrato():
     valido = json.loads((EJEMPLOS / "valido.json").read_text(encoding="utf-8"))
+    # En los ejemplos del contrato lata = 0 y mochila = 1; con esas clases:
     # mochila 212-431 en 640 -> centro; lata 20-88.5 (conf 0.55) -> izquierda.
-    assert zonas_ocupadas(valido, CONFIG) == {"izq", "centro"}
+    con_clases_de_ejemplo = replace(CONFIG, clases_obstaculo=frozenset({0, 1}))
+    assert zonas_ocupadas(valido, con_clases_de_ejemplo) == {"izq", "centro"}
+    # Con las clases definitivas (T12, #32), los ids de ejemplo ya no son obstáculo.
+    assert zonas_ocupadas(valido, CONFIG) == set()
     vacio = json.loads((EJEMPLOS / "vacio.json").read_text(encoding="utf-8"))
     assert zonas_ocupadas(vacio, CONFIG) == set()

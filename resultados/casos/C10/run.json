@@ -25,7 +25,7 @@
       {
         "accion": "cerrar",
         "t_ms": 1800.0,
-        "comando": 11
+        "comando": 10
       }
     ]
   },
@@ -36,7 +36,7 @@
     },
     "politica.yaml": {
       "ruta": "config/control/politica.yaml",
-      "sha256": "a582469691b44d23d4100239e69a4a42b328d90b59185f39dbfc6c289fb2b4a7"
+      "sha256": "847209f797953c397cc754cb82aee24a304161defbdc190ed6d2319963a85f65"
     }
   },
   "detector": {
@@ -53,9 +53,9 @@
   },
   "conteos": {
     "eventos": 8,
-    "comandos": 12,
+    "comandos": 11,
     "comandos_fuera_de_contrato": 0,
-    "errores": 2
+    "errores": 1
   },
   "archivos": [
     "detecciones.jsonl",

@@ -14,6 +14,8 @@ from control.politica import ESTADO_INICIAL, decidir
 
 # Sin giro, un obstáculo al centro siempre es STOP (como en la secuencia del issue).
 CONFIG = replace(cargar_config_politica(), permitir_giro=False)
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(CONFIG.clases_obstaculo)
 N = CONFIG.cuadros_libres_para_reanudar
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
 CENTRO = [260, 100, 380, 400]  # en una imagen de 640 px
@@ -36,7 +38,7 @@ def evento(i, *cajas, conf=0.9):
         "status": "ok",
         "bbox_format": "xyxy",
         "bbox_unit": "px",
-        "detections": [{"class_id": 1, "confidence": conf, "bbox": c} for c in cajas],
+        "detections": [{"class_id": OBSTACULO, "confidence": conf, "bbox": c} for c in cajas],
     }
     assert validar_evento(ev) == []
     return ev
@@ -146,11 +148,61 @@ def test_mientras_espera_no_gira_aunque_haya_lado_libre():
     assert estado["libres_seguidos"] == 0
 
 
-def test_con_giro_un_desvio_no_activa_la_espera():
+# --- Espera después de un giro (C7 con un lado libre) -----------------------------------
+# La caja CENTRO cae justo a la mitad: con los dos lados libres desempata hacia la izquierda.
+
+
+def test_tras_un_giro_repite_el_giro_y_reanuda_en_el_n_esimo():
     con_giro = replace(CONFIG, permitir_giro=True)
-    comandos, _ = correr(["L", "B", "L"], con_giro)
-    # La caja del centro cae justo a la mitad: desempata hacia la izquierda.
-    assert acciones(comandos) == ["AVANZAR", "GIRAR_IZQ", "AVANZAR"]
+    # libre -> bloqueo con un lado libre -> un libre -> bloqueo -> N libres
+    secuencia = [evento(1), evento(2, CENTRO, DER), evento(3), evento(4, CENTRO)]
+    secuencia += [evento(i) for i in range(5, 5 + N)]
+    comandos, estado = correr(secuencia, con_giro)
+
+    assert acciones(comandos[:2]) == ["AVANZAR", "GIRAR_IZQ"]  # gira hacia el lado libre
+    # El libre suelto repite la acción anterior (mantener_accion_cuadros de C7), no avanza.
+    assert comandos[2]["action"] == "GIRAR_IZQ"
+    assert comandos[2]["steering"] < 0
+    assert comandos[2]["reason"].startswith("esperando_cuadros_libres 1/")
+    assert comandos[3]["action"] == "GIRAR_IZQ"  # bloqueo otra vez: la racha se corta
+    assert comandos[3]["reason"].startswith("esperando_cuadros_libres 0/")
+    finales = comandos[4:]
+    # Sigue girando mientras espera y reanuda solo en el N-ésimo libre.
+    assert acciones(finales) == ["GIRAR_IZQ"] * (N - 1) + ["AVANZAR"]
+    assert finales[-1]["reason"].startswith(f"Reanuda tras {N}/{N}")
+    assert estado["esperando_libres"] is False
+
+
+def test_tras_un_stop_el_libre_suelto_repite_stop():
+    con_giro = replace(CONFIG, permitir_giro=True)
+    # Bloqueo sin lado libre -> STOP; luego un libre: repite STOP, no gira ni avanza.
+    comandos, _ = correr([evento(1), evento(2, IZQ, CENTRO, DER), evento(3)], con_giro)
+    assert acciones(comandos) == ["AVANZAR", "STOP", "STOP"]
+
+
+def test_si_el_lado_del_giro_se_ocupa_frena():
+    con_giro = replace(CONFIG, permitir_giro=True)
+    # Gira a la izquierda; luego la izquierda se ocupa (y la derecha queda libre): STOP,
+    # no cambia de lado. Después ya venía en STOP: los libres repiten STOP hasta el N-ésimo.
+    secuencia = [evento(1), evento(2, CENTRO, DER), evento(3, IZQ, CENTRO)]
+    secuencia += [evento(i) for i in range(4, 4 + N)]
+    comandos, _ = correr(secuencia, con_giro)
+    assert acciones(comandos) == ["AVANZAR", "GIRAR_IZQ", "STOP"] + ["STOP"] * (N - 1) + ["AVANZAR"]
+    assert "ya no está libre" in comandos[2]["reason"]
+
+
+def test_un_desvio_de_varios_cuadros_sigue_girando():
+    con_giro = replace(CONFIG, permitir_giro=True)
+    comandos, estado = correr(["L", "B", "B", "B"], con_giro)
+    assert acciones(comandos) == ["AVANZAR"] + ["GIRAR_IZQ"] * 3
+    assert estado["esperando_libres"] is True
+
+
+@pytest.mark.parametrize("n", [2, 5])
+def test_tras_un_giro_n_sale_de_la_config(n):
+    config = replace(CONFIG, permitir_giro=True, cuadros_libres_para_reanudar=n)
+    comandos, _ = correr(["L", "B"] + ["L"] * n, config)
+    assert acciones(comandos) == ["AVANZAR"] + ["GIRAR_IZQ"] * n + ["AVANZAR"]
 
 
 def test_obstaculo_con_poca_confianza_cuenta_como_libre():

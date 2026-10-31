@@ -1,2 +1,1 @@
-{"run_id": "casos-c10-armado", "frame_id": null, "t_ms": 1200.0, "motivo": "orden_vencida", "errores": ["la orden AVANZAR valía hasta 1100.0 ms"]}
 {"run_id": "casos-c10-armado", "frame_id": "X03_f0005", "t_ms": 1200.0, "motivo": "stale", "errores": ["status=stale: cuadro de 550 ms; se rechaza y se cancela la orden previa"]}

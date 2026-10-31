@@ -1,0 +1,30 @@
+archivo,grupo_nombre,objeto_visible,clases_confianzas,detecciones,estado_visual,observacion
+botella_centro_cerca.jpg,botella,botella,vase:0.375; bottle:0.337,2,coincide_con_confusion,Bottle y vase comparten exactamente la caja sobre la botella.
+botella_centro_lejos.jpg,botella,botella,dining table:0.382,1,omitido,"No hay bottle; dining table cubre el piso, no la botella."
+botella_der.jpg,botella,botella,bottle:0.585; vase:0.285,2,coincide_con_confusion,Bottle y vase sobre la botella derecha.
+botella_izq.jpg,botella,botella,bottle:0.620; dining table:0.368,2,coincide_con_falso_positivo,Bottle sobre la botella; dining table sobre el piso.
+maleta_centro_cerca.jpg,maleta,estuche_blando,chair:0.767; couch:0.361; refrigerator:0.325,3,clase_incorrecta,Chair y couch sobre el estuche rojo; refrigerator sobre mueble del fondo. Sin suitcase ni handbag.
+maleta_centro_lejos.jpg,maleta,estuche_blando,refrigerator:0.494; refrigerator:0.335; suitcase:0.329,3,coincide_suitcase,Suitcase sobre el estuche rojo lejano; dos refrigerator sobre muebles o puertas del fondo. Sin handbag.
+maleta_der.jpg,maleta,estuche_blando,chair:0.602; couch:0.371,2,clase_incorrecta,Chair y couch sobre el estuche derecho; sin suitcase ni handbag.
+maleta_izq.jpg,maleta,estuche_blando,couch:0.501; refrigerator:0.489; suitcase:0.398; chair:0.341,4,coincide_con_confusion,"Suitcase, couch y chair sobre el mismo estuche izquierdo; refrigerator sobre el fondo. Sin handbag."
+mochila_centro_cerca.jpg,mochila,mochila,suitcase:0.942; suitcase:0.771; dog:0.646,3,clase_incorrecta,"Dos suitcase sobre la mochila; dog sobre un adorno de peluche colgante, no un perro real. Sin backpack."
+mochila_centro_lejos.jpg,mochila,mochila,backpack:0.894,1,coincide,Backpack sobre la mochila lejana.
+mochila_cerca.jpg,mochila,mochila,backpack:0.682; handbag:0.294,2,coincide_con_confusion,Backpack y handbag se superponen sobre la misma mochila.
+mochila_der.jpg,mochila,mochila,suitcase:0.696; suitcase:0.596; teddy bear:0.592; dog:0.280,4,clase_incorrecta,Dos suitcase sobre la mochila; teddy bear y dog sobre el adorno colgante. Sin backpack.
+mochila_izq.jpg,mochila,mochila,backpack:0.906; suitcase:0.273,2,coincide_con_confusion,Backpack y suitcase sobre la misma mochila.
+mochila_lado.jpg,mochila,mochila,handbag:0.801; handbag:0.333; backpack:0.302,3,coincide_con_confusion,Backpack de baja confianza cubre la mochila lateral; dos handbag recaen sobre mochila y adorno.
+mochila_lado_2.jpg,mochila,mochila,backpack:0.770; handbag:0.261,2,coincide_con_confusion,Backpack y handbag sobre la mochila lateral.
+silla_centro_cerca.jpg,silla,silla,airplane:0.451,1,clase_incorrecta,Solo la base de la silla queda visible; airplane cubre la base. Sin chair.
+silla_centro_der.jpg,silla,silla,chair:0.701,1,coincide,Chair sobre la silla derecha.
+silla_centro_lejos.jpg,silla,silla,dining table:0.659; chair:0.480; refrigerator:0.392,3,coincide_con_falsos_positivos,Chair sobre la silla; dining table sobre el piso y refrigerator sobre puerta del fondo.
+silla_der.jpg,silla,silla_y_botella,refrigerator:0.300; tv:0.290,2,omitido,Sin chair ni bottle: tv sobre la parte alta de la silla; refrigerator sobre el fondo. Botella visible en borde izquierdo.
+silla_izq.jpg,silla,silla,chair:0.707; dining table:0.561; tv:0.463; refrigerator:0.289,4,coincide_con_confusion,Chair sobre la silla; tv también sobre su respaldo; dining table sobre piso y refrigerator sobre puerta.
+silla_lado.jpg,silla,silla,person:0.829; skateboard:0.283; skateboard:0.268; skateboard:0.251,4,clase_incorrecta,Sin chair: person sobre respaldo y skateboard sobre partes de la silla.
+taza_centro_cerca.jpg,taza,taza,cup:0.981; dining table:0.862,2,coincide_con_falso_positivo,Cup sobre taza; dining table cubre el piso.
+taza_centro_lejos.jpg,taza,taza,dining table:0.379,1,omitido,"Sin cup: dining table sobre piso, taza lejana visible."
+taza_der.jpg,taza,taza,dining table:0.642; cup:0.336,2,coincide_con_falso_positivo,Cup sobre taza derecha; dining table sobre piso.
+taza_izq.jpg,taza,taza,cup:0.522; dining table:0.518; chair:0.403,3,coincide_con_falsos_positivos,Cup sobre taza izquierda; chair sobre bote del fondo y dining table sobre piso.
+vacio_1.jpg,vacio,paso_despejado,dining table:0.360; refrigerator:0.282; bed:0.281,3,sin_objeto_del_dominio,"Sin objeto en la vía; dining table y bed sobre piso, refrigerator sobre puerta del fondo. No se consideran obstáculos detectados."
+vacio_2.jpg,vacio,paso_despejado,refrigerator:0.456; dining table:0.365; refrigerator:0.309; refrigerator:0.298,4,sin_objeto_del_dominio,Sin objeto en la vía; dining table sobre piso y tres refrigerator sobre puertas o muebles del fondo.
+varios_1.jpg,varios,botella_taza_mochila,suitcase:0.729; suitcase:0.707; suitcase:0.454; suitcase:0.284,4,clase_incorrecta,"Cuatro suitcase recaen sobre mochila y botella; no hay backpack, bottle ni cup. Objetos superpuestos."
+varios_2.jpg,varios,botella_taza_mochila,suitcase:0.509; suitcase:0.466,2,clase_incorrecta,"Dos suitcase recaen sobre mochila; no hay backpack, bottle ni cup. Taza parcialmente cortada a la izquierda."

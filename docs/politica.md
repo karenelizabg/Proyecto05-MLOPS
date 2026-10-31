@@ -15,7 +15,7 @@ el comando va al adaptador virtual, que solo lo registra.
 | Obstáculo al centro y un lado libre | **GIRAR** hacia el lado libre | C2 |
 | Obstáculo al centro sin lado libre, o con el giro desactivado | **STOP** | C2, C5 |
 | Obstáculo con confianza debajo del umbral | Se ignora y queda en `reason` | C6 |
-| Después de un STOP por obstáculo | Sigue en STOP hasta ver N cuadros libres seguidos | C7 |
+| Después de un STOP o un giro por obstáculo | Repite la última acción hasta ver N cuadros libres seguidos | C7 |
 
 Cada comando explica en `reason` qué regla se aplicó y qué detecciones la activaron
 (`class_id` y confianza).
@@ -51,11 +51,26 @@ Una detección cuenta solo si cumple **las dos** condiciones:
 tapa) **no son obstáculos**. No van en `clases_obstaculo`, para que no provoquen STOP; si no,
 el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 (`datos/DOMINIO.md`).
 
-> **Clases provisionales.** Hoy `clases_obstaculo: [0, 1]` (lata y mochila de los ejemplos del
-> contrato) y `clases_provisionales: true`. Las clases reales salen de `modelo/clases.json`,
-> que publica el grupo A en P5-04 (decisión DC-5 del contrato). Cuando exista, se ponen aquí
-> sus `class_id` de obstáculo y `clases_provisionales` pasa a `false`. La lista debe ser un
-> subconjunto de las clases de ese archivo.
+### Clases definitivas
+
+Las PM A y B aprobaron dos objetos con el detector **YOLO11n** (P5-04, decisión DC-5 del
+contrato). Los `class_id` son los de COCO de 80 clases que usa YOLO11n, los mismos que publica
+el grupo A en `modelo/clases.json`:
+
+| Objeto | Clase | `class_id` |
+|---|---|---|
+| Botella | `bottle` | 39 |
+| Taza | `cup` | 41 |
+
+En `politica.yaml`: `clases_obstaculo: [39, 41]` y `clases_provisionales: false`.
+
+- **Cualquier otra clase que dé el detector no es obstáculo** para la política. Por ejemplo,
+  el cuaderno de la secuencia S8 puede salir como `book`: se ignora y el carrito avanza.
+- La lista debe ser un **subconjunto** de `modelo/clases.json`. La prueba
+  `test_clases_obstaculo_son_subconjunto_de_clases_json` lo revisa en cuanto ese archivo existe.
+- Los ejemplos del contrato (`config/contrato/ejemplos/`) siguen con lata = 0 y mochila = 1,
+  que eran solo de ejemplo. Con las clases definitivas esos ids ya no frenan; las pruebas que
+  usan esos archivos cambian la clase por una real o lo dicen explícitamente.
 
 ## 3. Umbral de confianza (C6)
 
@@ -65,6 +80,9 @@ el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 
 - **Poca confianza no es lo mismo que una falla de percepción.** Con poca confianza el cuadro
   llegó bien (`status=ok`) y el detector solo duda de un objeto: se decide normal. Una falla de
   percepción (`stale` o `error`) significa que no hay cuadro confiable, y siempre es STOP.
+- El umbral del **detector** (grupo A) va más bajo que este 0.5. Así llegan detecciones con poca
+  confianza y el C6 se puede probar con datos reales: el detector las deja pasar y la política
+  las ignora.
 
 ## 4. Cuándo gira y cuándo frena
 
@@ -85,9 +103,13 @@ el carrito "siempre se detendría". La regla con las medidas reales es de P5-03 
 
 Sirve para no arrancar y frenar a cada cuadro cuando la detección parpadea.
 
-1. Un **STOP por obstáculo** empieza la espera.
-2. Mientras espera, la política sigue en **STOP**, aunque haya un lado libre para girar, con
-   `reason` `esperando_cuadros_libres k/N`.
+1. Un **STOP por obstáculo** o un **giro por obstáculo al centro** empieza la espera. El giro
+   se manda igual; lo que cambia es que el siguiente cuadro libre ya no basta para avanzar.
+2. Mientras espera, **repite la última acción**, con `reason` `esperando_cuadros_libres k/N`
+   (C7 pide `mantener_accion_cuadros: 1`):
+   - si venía en **STOP**, sigue en STOP, aunque se abra un lado libre;
+   - si venía **girando** y ese mismo lado sigue libre, sigue girando hacia allá;
+   - si el lado del giro ya no está libre, **STOP** (no cambia de lado), y desde ahí repite STOP.
 3. Cada cuadro con el centro libre suma 1. Un cuadro con el centro ocupado regresa la cuenta
    a 0: **un solo cuadro libre en medio de un bloqueo no reanuda.**
 4. Al llegar a `cuadros_libres_para_reanudar` (N = 3) cuadros libres seguidos → **AVANZAR**,
@@ -100,8 +122,16 @@ cuadro:  L  L  B     B     L     B     L     L     L
 acción:  ▶  ▶  ■     ■     ■ 1/3 ■ 0/3 ■ 1/3 ■ 2/3 ▶ reanuda
 ```
 
-Un GIRAR no es un STOP, así que no activa la espera. La histéresis empieza después de un STOP
-por obstáculo: al arrancar el run se avanza con el primer cuadro libre.
+Con un lado libre (B = obstáculo al centro y a la derecha; la izquierda queda libre):
+
+```
+cuadro:  L  B  L     B     L     L     L
+acción:  ▶  ↰  ↰ 1/3 ↰ 0/3 ↰ 1/3 ↰ 2/3 ▶ reanuda
+```
+
+Antes, un giro no activaba la espera y ese primer cuadro libre suelto hacía avanzar (lo
+encontró Luis en C7); luego daba STOP, que tampoco repetía la acción anterior. Al arrancar el run se avanza con el primer cuadro libre: no hay nada que
+esperar.
 
 ## 6. Pérdida de percepción: `stale` y `error`
 
@@ -113,12 +143,17 @@ El **supervisor** (`src/control/supervisor.py`, T03/T04) revisa estos casos **an
 a la política, frena por su cuenta y registra la falla en `errores.jsonl`. La política repite
 los mismos chequeos por seguridad, por si alguien la llama sin supervisor.
 
-> **Punto abierto (supervisor y histéresis).** Cuando el supervisor hace su propio STOP,
-> regresa el estado a `{"nombre": "DETENIDO"}` y se pierden los datos de la histéresis. Por
-> eso, tras un bloqueo seguido de un `stale` o `error`, **un solo cuadro libre reanuda** en lugar
-> de esperar N. Se puede corregir de dos maneras: que el supervisor conserve las claves de la
-> política y solo cambie `nombre`, o que la política pida N cuadros libres siempre que salga de
-> `DETENIDO`. Pendiente de decidir con la PM.
+**Supervisor e histéresis.** Cuando el supervisor hace su propio STOP (`stale`, `error`,
+STOP de reloj, emergencia, rearme o cierre), **cambia `nombre` a `DETENIDO`, pone
+`libres_seguidos` en 0 si existe** y conserva las demás claves de la política
+(`esperando_libres`). Así, tras un bloqueo seguido de un `stale`, el carrito sigue esperando N
+cuadros libres, y el `stale` corta la racha igual que cuando la política misma lo ve
+(`test_supervisor.py::test_libre_bloqueo_libre_stale_libre_sigue_en_stop` y
+`test_un_stale_corta_la_racha_de_cuadros_libres`).
+
+**Rearme (C10).** `rearmar()` solo quita la emergencia y manda STOP (`event=rearm`); no le
+pregunta a la política. El carrito avanza hasta que la política decide con el siguiente cuadro
+fresco (`test_emergencia.py::test_rearmar_con_un_cuadro_fresco_y_libre_manda_stop_y_no_avanza`).
 
 ## 7. Estado entre cuadros
 
@@ -147,8 +182,8 @@ cargar y, si algo no cumple, falla con un mensaje que dice qué valor corregir.
 |---|---|---|---|
 | `zonas` | 0–0.33 / 0.33–0.67 / 0.67–1 | contiguas, de 0 a 1 | Franjas izquierda, centro y derecha. |
 | `traslape_minimo` | 0.15 | 0 < x ≤ 1 | Fracción de la caja que debe caer en una zona para ocuparla. |
-| `clases_obstaculo` | `[0, 1]` (provisional) | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo. |
-| `clases_provisionales` | `true` | true/false | Marca que las clases aún no son las definitivas. |
+| `clases_obstaculo` | `[39, 41]` | `class_id` ≥ 0, sin repetir | Qué clases son obstáculo (botella y taza). |
+| `clases_provisionales` | `false` | true/false | `true` solo mientras las clases no estén aprobadas. |
 | `umbral_confianza` | 0.5 | 0 ≤ x ≤ 1 | Confianza mínima para que una detección cuente. |
 | `cuadros_libres_para_reanudar` | 3 | entero ≥ 1 | N de la histéresis. |
 | `velocidad_avance` | 0.4 | 0 < x ≤ 1 | Velocidad de AVANZAR y de los giros. |
@@ -167,7 +202,7 @@ uv run pytest -q tests/test_config_politica.py tests/test_zonas.py \
 
 | Archivo | Qué cubre |
 |---|---|
-| `test_config_politica.py` | Carga del YAML y rangos (T07). |
+| `test_config_politica.py` | Carga del YAML, rangos (T07) y clases definitivas contra `modelo/clases.json` (T12). |
 | `test_zonas.py` | Zonas con distintos anchos, `xyxy`/`xywh` y filtros de clase y confianza (T08). |
 | `test_decision.py` | C1–C5, stale/error y forma del comando (T09). |
 | `test_umbral.py` | C6, y que poca confianza no es falla de percepción (T10). |

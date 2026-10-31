@@ -188,71 +188,81 @@ def test_el_ultimo_cuadro_es_el_que_cuenta(tmp_path):
     assert supervisor.rearmar(410)["reason"] == "rearme_rechazado"
 
 
-def test_rearmar_con_un_cuadro_fresco_y_valido_reanuda(tmp_path):
+def test_rearmar_con_un_cuadro_fresco_y_libre_manda_stop_y_no_avanza(tmp_path):
+    # Lo que encontró Luis: rearmar con un cuadro libre no debe dar AVANZAR en ese momento.
     supervisor = en_emergencia(tmp_path)
     supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
 
     comando = supervisor.rearmar(250)
 
-    assert comando["action"] == "AVANZAR"
-    assert comando["event"] == "rearm"
+    assert_stop(comando, "rearm", "rearmado")
     assert comando["frame_id"] == "f1"
-    assert comando["reason"] == "politica_de_prueba"
-    assert validar_comando(comando) == []
-    assert supervisor.estado["nombre"] == "AVANZANDO"
-    # Ya no hay emergencia: el siguiente cuadro libre pasa por la política.
+    assert supervisor.estado["nombre"] == "DETENIDO"
+    assert supervisor.adaptador.activo["action"] == "STOP"
+    assert errores(tmp_path) == []
+
+
+def test_al_rearmar_no_se_llama_a_la_politica(tmp_path):
+    llamadas = []
+
+    def politica(ev, estado, config):
+        llamadas.append(ev["frame_id"])
+        return politica_de_prueba(ev, estado, config)
+
+    supervisor = en_emergencia(tmp_path, politica)
+    supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
+    supervisor.rearmar(250)
+
+    assert llamadas == ["f0"]
+
+
+def test_despues_de_rearmar_avanza_con_el_siguiente_cuadro_fresco(tmp_path):
+    supervisor = en_emergencia(tmp_path)
+    supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
+    supervisor.rearmar(250)
+
     siguiente = supervisor.procesar_evento(cuadro(400, "f2"), ahora_ms=400)
-    assert (siguiente["action"], siguiente["event"]) == ("AVANZAR", "frame")
+
+    assert (siguiente["action"], siguiente["event"], siguiente["frame_id"]) == (
+        "AVANZAR",
+        "frame",
+        "f2",
+    )
 
 
-@pytest.mark.parametrize("edad_ms, accion", [(MAX_EDAD, "AVANZAR"), (MAX_EDAD + 1, "STOP")])
-def test_el_limite_de_frescura_del_rearme_es_max_frame_age_ms(tmp_path, edad_ms, accion):
+def test_despues_de_rearmar_un_cuadro_viejo_no_avanza(tmp_path):
+    supervisor = en_emergencia(tmp_path)
+    supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
+    supervisor.rearmar(250)
+
+    viejo = supervisor.procesar_evento(cuadro(300, "f2"), ahora_ms=300 + MAX_EDAD + 1)
+    assert viejo["reason"] == "cuadro_viejo"
+    fresco = supervisor.procesar_evento(cuadro(1000, "f3"), ahora_ms=1000)
+    assert fresco["action"] == "AVANZAR"
+
+
+@pytest.mark.parametrize(
+    "edad_ms, motivo", [(MAX_EDAD, "rearmado"), (MAX_EDAD + 1, "rearme_rechazado")]
+)
+def test_el_limite_de_frescura_del_rearme_es_max_frame_age_ms(tmp_path, edad_ms, motivo):
     supervisor = en_emergencia(tmp_path)
     supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
 
-    assert supervisor.rearmar(200 + edad_ms)["action"] == accion
+    comando = supervisor.rearmar(200 + edad_ms)
 
-
-def test_al_rearmar_decide_la_politica_aunque_diga_stop(tmp_path):
-    def politica(ev, estado, config):
-        if ev["frame_id"] == "f1":
-            return {"action": "STOP", "speed": 0, "steering": 0.0, "reason": "obstáculo"}, {
-                "nombre": "DETENIDO"
-            }
-        return politica_de_prueba(ev, estado, config)
-
-    supervisor = en_emergencia(tmp_path, politica)
-    supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
-
-    comando = supervisor.rearmar(250)
-    assert (comando["action"], comando["event"], comando["reason"]) == (
-        "STOP",
-        "rearm",
-        "obstáculo",
-    )
-    # La emergencia se quitó: el siguiente cuadro decide la política.
-    assert supervisor.procesar_evento(cuadro(400, "f2"), ahora_ms=400)["action"] == "AVANZAR"
-
-
-def test_si_la_politica_falla_al_rearmar_da_stop_con_event_rearm(tmp_path):
-    def politica(ev, estado, config):
-        if ev["frame_id"] == "f1":
-            raise RuntimeError("falla")
-        return politica_de_prueba(ev, estado, config)
-
-    supervisor = en_emergencia(tmp_path, politica)
-    supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
-
-    assert_stop(supervisor.rearmar(250), "rearm", "politica_excepcion")
+    assert_stop(comando, "rearm", motivo)
 
 
 def test_despues_de_rearmar_el_watchdog_vuelve_a_vigilar(tmp_path):
     supervisor = en_emergencia(tmp_path)
     supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
     supervisor.rearmar(250)
+    # Rearmado pero detenido: el reloj no tiene nada que frenar.
+    assert supervisor.tick(2000) is None
 
-    assert supervisor.tick(300) is None
-    assert supervisor.tick(2000)["event"] == "clock"
+    supervisor.procesar_evento(cuadro(2000, "f2"), ahora_ms=2000)
+    assert supervisor.tick(2300) is None
+    assert supervisor.tick(2700)["event"] == "clock"
 
 
 def test_rearmar_sin_emergencia_no_hace_nada(tmp_path):
@@ -313,7 +323,8 @@ def test_secuencia_emergencia_rearme_y_cierre(tmp_path):
     supervisor.procesar_evento(cuadro(200, "f1"), ahora_ms=200)
     supervisor.rearmar(1000)  # f1 ya es viejo: rechazado
     supervisor.procesar_evento(cuadro(1100, "f2"), ahora_ms=1100)
-    supervisor.rearmar(1150)  # f2 es fresco: reanuda
+    supervisor.rearmar(1150)  # f2 es fresco: quita la emergencia, sigue en STOP
+    supervisor.procesar_evento(cuadro(1200, "f3"), ahora_ms=1200)  # siguiente cuadro: avanza
     supervisor.cerrar(1300)
 
     registro = comandos(tmp_path)
@@ -323,7 +334,8 @@ def test_secuencia_emergencia_rearme_y_cierre(tmp_path):
         ("frame", "STOP", "emergencia_activa"),
         ("rearm", "STOP", "rearme_rechazado"),
         ("frame", "STOP", "emergencia_activa"),
-        ("rearm", "AVANZAR", "politica_de_prueba"),
+        ("rearm", "STOP", "rearmado"),
+        ("frame", "AVANZAR", "politica_de_prueba"),
         ("shutdown", "STOP", "cierre"),
     ]
     assert all(validar_comando(c) == [] for c in registro)

@@ -22,7 +22,8 @@ from control.politica import (
 
 CONFIG = cargar_config_politica()
 EJEMPLOS = RAIZ / "config" / "contrato" / "ejemplos"
-OBSTACULO = 1
+# Una clase de obstáculo real de politica.yaml (T12, #32); así la prueba no depende del id.
+OBSTACULO = min(CONFIG.clases_obstaculo)
 NO_RELEVANTE = 7
 
 # Cajas en una imagen de 640 px (izq 0-211.2, centro 211.2-428.8, der 428.8-640).
@@ -95,7 +96,7 @@ def test_c2_centro_con_lados_libres_gira_y_lo_explica():
     comando, nuevo = decidir(evento(CENTRO), {"nombre": AVANZANDO}, CONFIG)
     assert comando["action"] in {"GIRAR_IZQ", "GIRAR_DER"}
     assert "libre" in comando["reason"]
-    assert "class_id 1" in comando["reason"]
+    assert f"class_id {OBSTACULO}" in comando["reason"]
     esperado = GIRANDO_IZQ if comando["action"] == "GIRAR_IZQ" else GIRANDO_DER
     assert comando["state_after"] == esperado
     assert nuevo["nombre"] == esperado

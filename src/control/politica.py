@@ -117,6 +117,8 @@ ESTADO_POR_ACCION = {
 }
 
 NOMBRE_ZONA = {"izq": "la izquierda", "centro": "el centro", "der": "la derecha"}
+# Lado hacia el que venía girando, según el estado (para repetir el giro mientras espera).
+LADO_DEL_GIRO = {GIRANDO_IZQ: "izq", GIRANDO_DER: "der"}
 
 # Histéresis (T11): claves que la política guarda en el estado.
 # - "esperando_libres": true después de un STOP por obstáculo, hasta que reanuda.
@@ -251,9 +253,9 @@ def decidir(
     Las detecciones con confianza debajo de `umbral_confianza` no cuentan y se mencionan en
     `reason` como `ignorada_por_confianza` (C6, T10).
 
-    Histéresis (C7, T11): después de un STOP por obstáculo sigue en STOP, con `reason`
-    `esperando_cuadros_libres k/N`, hasta ver N cuadros libres seguidos
-    (`cuadros_libres_para_reanudar`). Lo lleva en el estado: `esperando_libres` y
+    Histéresis (C7, T11): después de un STOP o de un giro por obstáculo al centro, no
+    avanza hasta ver N cuadros libres seguidos (`cuadros_libres_para_reanudar`); mientras,
+    da STOP con `reason` `esperando_cuadros_libres k/N`. Lo lleva en el estado: `esperando_libres` y
     `libres_seguidos`.
 
     STOP siempre lleva speed=0 y steering=0. No lee el reloj: `t_decision_ms` es el
@@ -296,12 +298,18 @@ def _con_histeresis(
     speed: float,
     steering: float,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Histéresis (T11, C7): tras un STOP por obstáculo, reanuda solo con N cuadros libres.
+    """Histéresis (T11, C7): tras un STOP o un giro por obstáculo, reanuda con N cuadros libres.
 
     - Un STOP por obstáculo empieza la espera (`esperando_libres: true`, contador en 0).
-    - Mientras espera, la política sigue en STOP. Cada cuadro con el centro libre suma 1;
-      un cuadro con el centro ocupado regresa el contador a 0, así que un solo cuadro libre
-      en medio de un bloqueo no reanuda.
+    - Un giro por obstáculo al centro (GIRAR_IZQ o GIRAR_DER) también: el giro se manda, pero
+      el siguiente cuadro libre no basta para avanzar. Si no, en C7 con un lado libre un solo
+      cuadro libre en medio del bloqueo hacía avanzar.
+    - Mientras espera, **repite la última acción** (C7, `mantener_accion_cuadros`): si venía
+      girando y ese lado sigue libre, sigue girando hacia el mismo lado; si venía en STOP, o
+      el lado del giro ya no está libre, STOP. Nunca gira hacia una zona ocupada y nunca
+      avanza antes de tiempo.
+    - Cada cuadro con el centro libre suma 1; un cuadro con el centro ocupado regresa el
+      contador a 0, así que un solo cuadro libre en medio de un bloqueo no reanuda.
     - Al llegar a `cuadros_libres_para_reanudar` cuadros libres seguidos, AVANZAR.
     """
     n = config.cuadros_libres_para_reanudar
@@ -309,25 +317,34 @@ def _con_histeresis(
         if accion == "STOP":
             extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
             return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+        if accion in ("GIRAR_IZQ", "GIRAR_DER"):
+            # Solo se gira por un obstáculo al centro: la espera empieza igual que con STOP.
+            extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
+            return _comando(evento, estado, accion, razon, speed, steering, extra)
         extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
         return _comando(evento, estado, accion, razon, speed, steering, extra)
 
-    if accion != "AVANZAR":
-        # Camino bloqueado otra vez: la racha de cuadros libres se corta.
-        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: 0}
-        return _comando(
-            evento, estado, "STOP", f"esperando_cuadros_libres 0/{n}: {razon}", 0, 0, extra
-        )
+    if accion == "AVANZAR":
+        libres = _libres(estado) + 1
+        if libres >= n:
+            extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
+            razon = f"Reanuda tras {libres}/{n} cuadros libres seguidos. {razon}"
+            return _comando(evento, estado, "AVANZAR", razon, speed, steering, extra)
+    else:
+        libres = 0  # camino bloqueado otra vez: la racha de cuadros libres se corta
+    extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: libres}
+    espera = f"esperando_cuadros_libres {libres}/{n}"
 
-    libres = _libres(estado) + 1
-    if libres < n:
-        extra = {ESPERANDO_LIBRES: True, LIBRES_SEGUIDOS: libres}
-        return _comando(
-            evento, estado, "STOP", f"esperando_cuadros_libres {libres}/{n}: {razon}", 0, 0, extra
-        )
-    extra = {ESPERANDO_LIBRES: False, LIBRES_SEGUIDOS: 0}
-    razon = f"Reanuda tras {libres}/{n} cuadros libres seguidos. {razon}"
-    return _comando(evento, estado, "AVANZAR", razon, speed, steering, extra)
+    lado = LADO_DEL_GIRO.get(_nombre_de(estado))
+    if lado is not None and not detecciones_por_zona(evento, config)[lado]:
+        repetida = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
+        giro = -config.giro if lado == "izq" else config.giro
+        razon = f"{espera}: sigue girando hacia {NOMBRE_ZONA[lado]}, que está libre. {razon}"
+        return _comando(evento, estado, repetida, razon, config.velocidad_avance, giro, extra)
+    if lado is not None:
+        razon = f"{espera}: {NOMBRE_ZONA[lado]} ya no está libre, deja de girar: STOP. {razon}"
+        return _comando(evento, estado, "STOP", razon, 0, 0, extra)
+    return _comando(evento, estado, "STOP", f"{espera}: {razon}", 0, 0, extra)
 
 
 def _stop(

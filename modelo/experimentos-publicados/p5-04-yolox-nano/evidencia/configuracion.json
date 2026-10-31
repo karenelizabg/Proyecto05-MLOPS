@@ -1,0 +1,76 @@
+{
+  "proposito": "Prueba preliminar P5-04; no benchmark oficial P5-15",
+  "camara": "ESP32-CAM real del carrito (declarado por el usuario)",
+  "fuente_fotos": "Fotografías ESP32-CAM originales; identidad fijada en manifiesto.csv",
+  "modelo": "YOLOX-Nano ONNX",
+  "release": "0.1.1rc0",
+  "source_commit": "e1052df71842031413f6030723c3607b839c80ce",
+  "checkpoint": "yolox_nano.onnx",
+  "checkpoint_url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx",
+  "checkpoint_sha256": "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d",
+  "checkpoint_bytes": 3659407,
+  "licencia_codigo": "Apache-2.0 (YOLOX)",
+  "licencia_pesos": "Condiciones independientes no verificadas; no inferir Apache-2.0",
+  "parametros": {
+    "providers": [
+      "CPUExecutionProvider"
+    ],
+    "batch": 1,
+    "input_size": [
+      416,
+      416
+    ],
+    "letterbox": "arriba-izquierda",
+    "padding": 114,
+    "channels": "BGR CHW float32",
+    "normalization": "none",
+    "decode_strides": [
+      8,
+      16,
+      32
+    ],
+    "score": "objectness * class_probability",
+    "report_confidence_gte": 0.25,
+    "nms": "por clase, NumPy YOLOX 0.1.1rc0",
+    "nms_iou": 0.45,
+    "intra_op_threads": 1,
+    "inter_op_threads": 1
+  },
+  "entrada": {
+    "name": "images",
+    "shape": [
+      1,
+      3,
+      416,
+      416
+    ],
+    "type": "tensor(float)"
+  },
+  "salida": {
+    "name": "output",
+    "shape": [
+      1,
+      3549,
+      85
+    ],
+    "type": "tensor(float)"
+  },
+  "versiones": {
+    "python": "3.12.14",
+    "onnxruntime": "1.31.1",
+    "numpy": "1.26.4",
+    "opencv": "4.11.0"
+  },
+  "hardware": {
+    "sistema": "macOS-27.0.1-arm64-arm-64bit",
+    "arquitectura": "arm64",
+    "equipo": "MacBook Air Apple M3, 8 núcleos, 16 GB RAM"
+  },
+  "medicion": "preprocess_ms: JPEG+letterbox+CHW; inference_ms: session.run; postprocess_ms: decode+filtro+NMS; wall_ms: todo. Primera imagen separada.",
+  "discrepancia_historica": "El ejemplo ONNX en el commit de release normaliza, pero las notas 0.1.1rc0 indican que los pesos nuevos dejan de normalizar; la documentación oficial posterior enlaza el mismo asset y usa preprocesamiento sin normalización. La prueba mínima visual de taza fue coherente con esta ruta.",
+  "publicacion": {
+    "tipo": "copia de revisión; resultados numéricos originales intactos",
+    "configuracion_original_sha256": "5f392cb36f8373350e3916809fa0e6c5d20a1456bac0906987897c57a8ed9df8",
+    "rutas_locales": "sustituidas por nombres relativos; no afectan inferencia ni resultados"
+  }
+}

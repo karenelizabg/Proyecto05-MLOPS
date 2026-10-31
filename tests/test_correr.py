@@ -15,6 +15,7 @@ import control.__main__ as correr
 from contrato import leer_eventos, validar_comando
 from control import Supervisor
 from control.__main__ import main
+from control.config import cargar_config_politica
 
 RAIZ = Path(__file__).resolve().parents[1]
 FLUJO = RAIZ / "config" / "contrato" / "ejemplos" / "flujo.jsonl"
@@ -94,7 +95,16 @@ def test_todos_los_comandos_cumplen_el_contrato(salida):
         assert validar_comando(comando) == []
 
 
-def test_decisiones_del_flujo(salida):
+def test_decisiones_del_flujo(tmp_path):
+    # En el flujo del contrato la mochila de ejemplo es class_id 1. Con las clases definitivas
+    # (T12, #32) ese id ya no es obstáculo, así que se cambia por una clase real de politica.yaml.
+    obstaculo = min(cargar_config_politica().clases_obstaculo)
+    eventos = leer_eventos(FLUJO)
+    for evento in eventos:
+        for det in evento["detections"]:
+            det["class_id"] = obstaculo
+    salida = tmp_path / "s"
+    assert correr_flujo(salida, escribir(tmp_path / "flujo.jsonl", eventos)) == 0
     decisiones = leer(salida / "decisiones.jsonl")
     assert [(d["frame_id"], d["action"], d["decidio"]) for d in decisiones] == [
         ("S02_f0001", "AVANZAR", "politica"),
@@ -472,7 +482,7 @@ def test_emergencia_y_rearme_en_su_instante_y_en_run_json(tmp_path):
         ("frame", "AVANZAR", 240.0),
         ("emergency", "STOP", 300.0),
         ("frame", "STOP", 440.0),  # emergencia_activa
-        ("rearm", "AVANZAR", 500.0),  # T06: decide con el cuadro de 440, que es fresco
+        ("rearm", "STOP", 500.0),  # T06 (#71): el rearme solo quita la emergencia
         ("frame", "AVANZAR", 640.0),
         ("shutdown", "STOP", 640.0),
     ]
@@ -485,7 +495,7 @@ def test_emergencia_y_rearme_en_su_instante_y_en_run_json(tmp_path):
         {"accion": "cerrar", "t_ms": 640.0, "comando": 6},
     ]
     rearme = leer(salida / "decisiones.jsonl")[4]
-    assert (rearme["event"], rearme["decidio"]) == ("rearm", "politica")
+    assert (rearme["event"], rearme["decidio"]) == ("rearm", "supervisor")
 
 
 def test_una_accion_va_despues_del_cuadro_de_su_mismo_instante(tmp_path):
