@@ -210,9 +210,9 @@ Los intentos fallidos quedan en `datos/pruebas-b/_fallidas/` y no se suben.
 Antes de filmar se hacen **tomas de prueba aparte**, con la misma cámara y el mismo lugar, para
 comprobar que botella y taza se detectan con 0.50 o más en la posición y la distancia de cada
 secuencia, en S5 las tres a la vez y en S9 y S10 la taza en la posición de cada una. Para S7 (C6)
-se comprueba además que, acercando la taza, sale **al menos un cuadro con `cup` entre 0.25 y 0.50** (el detector la emite, la política la ignora) y
-otro con **0.50 o más**; si no, se cambia la distancia o la luz de S7, sin tocar los umbrales
-congelados. Estas tomas son de selección como las de P5-04: **no**
+se comprueba además que, acercando la taza, sale **al menos un cuadro con `cup` entre 0.25 y
+0.50** (el detector la emite, la política la ignora) y otro con **0.50 o más**; si no, se cambia la
+distancia o la luz de S7, sin tocar los umbrales congelados. Estas tomas son de selección como las de P5-04: **no**
 entran a `datos/` ni a las métricas (D-06). Si una posición no se detecta, se ajusta la distancia
 o la separación y se vuelve a probar antes de filmar.
 
