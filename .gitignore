@@ -26,6 +26,8 @@ datos/crudo/
 modelo/descargas/
 # Corridas locales de prueba que no forman parte de la entrega.
 tmp/
+# Se genera de uv.lock para instalar con pip (README, Grupo B); la fuente es uv.lock.
+requirements.txt
 
 # Sistema y editores
 .DS_Store

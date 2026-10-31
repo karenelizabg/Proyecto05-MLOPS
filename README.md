@@ -35,7 +35,9 @@ Funciona igual en Windows, macOS y Linux. En Windows, los comandos con `bash` ne
 | Validar eventos del contrato | `uv run python -m contrato config/contrato/ejemplos/flujo.jsonl` |
 | Métricas de detección (P5-13) | `uv run python -m metricas --detecciones run.jsonl --anotaciones anotaciones.jsonl --salida resultados/metricas/ --model-sha256 … --config-sha256 …` (ver [`config/anotaciones/`](config/anotaciones/README.md)) |
 | Benchmark (P5-15) | `uv run python -m bench --entradas datos/cuadros/ --salida mediciones/<run>/ --equipo "laptop de A3" --detector … --model-sha256 … --config-sha256 …` (ver [`mediciones/`](mediciones/README.md)) |
-| Inferir, reproducir | Se agregan con sus tickets: `infer` (P5-05), `python -m control` (T14). |
+| Correr el control con una secuencia (grupo B) | `uv run python -m control --entrada <eventos.jsonl> --config config/control/ --salida <carpeta>/` (ver [Grupo B](#grupo-b--control-y-verificación)) |
+| Casos C1–C10 (grupo B) | `uv run python casos/runner.py` |
+| Inferir | Se agrega con su ticket: `infer` (P5-05). |
 
 Para agregar una dependencia: `uv add paquete` (o `uv add --dev paquete`) y sube `pyproject.toml` y `uv.lock` en el
 mismo PR. Sin paquetes de GPU: una prueba de humo lo revisa.
@@ -47,7 +49,7 @@ mismo PR. Sin paquetes de GPU: una prueba de humo lo revisa.
 | `modelo/` | Detector: decisión, ficha, licencia, pesos o su descarga con SHA-256 (E2). |
 | `config/` | Contrato A → B, modo de ejecución y configuración de política y plazos. |
 | `datos/` | Cuadros, anotaciones, manifiesto y dominio (E3). |
-| `src/` | Código: `contrato/` (validador) y los paquetes que vienen (detector, `control/`, ...). |
+| `src/` | Código: `contrato/` (validador), `control/` (grupo B), `metricas/` y `bench/` (grupo A). |
 | `casos/` | Casos C1–C10 y su runner (E5). |
 | `resultados/` | Detecciones, decisiones y comandos por cuadro; métricas (E6). |
 | `mediciones/` | Benchmark y límites (E7). |
@@ -69,8 +71,21 @@ los casos C1–C10. Nada mueve motores: el adaptador virtual solo **registra** l
 
 ### Instalación
 
-Igual que arriba: `uv sync --locked`. No hay `requirements.txt`: las versiones fijadas de todo están en
-`uv.lock` y Python 3.12 en `.python-version`. Todos los comandos se corren **desde la raíz del repo**.
+Igual que arriba: `uv sync --locked`. Las versiones fijadas de todo están en `uv.lock` y Python 3.12 en
+`.python-version`; no se sube un `requirements.txt` aparte para no tener dos listas que se desfasen. Todos
+los comandos se corren **desde la raíz del repo**.
+
+**Con `pip` en vez de uv.** La parte B solo necesita `jsonschema` y `pyyaml`. Saca de `uv.lock` la lista
+con sus versiones fijadas e instálala en un entorno de Python 3.12:
+
+```bash
+uv export --locked --no-hashes --no-dev --no-emit-project -o requirements.txt
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt` está en `.gitignore`: se genera, no se sube. Con `pip`, cambia `uv run python` por
+`PYTHONPATH=src python` en los comandos de abajo (en PowerShell: `$env:PYTHONPATH = "src"` y luego
+`python ...`).
 
 ### Qué se configura
 
@@ -130,8 +145,10 @@ Por caso quedan en `resultados/casos/Cn/` los mismos archivos de `python -m cont
 (cada tramo con su motivo), y la tabla en `resultados/casos/resumen.txt`. Qué se espera de cada caso y cómo
 se juzga: [`casos/README.md`](casos/README.md).
 
-> C1 a C7 necesitan las secuencias reales del grupo A (P5-09, P5-12). Mientras no existan, el runner los
-> marca FALLA con "falta entrada.jsonl".
+> Hoy pasan **3 de 10**: C8, C9 y C10, cuyas entradas están armadas a mano porque prueban fallas sin
+> video (sin cuadros, errores del detector y emergencia). C1 a C7 necesitan las secuencias reales del
+> grupo A (P5-09), la salida de `infer` (P5-05) y `datos/MAPA_CASOS.md` (P5-12). Mientras no existan, el
+> runner los marca FALLA con "falta entrada.jsonl".
 
 ### 4. Comprobar que una expectativa alterada se detecta
 
@@ -150,9 +167,24 @@ uv run python casos/runner.py C8 --casos /tmp/casos-copia --salida /tmp/casos-sa
 #      - hueco: ninguna orden con AVANZAR en el plazo de 600 ms
 ```
 
-En la copia, `sha256sum -c expectativas.sha256` (dentro de la carpeta) también marca
-`C8/expectativa.yaml: FAILED`. En Windows, `cp` y `sha256sum` necesitan Git Bash; la prueba (a) funciona
-igual en todos lados.
+En PowerShell, el paso (b) es:
+
+```powershell
+Copy-Item -Recurse casos "$env:TEMP\casos-copia"
+#    en $env:TEMP\casos-copia\C8\expectativa.yaml, tramo "hueco": acciones_permitidas: [AVANZAR]
+uv run python casos/runner.py C8 --casos "$env:TEMP\casos-copia" --salida "$env:TEMP\casos-salida"
+```
+
+En la copia, `sha256sum -c expectativas.sha256` (dentro de la carpeta, en Git Bash) también marca
+`C8/expectativa.yaml: FAILED`. La prueba (a) funciona igual en todos lados.
+
+### Dónde quedan los resultados
+
+| Qué corriste | Dónde queda |
+|---|---|
+| `python -m control` | En la carpeta que diste con `--salida`. |
+| `casos/runner.py` | En `resultados/casos/Cn/` (o en la carpeta de `--salida`), más la tabla en `resumen.txt`. |
+| Lo que se sube al repo | `resultados/casos/`, la última corrida de los casos. Tus corridas de prueba no hace falta subirlas. |
 
 ### Pruebas del grupo B
 
@@ -160,7 +192,7 @@ igual en todos lados.
 uv run pytest -q tests/test_config_politica.py tests/test_zonas.py tests/test_decision.py \
   tests/test_umbral.py tests/test_histeresis.py tests/test_supervisor.py tests/test_watchdog.py \
   tests/test_fallas.py tests/test_emergencia.py tests/test_adaptador_virtual.py tests/test_comando.py \
-  tests/test_correr.py tests/test_expectativas.py tests/test_runner.py
+  tests/test_correr.py tests/test_expectativas.py tests/test_runner.py tests/test_readme_b.py
 ```
 
 ## Cómo contribuir
