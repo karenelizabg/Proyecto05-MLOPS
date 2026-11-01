@@ -71,11 +71,8 @@ Se **descartaron** la mochila (YOLO11n la confunde con `suitcase` en 5 de 7 foto
 no la detecta como `backpack`), la silla (a la izquierda sale como `tv`) y la maleta, que era un
 estuche blando. Los `class_id` están en `modelo/clases.json`.
 
-> **Pendiente del grupo B:** la política (`clases_obstaculo` en `config/control/politica.yaml`)
-> todavía tiene las clases provisionales `[0, 1]`, y el PR #64 de Hannah las cambia a
-> `[24, 39, 41]`. Debe quedar en **`[39, 41]`**. Mientras no se cambie, una botella o una taza no
-> cuentan como obstáculo para B: un cuadro de S5 con las tres detecciones da AVANZAR en vez de STOP.
-> Este documento no cambia la política; lo ajusta Hannah.
+La política del grupo B usa las mismas clases: `clases_obstaculo: [39, 41]` en
+`config/control/politica.yaml`.
 
 **Toda botella o taza que aparezca en un cuadro se anota**, también las laterales, lejanas y
 parciales (P5-10). Un objeto de otra clase (el bote, un mueble, una mochila) no se anota.
@@ -101,8 +98,8 @@ Entre 2 y 3.2 cm la llanta podría subir, pero los motores pegarían: también e
 | Cajita de un tag | 0.5 cm | Transitable | Sí, pasa |
 | Cuaderno pequeño, acostado | 1 cm | Transitable | Sí, pasa |
 | Cable | 0.5 mm | Transitable | Sí, pasa |
-| Borrador, acostado | **pendiente** | Transitable si mide menos de 2 cm | **pendiente** |
-| Tapa | **pendiente** | Transitable si mide menos de 2 cm | **pendiente** |
+| Borrador, acostado | 0.9 cm | Transitable | Sí, pasa |
+| Tapa | 1.2 cm | Transitable | Sí, pasa |
 
 S8 usa el **borrador, la tapa y el cable**, los transitables que nombra la expectativa de C1
 (`casos/C1/expectativa.yaml`), para que el plan y el caso coincidan. La cajita y el cuaderno
@@ -110,7 +107,8 @@ quedan como transitables comprobados, pero no se filman.
 
 Se comprobó empujando el carro a mano (2026-10-28). Con los motores sin alimentar las llantas
 giran duro, porque arrastran la reducción de los motores; esa resistencia es del motor, no del
-objeto.
+objeto. El borrador y la tapa se comprobaron el 2026-10-31 andando con los motores, solo para esta
+prueba: al empujarlo no se distinguía si el carro los pasaba. Ninguno se atoró.
 
 Un transitable puede salir en el detector con una clase de COCO que no está entre las elegidas
 (el cuaderno como `book`): esa detección no cuenta como obstáculo para la política, y el detector
@@ -180,6 +178,11 @@ tramo de cada cuadro lo da su anotación (taza al centro o no), y P5-12 lo regis
 `MAPA_CASOS.md`. Si el hueco libre del medio sale de cero o de dos cuadros, la secuencia se vuelve
 a filmar.
 
+**Lo que se filmó en S6:** 20 cuadros con `--cada-ms 250`, no unos 15 cada 200 ms, y con el carro
+quieto. Separar más los cuadros da margen para el cuadro libre, y con 16 o 18 quedaban unos 4 libres
+al final. Los motivos y las tomas descartadas están en #13. **Ninguna toma nueva se filma sin el OK
+del PM A en #13.**
+
 **S9 y S10** (pedidas por el grupo B). S3 y S4 no sirven para probar el giro: el centro queda libre
 y la política avanza recto. Aquí la taza ocupa el centro y su caja queda cargada hacia un lado. Con
 la imagen de 640 px, el centro de la caja debe caer en **x ≈ 240–290** en S9 y en **x ≈ 350–400** en
@@ -230,15 +233,15 @@ que diga el detector:** una vez filmada, esa toma es la definitiva (PM A, 2026-1
 
 | Dato | Valor |
 |---|---|
-| Cuadros por secuencia | 10 a 12, y unos 15 en S6 (S1–S8: ≈ 85 a 100 en total; el mínimo de E3 es 60). S9 y S10 no cuentan para ese mínimo |
-| Con obstáculo / despejados | S2–S6 casi todos con obstáculo, S1 y S8 despejados: ≈ 50 y ≈ 30 (mínimo 20 y 20) |
+| Cuadros por secuencia | Plan: 10 a 12, y unos 15 en S6. Filmados: 12, salvo S6 con 20 y S7 con 15 (107 en S1–S8; el mínimo de E3 es 60). S9 y S10 no cuentan para ese mínimo |
+| Con obstáculo / despejados | Plan: ≈ 50 y ≈ 30. Filmados: 71 y 36 (mínimo 20 y 20). S2–S5 y S7 con obstáculo en todos sus cuadros, S1 y S8 despejados, S6 con 8 y 12 |
 | Ritmo | ≈ 5 cuadros por segundo (uno cada 200 ms), el ritmo que supone el grupo B |
 | Hueco máximo entre cuadros | **Menos de 400 ms** (`validez_orden_ms`); una secuencia con un hueco mayor se vuelve a filmar |
 | Cómo se capturan | Script que lee el stream de la ESP32-CAM (`:81/stream`) y guarda los bytes JPEG como llegan, sin recomprimir, con la hora real de recepción (P5-09) |
 | Distancia | Las secuencias empiezan a distancia media, no lejos: ni botella ni taza se detectaron lejos (salvo S7, que lo usa a propósito) |
 | Movimiento | El carro se empuja a mano, despacio y en línea recta, hacia los objetos. Como las llantas giran duro con los motores sin alimentar, se empuja parejo para que no avance a saltos (un salto desenfoca el cuadro) |
-| Quién filma | A2 (Andy), que tiene el carro; **pendiente** quién ayuda a empujar y a mover los objetos |
-| Cuándo | **pendiente** |
+| Quién filma | A2 (Andy), sin ayuda: empuja el carro y mueve los objetos |
+| Cuándo | S1 a S5, S7, S8, S9 y S10 el 2026-10-30; S6 otra vez el 2026-10-31 |
 
 - Ningún nombre de archivo lleva la clase ni el caso (P5-09).
 - Los cuadros casi iguales se revisan con su SHA-256: un duplicado exacto se descarta.
@@ -247,9 +250,9 @@ que diga el detector:** una vez filmada, esa toma es la definitiva (PM A, 2026-1
 ## Pendiente
 
 - [x] Clases aprobadas por los PM A y B tras P5-04 (PEND-04, DC-5): botella y taza.
-- [ ] Conseguir una segunda botella para S5.
-- [ ] Medir el borrador y la tapa de S8 y comprobarlos con el carro.
-- [ ] Grupo B: `clases_obstaculo: [39, 41]` en la política (PR #64 de Hannah).
+- [x] Conseguir una segunda botella para S5.
+- [x] Medir el borrador y la tapa de S8 y comprobarlos con el carro.
+- [x] Grupo B: `clases_obstaculo: [39, 41]` en la política.
 - [x] Tomas de prueba de cada posición, de S5, de S7 (C6), de S9 y de S10 antes de filmar. En S7,
   `cup` salió entre 0.30 y 0.42 en cuatro fotos y entre 0.51 y 0.57 en dos.
-- [ ] Quién ayuda a filmar y cuándo.
+- [x] Quién filmó y cuándo.
