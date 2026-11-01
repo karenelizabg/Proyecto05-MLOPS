@@ -1,7 +1,7 @@
 # Anotaciones y métricas de detección
 
-> **Formato v1, propuesto en P5-13** para que el script de métricas tenga qué leer. Lo confirma A2 en
-> P5-10: si cambia, cambian este esquema, el ejemplo y `src/metricas/` en el mismo PR.
+> **Formato v1, propuesto en P5-13 y confirmado por A2 en P5-10:** `datos/anotaciones.jsonl` lo usa tal
+> cual. Si cambia, cambian este esquema, el ejemplo y `src/metricas/` en el mismo PR.
 
 | Archivo | Qué es |
 |---|---|

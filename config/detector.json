@@ -1,0 +1,52 @@
+{
+  "artifacts": {
+    "weights_path": "modelo/descargas/yolo11n.pt",
+    "expected_model_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
+  },
+  "effective": {
+    "model": {
+      "name": "YOLO11n",
+      "backend": "pytorch_pt"
+    },
+    "runtime": {
+      "ultralytics": "8.3.0",
+      "torch": "2.9.0",
+      "torchvision": "0.24.0",
+      "opencv-python": "4.11.0.86",
+      "numpy": "1.26.4"
+    },
+    "execution": {
+      "device": "cpu",
+      "dtype": "float32",
+      "batch": 1,
+      "torch_threads": 2,
+      "augment": false
+    },
+    "preprocess": {
+      "decoder": "cv2.imread_IMREAD_COLOR",
+      "input_channels": "BGR",
+      "model_channels": "RGB",
+      "layout": "BCHW",
+      "imgsz": 640,
+      "letterbox": "minimum_rectangle_auto",
+      "stride": 32,
+      "scale_fill": false,
+      "scaleup": true,
+      "center": true,
+      "padding_value": 114,
+      "interpolation": "cv2.INTER_LINEAR",
+      "normalization_divisor": 255
+    },
+    "postprocess": {
+      "confidence": 0.25,
+      "nms_iou": 0.7,
+      "agnostic_nms": false,
+      "max_det": 300,
+      "class_ids": [39, 41],
+      "bbox_format": "xyxy",
+      "bbox_unit": "px",
+      "coordinates": "original",
+      "clip_boxes": true
+    }
+  }
+}

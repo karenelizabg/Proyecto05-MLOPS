@@ -12,6 +12,15 @@ dependencies = [
     "jsonschema>=4.23,<5",
     "pillow>=11,<13",
     "pyyaml>=6.0,<7",
+    # Versiones usadas en la evidencia CPU de P5-04 (Python 3.12).
+    "ultralytics==8.3.0",
+    "torch==2.9.0",
+    # El índice CPU también contiene versiones locales solo para Windows ARM64.
+    # Elegir +cpu en Linux x86_64 evita que el lock universal tome una de ellas.
+    "torchvision==0.24.0+cpu; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision==0.24.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
+    "opencv-python==4.11.0.86",
+    "numpy==1.26.4",
 ]
 
 [dependency-groups]
@@ -19,6 +28,18 @@ dev = [
     "ruff>=0.7,<1",
     "pytest>=8.3,<9",
 ]
+
+# En Linux, PyPI ofrece builds de torch con dependencias CUDA. La variante CPU
+# oficial evita incluir paquetes NVIDIA en el lock universal. macOS y Windows
+# usan las ruedas oficiales de PyPI para estas versiones.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=75"]

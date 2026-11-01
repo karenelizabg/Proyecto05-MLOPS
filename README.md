@@ -34,11 +34,13 @@ Funciona igual en Windows, macOS y Linux. En Windows, los comandos con `bash` ne
 | Lint y formato | `uv run ruff check .` · `uv run ruff format --check .` |
 | Validar eventos del contrato | `uv run python -m contrato config/contrato/ejemplos/flujo.jsonl` |
 | Métricas de detección (P5-13) | `uv run python -m metricas --detecciones run.jsonl --anotaciones anotaciones.jsonl --salida resultados/metricas/ --model-sha256 … --config-sha256 …` (ver [`config/anotaciones/`](config/anotaciones/README.md)) |
+| Resultados por cuadro y recálculo (P5-14) | `uv run python -m trazabilidad construir --corrida resultados/<run>/ --anotaciones datos/anotaciones.jsonl --salida resultados/<run>/trazabilidad/` · `… recalcular <carpeta>` · `… cuadro <carpeta> <frame_id>` (ver [`resultados/`](resultados/README.md)) |
 | Benchmark (P5-15) | `uv run python -m bench --entradas datos/cuadros/ --salida mediciones/<run>/ --equipo "laptop de A3" --detector … --model-sha256 … --config-sha256 …` (ver [`mediciones/`](mediciones/README.md)) |
 | Capturar una secuencia del carro (P5-09) | `uv run python -m captura --url http://IP:81/stream --secuencia S01 [--cuadros 12]` (guarda en `datos/cuadros/S01/` solo si sale completa; un intento fallido va a `datos/cuadros/_fallidas/`; ver [`datos/DOMINIO.md`](datos/DOMINIO.md)) |
+| Manifiesto y `verify_dataset` (P5-11) | `uv run python -m conjunto manifiesto` · `uv run python -m conjunto verificar [--sha256 HASH_CONGELADO]` · `uv run python -m conjunto hojas --salida <carpeta nueva>` (leen `datos/cuadros/`, `datos/anotaciones.jsonl` y `datos/manifiesto.jsonl`) |
+| Inferir (P5-05) | `uv run --locked python -m infer --input <JPEG o carpeta> --weights <ruta local>/yolo11n.pt --output <archivo .jsonl> --run-id <run> [--sequence-id S01] [--capture-ms …]` (ver [`config/DETECTOR.md`](config/DETECTOR.md)) |
 | Correr el control con una secuencia (grupo B) | `uv run python -m control --entrada <eventos.jsonl> --config config/control/ --salida <carpeta>/` (ver [Grupo B](#grupo-b--control-y-verificación)) |
 | Casos C1–C10 (grupo B) | `uv run python casos/runner.py` |
-| Inferir | Se agrega con su ticket: `infer` (P5-05). |
 
 Para agregar una dependencia: `uv add paquete` (o `uv add --dev paquete`) y sube `pyproject.toml` y `uv.lock` en el
 mismo PR. Sin paquetes de GPU: una prueba de humo lo revisa.
@@ -147,9 +149,10 @@ Por caso quedan en `resultados/casos/Cn/` los mismos archivos de `python -m cont
 se juzga: [`casos/README.md`](casos/README.md).
 
 > Hoy pasan **3 de 10**: C8, C9 y C10, cuyas entradas están armadas a mano porque prueban fallas sin
-> video (sin cuadros, errores del detector y emergencia). C1 a C7 necesitan las secuencias reales del
-> grupo A (P5-09), la salida de `infer` (P5-05) y `datos/MAPA_CASOS.md` (P5-12). Mientras no existan, el
-> runner los marca FALLA con "falta entrada.jsonl".
+> video (sin cuadros, errores del detector y emergencia). C1 a C7 salen de las secuencias S01 a S08
+> (`datos/cuadros/`) pasadas por `infer`, pero se arman cuando el conjunto esté congelado (P5-11) y
+> exista `datos/MAPA_CASOS.md` (P5-12). Mientras tanto, el runner los marca FALLA con "falta
+> entrada.jsonl".
 
 ### 4. Comprobar que una expectativa alterada se detecta
 

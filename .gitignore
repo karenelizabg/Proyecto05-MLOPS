@@ -24,6 +24,7 @@ htmlcov/
 datos/crudo/
 # Intentos de captura que fallaron (P5-09): se revisan y se borran, no son del conjunto.
 datos/cuadros/_fallidas/
+datos/pruebas-b/_fallidas/
 # Pesos descargados por script (P5-07); si los pesos van en Git, se suben sin esta carpeta.
 modelo/descargas/
 # Corridas locales de prueba que no forman parte de la entrega.
