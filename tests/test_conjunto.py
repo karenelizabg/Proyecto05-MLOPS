@@ -591,3 +591,63 @@ def test_el_sha_impreso_es_el_del_archivo(tmp_path, capsys):
     assert cli.main(_argumentos_manifiesto(tmp_path, anotaciones)) == 0
     sha = hashlib.sha256((tmp_path / "manifiesto.jsonl").read_bytes()).hexdigest()
     assert sha in capsys.readouterr().out
+
+
+def _anotacion(frame: str, secuencia: str, *cajas: list[float]) -> dict:
+    return {
+        "frame_id": frame,
+        "sequence_id": secuencia,
+        "image_width": 640,
+        "image_height": 480,
+        "objetos": [{"class_id": TAZA, "bbox": caja} for caja in cajas],
+    }
+
+
+def _hojas_de(tmp_path: Path, anotaciones: list[dict]) -> list[str]:
+    """Cuadros de un solo color y sus anotaciones; devuelve los argumentos de `hojas`."""
+    for anotacion in anotaciones:
+        carpeta = tmp_path / "cuadros" / anotacion["sequence_id"]
+        carpeta.mkdir(parents=True, exist_ok=True)
+        (carpeta / f"{anotacion['frame_id']}.jpg").write_bytes(jpeg(0))
+    ruta = tmp_path / "anotaciones.jsonl"
+    ruta.write_text("".join(json.dumps(a) + "\n" for a in anotaciones), encoding="utf-8")
+    return ["hojas", "--cuadros", str(tmp_path / "cuadros"), "--anotaciones", str(ruta)]
+
+
+def test_hojas_dibuja_las_cajas_a_resolucion_completa(tmp_path, capsys):
+    caja = [100.0, 100.0, 200.0, 200.0]
+    anotaciones = [_anotacion(f"S01_f000{n}", "S01", caja) for n in range(1, 6)]
+    anotaciones[4]["objetos"] = []
+    salida = tmp_path / "hojas"
+    assert cli.main([*_hojas_de(tmp_path, anotaciones), "--salida", str(salida)]) == 0
+
+    with Image.open(salida / "S01.png") as hoja:
+        assert hoja.size == (640 * 4, 480 * 2)
+        fondo = hoja.getpixel((150, 150))
+        assert hoja.getpixel((100, 150)) != fondo  # el borde de la caja, en el píxel anotado
+        assert hoja.getpixel((640 + 100, 150)) != fondo  # también en el segundo cuadro
+        assert hoja.getpixel((100, 480 + 150)) == fondo  # el quinto cuadro no lleva caja
+    assert "repetida en S01_f0001, S01_f0002, S01_f0003, S01_f0004" in capsys.readouterr().err
+
+
+def test_hojas_no_avisa_si_las_cajas_son_distintas(tmp_path, capsys):
+    anotaciones = [
+        _anotacion("S01_f0001", "S01", [100.0, 100.0, 200.0, 200.0]),
+        _anotacion("S01_f0002", "S01", [101.0, 100.0, 200.0, 200.0]),
+        _anotacion("S02_f0001", "S02", [100.0, 100.0, 200.0, 200.0]),
+    ]
+    assert cli.main([*_hojas_de(tmp_path, anotaciones), "--salida", str(tmp_path / "h")]) == 0
+    assert "repetida" not in capsys.readouterr().err
+
+
+def test_hojas_no_escribe_en_una_carpeta_ocupada_ni_sin_cuadros(tmp_path, capsys):
+    argumentos = _hojas_de(tmp_path, [_anotacion("S01_f0001", "S01")])
+    ocupada = tmp_path / "ocupada"
+    ocupada.mkdir()
+    (ocupada / "algo.txt").write_text("x", encoding="utf-8")
+    assert cli.main([*argumentos, "--salida", str(ocupada)]) == 2
+    assert "no es una carpeta vacía" in capsys.readouterr().err
+
+    (tmp_path / "cuadros" / "S01" / "S01_f0001.jpg").unlink()
+    assert cli.main([*argumentos, "--salida", str(tmp_path / "h")]) == 2
+    assert "no se pudieron armar" in capsys.readouterr().err

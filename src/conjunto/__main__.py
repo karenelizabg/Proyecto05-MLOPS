@@ -5,6 +5,8 @@ Uso:
         [--anotaciones datos/anotaciones.jsonl] [--salida datos/manifiesto.jsonl] [--sobrescribir]
     python -m conjunto verificar [--manifiesto datos/manifiesto.jsonl] \
         [--anotaciones datos/anotaciones.jsonl] [--sha256 HASH_CONGELADO]
+    python -m conjunto hojas --salida CARPETA_NUEVA [--cuadros datos/cuadros] \
+        [--anotaciones datos/anotaciones.jsonl]
 
 `manifiesto` junta la captura (P5-09) y las anotaciones (P5-10) en una fila por cuadro. Si
 `--salida` ya existe, aunque sea un enlace roto, no la toca, salvo con `--sobrescribir`: puede
@@ -14,6 +16,8 @@ ser el manifiesto congelado. Con `--sobrescribir` se reemplaza la ruta, sin segu
 para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado. Cada
 `hueco_intencional` sale como aviso por stderr, con su cuadro y su hueco, y la última línea dice
 `OK con N excepciones`. La regla es cero excepciones, salvo las que apruebe el PM A en #13.
+`hojas` es la revisión visual de P5-10: dibuja las cajas sobre los cuadros, una hoja PNG por
+secuencia a resolución completa, y avisa por stderr de cada caja repetida entre cuadros.
 
 Salida: 0 si todo cumple, 1 si alguna regla se rompe, 2 si una entrada no se puede leer o la salida
 no se puede escribir.
@@ -32,6 +36,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from .hojas import cajas_repetidas, escribir_hojas
 from .manifiesto import RAIZ, ErrorManifiesto, construir, leer_jsonl
 from .verificacion import conteo, excepciones_de_hueco, verificar
 
@@ -123,6 +128,24 @@ def _verificar(args: argparse.Namespace) -> int:
     return 1 if errores else 0
 
 
+def _hojas(args: argparse.Namespace) -> int:
+    try:
+        if args.salida.exists() and (  # NOSONAR (S8707)
+            not args.salida.is_dir() or any(args.salida.iterdir())  # NOSONAR (S8707)
+        ):
+            raise OSError(f"{args.salida.as_posix()} no es una carpeta vacía")
+        anotaciones = leer_jsonl(args.anotaciones)
+        args.salida.mkdir(parents=True, exist_ok=True)  # NOSONAR (S8707)
+        hojas = escribir_hojas(anotaciones, args.cuadros, args.salida)
+    except (OSError, ValueError, KeyError) as exc:  # PIL lanza OSError con un JPEG ilegible
+        print(f"no se pudieron armar las hojas: {exc}", file=sys.stderr)
+        return 2
+    for aviso in cajas_repetidas(anotaciones):
+        print(f"aviso: {aviso}", file=sys.stderr)
+    print(f"{len(hojas)} hojas en {args.salida.as_posix()}/")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     for flujo in (sys.stdout, sys.stderr):
         if hasattr(flujo, "reconfigure"):
@@ -151,8 +174,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     v.add_argument("--anotaciones", type=Path, default=Path("datos/anotaciones.jsonl"))
     v.add_argument("--sha256", help="SHA-256 congelado del manifiesto.")
 
+    h = sub.add_parser("hojas", help="Dibuja las cajas sobre los cuadros para revisarlas a ojo.")
+    h.add_argument("--salida", type=Path, required=True, help="Carpeta nueva o vacía.")
+    h.add_argument("--cuadros", type=Path, default=Path("datos/cuadros"))
+    h.add_argument("--anotaciones", type=Path, default=Path("datos/anotaciones.jsonl"))
+
     args = parser.parse_args(argv)
-    return _manifiesto(args) if args.comando == "manifiesto" else _verificar(args)
+    comandos = {"manifiesto": _manifiesto, "verificar": _verificar, "hojas": _hojas}
+    return comandos[args.comando](args)
 
 
 if __name__ == "__main__":

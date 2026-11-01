@@ -77,6 +77,9 @@ del cuadro original. A2 dibujó las cajas a mano, salvo las 53 ajustadas que se 
   zonas y el `traslape_minimo` de `config/control/politica.yaml`. El estado es `obstaculo` si hay
   alguna caja, aunque el centro quede libre.
 
+**Revisión visual:** `python -m conjunto hojas --salida <carpeta nueva>` dibuja las cajas sobre los
+cuadros, una hoja por secuencia a resolución completa, y avisa si una caja se repite entre cuadros.
+
 **Revisión cruzada:** Ale (A3) revisó los 107 cuadros el 2026-10-31, 47 de ellos con zoom (S5, S6 y
 S7), en hojas a la mitad de resolución. No encontró cajas mal puestas ni objetos sin anotar, pero a esa
 escala no se veía que algunas cajas eran copias.
