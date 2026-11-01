@@ -99,7 +99,7 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | PEND-10 | **Fechas internas** de cada bloque (los campos "Fecha objetivo" de la guía están vacíos). | PM A + PM B | Plan de la sección 5 | Las fechas sugeridas de la sección 5. |
 | PEND-11 | **Dónde viven los archivos grandes** (pesos, imágenes): dentro de Git o fuera con descarga automatizable + hash (la guía lo permite). | PM A + PM B | P5-07, P5-11 | Si pesan poco (< 50 MB) dentro de Git; si no, GitHub Release con SHA-256 y script de descarga. |
 | PEND-12 | **Medidas del carro:** diámetro de llanta, altura libre del chasis, ancho, y altura y ángulo de la cámara. Con eso se fija la altura mínima de un obstáculo (un borrador, más bajo que la llanta, es transitable). **Pendiente:** la ficha del kit en UNIT Electronics (acrílico, caja de 275 × 170 × 50 mm, 795 g) no da el diámetro de llanta ni la altura libre. No hay dato hasta medir el carro armado. | Quien tenga el carro | P5-03, P5-09, P5-10, P5-19 | Sin valor: medirlo en P5-19 (10 minutos). Mientras tanto, objetos como un borrador, una tapa o un cable se tratan como transitables y no se fija ninguna altura mínima de obstáculo hasta tener la medida. |
-| PEND-13 | **Baterías y quién arma el carro.** El kit **no incluye baterías** (18650, 6–7.4 V; ver cuántas en el instructivo) ni cargador. Armarlo y ponerlo a transmitir pide, según la ficha: el cable USB-C (viene en el kit), el IDE de Arduino con el soporte ESP32, el driver USB-serial CH340 y una red WiFi de **2.4 GHz**. **No es solo para Windows:** el IDE y el soporte ESP32 también existen para macOS; la ficha solo enlaza el driver de Windows, así que en Mac hay que comprobar si la placa aparece como puerto serial o instalar el driver CH340 de WCH. | PM A | P5-19 | Sin valor: decidir quién compra las baterías (los tres arman el carro en P5-19). Plan B: celular (D-07). |
+| PEND-13 | **Baterías y quién arma el carro.** El kit **no incluye baterías** (18650, 6–7.4 V; ver cuántas en el instructivo) ni cargador. Armarlo y ponerlo a transmitir pide, según la ficha: el cable USB-C (viene en el kit), el IDE de Arduino con el soporte ESP32, el driver USB-serial CH340 y una red WiFi de **2.4 GHz**. **No es solo para Windows:** el IDE y el soporte ESP32 también existen para macOS; la ficha solo enlaza el driver de Windows, así que en Mac hay que comprobar si la placa aparece como puerto serial o instalar el driver CH340 de WCH. | PM A | — (cerrado) | **Cerrado 2026-11-01:** ya tenemos las baterías, pero no se usan: el control es virtual y el firmware no tiene paro automático ni control de velocidad, así que el carro se empuja a mano y la ESP32-CAM se alimenta por USB-C (decisión del PM A del 2026-10-30, sección "Alimentación" de `datos/CARRO.md`, #74). El carro ya está armado y transmite desde el 2026-10-28 (P5-19). |
 
 ### Decisiones abiertas (con default para no esperar)
 
@@ -166,7 +166,7 @@ Cada ticket lleva su revisor en la línea `Revisa el PR`. P5-19 lo hacen los tre
 | P5-16 | P5-15, declaración de plazos de B (PEND-09) |
 | P5-17 | P5-07, P5-11, P5-13, P5-15 |
 | P5-18 | P5-11 |
-| P5-19 | PEND-13 |
+| P5-19 | — (PEND-13 quedó cerrado) |
 
 ---
 
@@ -282,7 +282,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 #### P5-19 · Armar el carro y poner a transmitir la ESP32-CAM
 - **Responsable:** A1 + A2 + A3 (los tres) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[SUGERENCIA]` (D-07)
 - **Revisión:** los tres se revisan entre sí: cada medida y cada foto las comprueba alguien que no las tomó.
-- **Depende de:** PEND-13 (baterías y cargador)
+- **Depende de:** — (PEND-13, baterías y cargador, quedó cerrado el 2026-11-01)
 - **Por qué:** P5-09 (video con la óptica real) y P5-03 (regla obstáculo/transitable) necesitan el carro armado: el video de la ESP32-CAM y las medidas de llanta, chasis y cámara. Si no se logra a tiempo, el plan B es el celular (D-07).
 - **Alcance** (según la ficha de UNIT Electronics; todavía no se probó)
   - Armar el kit con el instructivo (las baterías 18650 y el cargador no vienen incluidos).
@@ -300,7 +300,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] Dos de los tres ven el video desde su propia computadora.
   - [ ] Otra persona del equipo comprobó las medidas (repitió al menos dos con regla o cinta).
 - **Evidencia:** fotos en `docs/carro/`, `datos/CARRO.md` y la captura del video.
-- **Pendientes:** PEND-06, PEND-12, PEND-13.
+- **Pendientes:** PEND-06, PEND-12 (PEND-13 quedó cerrado el 2026-11-01).
 
 #### P5-05 · Detector ejecutable en CPU y comando `infer`
 - **Responsable:** A1 · **Tamaño:** L · **Prioridad:** P0 · **Bloque:** 2 · **Marca:** `[GUÍA]` E2
@@ -565,7 +565,7 @@ Con **E4** (política, adaptador) y **E5** (ejecutar C1–C10) cubiertos por el 
 | Evaluador no puede instalar o recuperar los pesos. | Reproducción fallida. | Lockfile, descarga con hash, probar en copia limpia (P5-17); repo público o ZIP (PEND-03). |
 | Rostros en repo público. | Privacidad. | Consentimiento y cuadros sin rostros identificables (P5-09). |
 | Objetos bajos (borrador, cable) tratados como obstáculo, o un obstáculo real ignorado, sin una regla escrita. | STOP innecesarios (no avanza), o choque no detectado; etiquetas inconsistentes y F1 ruidoso. | Regla con medidas reales (P5-03, PEND-12), cuadros transitables en S8 y el mismo criterio en anotación (P5-10) y en la lista de clases relevantes de B1. |
-| El carro no se arma o la ESP32-CAM no transmite a tiempo (driver CH340, WiFi de 2.4 GHz, 5 V inestables, baterías que el kit no trae). | Sin cuadros con la óptica del carro; se atrasa P5-09 y todo lo que cuelga de los datos. | Plan B del celular a 640×480 (D-07). `[SUGERENCIA]` Decidir hoy quién compra las baterías y quién arma el carro (PEND-13), y pasar al celular si el martes 27 no hay video. |
+| El carro no se arma o la ESP32-CAM no transmite a tiempo (driver CH340, WiFi de 2.4 GHz, 5 V inestables, baterías que el kit no trae). | Sin cuadros con la óptica del carro; se atrasa P5-09 y todo lo que cuelga de los datos. | Plan B del celular a 640×480 (D-07). PEND-13 quedó cerrado el 2026-11-01: el carro transmite desde el 2026-10-28 y ya hay baterías. |
 | Poco tiempo (7 días). | Se empuja todo al final. | Filmar el fin de semana; plan por bloques de la sección 5. |
 
 ---
