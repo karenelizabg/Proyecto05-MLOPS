@@ -234,7 +234,7 @@ que diga el detector:** una vez filmada, esa toma es la definitiva (PM A, 2026-1
 | Dato | Valor |
 |---|---|
 | Cuadros por secuencia | Plan: 10 a 12, y unos 15 en S6. Filmados: 12, salvo S6 con 20 y S7 con 15 (107 en S1–S8; el mínimo de E3 es 60). S9 y S10 no cuentan para ese mínimo |
-| Con obstáculo / despejados | S2–S6 casi todos con obstáculo, S1 y S8 despejados: ≈ 50 y ≈ 30 (mínimo 20 y 20) |
+| Con obstáculo / despejados | Plan: ≈ 50 y ≈ 30. Filmados: 71 y 36 (mínimo 20 y 20). S2–S5 y S7 con obstáculo en todos sus cuadros, S1 y S8 despejados, S6 con 8 y 12 |
 | Ritmo | ≈ 5 cuadros por segundo (uno cada 200 ms), el ritmo que supone el grupo B |
 | Hueco máximo entre cuadros | **Menos de 400 ms** (`validez_orden_ms`); una secuencia con un hueco mayor se vuelve a filmar |
 | Cómo se capturan | Script que lee el stream de la ESP32-CAM (`:81/stream`) y guarda los bytes JPEG como llegan, sin recomprimir, con la hora real de recepción (P5-09) |
