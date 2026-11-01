@@ -7,6 +7,7 @@ import hashlib
 import json
 import platform
 import statistics
+import time
 from importlib.metadata import version
 from pathlib import Path
 
@@ -38,11 +39,21 @@ def main() -> None:
     args = parser.parse_args()
 
     config = cargar_config_detector()
+    inicio = time.perf_counter()
     cargado = cargar_pesos(args.weights, config)
+    carga_ms = (time.perf_counter() - inicio) * 1000
+    inicio = time.perf_counter()
     detector = DetectorJPEG(cargado, config)
+    construccion_ms = (time.perf_counter() - inicio) * 1000
     hilos_tras_setup = torch.get_num_threads()
+    inicio = time.perf_counter()
+    detector.calentar()
+    calentamiento_sintetico_ms = (time.perf_counter() - inicio) * 1000
+    hilos_tras_calentamiento = torch.get_num_threads()
+    inicio = time.perf_counter()
     for _ in range(10):
         detector.inferir(args.image)
+    calentamiento_jpeg_ms = (time.perf_counter() - inicio) * 1000
 
     series: dict[str, list[float]] = {
         "detector_total_ms": [],
@@ -68,7 +79,11 @@ def main() -> None:
         }
 
     datos = {
-        "machine": {"os": platform.platform(), "cpu": platform.processor()},
+        "machine": {
+            "os": platform.platform(),
+            "architecture": platform.machine(),
+            "cpu": platform.processor(),
+        },
         "python": platform.python_version(),
         "runtime": {
             nombre: version(nombre)
@@ -77,7 +92,14 @@ def main() -> None:
         "torch_threads": config.torch_threads,
         "torch_threads_configured": config.torch_threads,
         "torch_threads_after_setup": hilos_tras_setup,
+        "torch_threads_after_warmup": hilos_tras_calentamiento,
         "torch_threads_effective": torch.get_num_threads(),
+        "preparation_ms": {
+            "verified_weights_load": carga_ms,
+            "detector_setup": construccion_ms,
+            "synthetic_predictor_warmup": calentamiento_sintetico_ms,
+            "jpeg_warmup_10_runs": calentamiento_jpeg_ms,
+        },
         "device": "cpu",
         "image": args.image.name,
         "image_sha256": hashlib.sha256(args.image.read_bytes()).hexdigest(),
@@ -92,6 +114,10 @@ def main() -> None:
             "detector_total_ms": "DetectorJPEG.inferir: JPEG + predictor + validación, sin carga",
             "forward_ms": "Ultralytics Results.speed[inference]: forward del modelo",
             "percentile": "NumPy percentile(method=linear) 95",
+            "preparation_ms": (
+                "Separada de las 50 inferencias medidas; incluye carga, setup, "
+                "calentamiento sintético y 10 JPEG"
+            ),
         },
         "stats": {nombre: resumen(valores) for nombre, valores in series.items()},
         "samples_ms": series,

@@ -242,7 +242,17 @@ Python 3.12. `uv.lock` fija también las dependencias transitivas. En Linux,
 `torch` sale como `2.9.0+cpu` y, en x86_64, `torchvision` como `0.24.0+cpu`
 del índice CPU oficial de PyTorch. El sufijo local selecciona el artefacto
 CPU sin cambiar la versión pública usada en P5-04. macOS arm64 y Windows
-x86_64 usan sus ruedas de PyPI. No se han comprobado todavía instalación,
-latencia ni igualdad numérica en la laptop Windows de Ale. Esa verificación
-corresponde a PEND-05/P5-15; las posibles diferencias entre plataformas se
-medirán con JPEG reales.
+x86_64 usan sus ruedas de PyPI. Tras integrar `origin/main=4ed9d385`, la
+dependencia directa `pillow>=11,<13` de P5-09 selecciona Pillow 12.3.0; el
+runtime de P5-05 y sus índices CPU permanecen fijados. `uv sync --locked` pasó
+en macOS y las resoluciones Linux x86_64 y Windows x86_64 se simularon con
+`uv sync --locked --dry-run --python-platform`, sin instalar allí.
+
+Ale ya instaló el lock anterior y ejecutó tres JPEG en Windows 11: observó
+cajas prácticamente equivalentes a macOS y p95 aproximado de 153 ms, cuando
+Ultralytics dejaba siete hilos intraop efectivos. Es una medición histórica,
+anterior a la restauración de un hilo y al calentamiento antes del reloj. La
+[evaluación actual](../resultados/P5-05-ACEPTACION.md) contiene dos series
+macOS con el lock integrado y un hilo efectivo, sin extrapolarlas a Windows.
+La revisión Windows con el código integrado y el dictamen de A3 siguen
+pendientes.

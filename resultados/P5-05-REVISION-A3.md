@@ -1,6 +1,13 @@
 # P5-05 · revisión independiente de A3 en Windows
 
-**Estado:** A3 ejecutó tres JPEG en Windows 11 y solicitó cambios en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75); todavía faltan una escena múltiple, una despejada y el dictamen sobre las omisiones. Estas instrucciones se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7) y a la [evidencia macOS](P5-05-ACEPTACION.md). Mantener Ultralytics 8.3.0, el checkpoint aprobado y la configuración actual. No cambiar umbrales durante esta revisión.
+**Estado:** A3 ejecutó tres JPEG en Windows 11 y solicitó cambios en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75); todavía faltan una escena múltiple, una despejada y el dictamen sobre las omisiones. Su medición Windows previa (p95 aproximado de 153 ms) usó siete hilos intraop efectivos. La [evidencia macOS integrada](P5-05-ACEPTACION.md) usa el código local con un hilo efectivo, calentamiento sintético antes del reloj y Pillow de P5-09; las cifras no son directamente comparables hasta repetir la revisión en Windows con el mismo commit. Estas instrucciones se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7). Mantener Ultralytics 8.3.0, el checkpoint aprobado y la configuración actual. No cambiar umbrales durante esta revisión.
+
+Heri añadió una [captura auténtica del CLI integrado](P5-05-COMANDO-INTEGRADO.png)
+y [su JSONL validado](p5-05-comando-integrado.jsonl): un JPEG neutral,
+`1 cuadros, 0 errores` y contrato v1 `OK (1 eventos)`. La
+[captura anterior](P5-05-COMANDO.png) y [su JSONL](p5-05-captura-evidencia.jsonl)
+permanecen como evidencia histórica. Esta ejecución macOS no sustituye la
+selección independiente ni las mediciones Windows de A3.
 
 ## Bloqueos previos
 
@@ -10,7 +17,7 @@
 
 ## Preparación en Windows PowerShell
 
-Requisitos: Windows x86_64, Git, conexión **solo para obtener uv/dependencias/checkpoint**, espacio suficiente para el entorno PyTorch y cuatro JPEG. Python 3.12 está fijado en .python-version y pyproject.toml. El lockfile fija Ultralytics 8.3.0, PyTorch 2.9.0, Torchvision 0.24.0, OpenCV 4.11.0.86 y NumPy 1.26.4. Estas instrucciones son para PowerShell, no Git Bash. El comando de instalación de uv sigue la [documentación oficial de Astral](https://docs.astral.sh/uv/getting-started/installation/).
+Requisitos: Windows x86_64, Git, conexión **solo para obtener uv/dependencias/checkpoint**, espacio suficiente para el entorno PyTorch y cuatro JPEG. Python 3.12 está fijado en .python-version y pyproject.toml. El lockfile integrado fija Ultralytics 8.3.0, PyTorch 2.9.0, Torchvision 0.24.0, OpenCV 4.11.0.86, NumPy 1.26.4 y Pillow 12.3.0 de P5-09. Esta revisión debe esperar la publicación de los commits locales de P5-05; registrar el HEAD realmente instalado. Estas instrucciones son para PowerShell, no Git Bash. El comando de instalación de uv sigue la [documentación oficial de Astral](https://docs.astral.sh/uv/getting-started/installation/).
 
 En un directorio nuevo:
 
@@ -21,7 +28,7 @@ Set-Location $Repo
 git rev-parse HEAD
 git status --short
 
-powershell -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/0.12.13/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/0.13.6/install.ps1 | iex"
 uv --version
 uv python install 3.12
 uv sync --locked
@@ -181,20 +188,25 @@ Ejecutar y conservar la salida junto con el transcript y los JSONL:
 Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,OSArchitecture,@{Name='RAM_GiB';Expression={[math]::Round($_.TotalVisibleMemorySize / 1MB, 2)}}
 Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors
 uv --version
-& $Python -c 'import sys, importlib.metadata as m; print(sys.version); print({p:m.version(p) for p in ("ultralytics","torch","torchvision","opencv-python","numpy")})'
+& $Python -c 'import sys, importlib.metadata as m; print(sys.version); print({p:m.version(p) for p in ("ultralytics","torch","torchvision","opencv-python","numpy","pillow")})'
 & $Python -c 'from infer.config import cargar_config_detector; print(cargar_config_detector().config_sha256)'
 ~~~
 
-Si Ale mide rendimiento en esa laptop, guardar **10 calentamientos y al menos 30 inferencias medidas**; el [script](p5-05-benchmark.py) hace 10 + 50:
+Si Ale mide rendimiento en esa laptop, guardar **10 calentamientos y al menos 30 inferencias medidas**; el [script](p5-05-benchmark.py) hace un calentamiento sintético mediante el predictor, 10 JPEG excluidos y 50 JPEG medidos, y registra por separado carga y preparación:
 
 ~~~powershell
 & $Python .\resultados\p5-05-benchmark.py --weights $Weights --image $Central --output (Join-Path $ReviewDir 'latencia-windows.json')
+& $Python .\resultados\p5-05-benchmark.py --weights $Weights --image $Central --output (Join-Path $ReviewDir 'latencia-windows-replica.json')
 ~~~
 
 El benchmark exige un nombre de salida nuevo y rechaza un archivo o enlace
 final existente; para repetirlo, usar otro nombre. Los directorios padres
 enlazados pueden redirigir la salida y deben ser confiables. Registrar el
 SHA-256 de la imagen antes y después de medir; si cambia, descartar esa serie.
+Comprobar `torch_threads_configured`, `torch_threads_after_setup`,
+`torch_threads_after_warmup` y `torch_threads_effective`: deben valer 1.
+Comparar p50, p95 y máximo de ambas series con la evidencia macOS actual;
+no usar el p95 Windows previo de 153 ms como medición de esta versión.
 
 Entregar: (1) commit revisado, SO/CPU/RAM y versiones; (2) SHA-256 de pesos, config y cada JPEG; (3) cuatro JSONL y resultado de python -m contrato; (4) PNG con cajas y juicio visual, incluida la escena vacía; (5) resultados específicos de varios_1/varios_2 y conclusión de aceptabilidad; (6) diferencias numéricas frente a macOS, si son los mismos bytes; (7) transcript/captura del comando; (8) latencia Windows si se ejecutó. El registro puede añadirse a una copia de este archivo o en un documento nuevo, **sin modificar la evidencia macOS**.
 
