@@ -489,7 +489,15 @@ def _correr_y_juzgar(
 # --- tabla y línea de comandos --------------------------------------------------------
 
 
-def tabla(veredictos: list[dict[str, Any]]) -> str:
+def _ruta_para_mostrar(ruta: Path) -> str:
+    """Relativa a la raíz del repo si cae dentro (así resumen.txt no lleva rutas de una máquina)."""
+    try:
+        return ruta.resolve().relative_to(RAIZ).as_posix()
+    except ValueError:
+        return str(ruta)
+
+
+def tabla(veredictos: list[dict[str, Any]], salida: Path = SALIDA) -> str:
     """La tabla PASA/FALLA y, debajo, cada motivo de los casos que fallan."""
     lineas = [f"{'Caso':<5} {'Entrada':<8} {'Tramos':<7} Resultado"]
     for v in veredictos:
@@ -501,7 +509,8 @@ def tabla(veredictos: list[dict[str, Any]]) -> str:
     fallan = [v for v in veredictos if not v["pasa"]]
     lineas += ["", f"{len(veredictos) - len(fallan)} de {len(veredictos)} casos pasan."]
     if fallan:
-        lineas += ["", "Por qué fallan (detalle en resultados/casos/Cn/veredicto.json):"]
+        detalle = _ruta_para_mostrar(salida / "Cn" / NOMBRE_VEREDICTO)
+        lineas += ["", f"Por qué fallan (detalle en {detalle}):"]
         for v in fallan:
             lineas.append(f"  {v['caso']}")
             lineas += [f"    - {motivo}" for motivo in v["motivos"]]
@@ -537,7 +546,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         evaluar(args.carpeta / n, esquema, args.config, config_politica, args.salida / n)
         for n in nombres
     ]
-    texto = tabla(veredictos)
+    texto = tabla(veredictos, args.salida)
     (args.salida / NOMBRE_RESUMEN).write_text(texto, encoding="utf-8")  # NOSONAR (S8707)
     print(texto, end="")
     return 0 if all(v["pasa"] for v in veredictos) else 1
