@@ -230,9 +230,9 @@ def test_sin_anotaciones_solo_conteos_de_b(tmp_path):
     assert main(["construir", "--corrida", str(RECORRIDO_REAL), "--salida", str(salida)]) == 1
     resumen = resumen_de(salida)
     assert resumen["metricas"] is None
-    # La corrida real de T16: los 12 cuadros llegaron viejos y terminaron en STOP.
-    assert resumen["conteos"]["por_secuencia"]["S09"]["acciones"] == {"STOP": 12}
-    assert len(resumen["conteos"]["errores"]) == 12
+    # La corrida real de T16 con el infer de #75: los 12 cuadros llegaron frescos y giran.
+    assert resumen["conteos"]["por_secuencia"]["S09"]["acciones"] == {"GIRAR_DER": 12}
+    assert len(resumen["conteos"]["errores"]) == 0
     assert main(["recalcular", str(salida)]) == 0
 
 

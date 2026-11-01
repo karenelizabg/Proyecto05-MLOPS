@@ -1,0 +1,53 @@
+{
+  "run_ids": [
+    "recorrido-real-der"
+  ],
+  "entrada": {
+    "ruta": "C:/Users/angel/AppData/Local/Temp/claude/c--Users-angel-OneDrive-Documentos-semestre-9-intercambio-mlops-projecto-5/13b72590-26d4-47f0-ad0f-88e48d3948ad/scratchpad/nueva/der/detector.jsonl",
+    "sha256": "94056e5ad739f1ce565198d1303dd1a75e2ee2908bd0a0a76a303c0b5b175ed3"
+  },
+  "acciones": {
+    "archivo": null,
+    "hechas": [
+      {
+        "accion": "cerrar",
+        "t_ms": 3172.000000020489,
+        "comando": 12
+      }
+    ]
+  },
+  "config": {
+    "plazos.yaml": {
+      "ruta": "config/control/plazos.yaml",
+      "sha256": "bd51e1c1d97d4d196eb476fbaefc37baf627c8de769b2aad0d9213a56b561e22"
+    },
+    "politica.yaml": {
+      "ruta": "config/control/politica.yaml",
+      "sha256": "847209f797953c397cc754cb82aee24a304161defbdc190ed6d2319963a85f65"
+    }
+  },
+  "detector": {
+    "model_sha256": [
+      "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
+    ],
+    "config_sha256": [
+      "6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08"
+    ]
+  },
+  "contratos": {
+    "percepcion": "1",
+    "comando": "1"
+  },
+  "conteos": {
+    "eventos": 12,
+    "comandos": 13,
+    "comandos_fuera_de_contrato": 0,
+    "errores": 2
+  },
+  "archivos": [
+    "detecciones.jsonl",
+    "decisiones.jsonl",
+    "comandos.jsonl",
+    "errores.jsonl"
+  ]
+}

@@ -3,15 +3,15 @@
     "recorrido-real-izq"
   ],
   "entrada": {
-    "ruta": "resultados/recorrido-real/izq/detector.jsonl",
-    "sha256": "fb60e6bb2b9ea4404a4a9299920fae9521ce8234b4cb0c0aa7f117d61f9c2fb5"
+    "ruta": "C:/Users/angel/AppData/Local/Temp/claude/c--Users-angel-OneDrive-Documentos-semestre-9-intercambio-mlops-projecto-5/13b72590-26d4-47f0-ad0f-88e48d3948ad/scratchpad/nueva/izq/detector.jsonl",
+    "sha256": "929ff4217f24a030067379a2822a00ba8fc6aaecb9e2b5bef3c0385d0410110e"
   },
   "acciones": {
     "archivo": null,
     "hechas": [
       {
         "accion": "cerrar",
-        "t_ms": 37562.000000150874,
+        "t_ms": 2640.9999998286366,
         "comando": 12
       }
     ]
@@ -31,7 +31,7 @@
       "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
     ],
     "config_sha256": [
-      "bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf"
+      "6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08"
     ]
   },
   "contratos": {
@@ -42,7 +42,7 @@
     "eventos": 12,
     "comandos": 13,
     "comandos_fuera_de_contrato": 0,
-    "errores": 12
+    "errores": 0
   },
   "archivos": [
     "detecciones.jsonl",

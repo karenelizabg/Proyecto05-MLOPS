@@ -1,0 +1,2 @@
+{"run_id": "recorrido-real-der", "frame_id": "S10_f0011", "t_ms": 2875.0, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 515.0 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
+{"run_id": "recorrido-real-der", "frame_id": "S10_f0012", "t_ms": 3172.000000020489, "motivo": "cuadro_viejo", "errores": ["edad del cuadro 609.0000000204891 ms (ahora_ms - t_capture_ms) > max_frame_age_ms 500 ms"]}
