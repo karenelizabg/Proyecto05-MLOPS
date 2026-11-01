@@ -1,75 +1,63 @@
-f000001 · run recorrido-real-izq · status ok · captura 0.0 ms · llegada 35797.00000002049 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8450450897216797 · bbox [211.00437927246094, 232.05035400390625, 359.7705078125, 343.033203125] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 35797.00000002049 ms · vale hasta 36197.00000002049 ms
-  error registrado: cuadro_viejo
+S09_f0001 · run recorrido-real-izq · status ok · captura 0.0 ms · llegada 125.0 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8450451493263245 · bbox [211.00437927246094, 232.05035400390625, 359.7705078125, 343.033203125] -> centro
+  decisión: DETENIDO -> GIRANDO_DER · GIRAR_DER (decidió politica) · Obstáculo en el centro (class_id 41, confianza 0.845045); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 125.0 ms · vale hasta 525.0 ms
 
-f000002 · run recorrido-real-izq · status ok · captura 203.0 ms · llegada 35952.99999997951 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.7571229934692383 · bbox [220.6966552734375, 229.7471160888672, 371.25909423828125, 341.05841064453125] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 35952.99999997951 ms · vale hasta 36352.99999997951 ms
-  error registrado: cuadro_viejo
+S09_f0002 · run recorrido-real-izq · status ok · captura 203.0 ms · llegada 312.99999984912574 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.7571228742599487 · bbox [220.6967010498047, 229.74713134765625, 371.25909423828125, 341.05841064453125] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.757123); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 312.99999984912574 ms · vale hasta 712.9999998491257 ms
 
-f000003 · run recorrido-real-izq · status ok · captura 484.0 ms · llegada 36141.00000006147 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8778864741325378 · bbox [216.285400390625, 223.55853271484375, 369.63543701171875, 339.80462646484375] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36141.00000006147 ms · vale hasta 36541.00000006147 ms
-  error registrado: cuadro_viejo
+S09_f0003 · run recorrido-real-izq · status ok · captura 484.0 ms · llegada 577.9999999795109 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.877886176109314 · bbox [216.285400390625, 223.55853271484375, 369.63543701171875, 339.80462646484375] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.877886); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 577.9999999795109 ms · vale hasta 977.9999999795109 ms
 
-f000004 · run recorrido-real-izq · status ok · captura 687.0 ms · llegada 36280.99999995902 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8839894533157349 · bbox [213.44898986816406, 223.43063354492188, 370.48291015625, 339.7840881347656] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36280.99999995902 ms · vale hasta 36680.99999995902 ms
-  error registrado: cuadro_viejo
+S09_f0004 · run recorrido-real-izq · status ok · captura 687.0 ms · llegada 765.9999998286366 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8839894533157349 · bbox [213.44898986816406, 223.43060302734375, 370.48291015625, 339.7840576171875] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.883989); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 765.9999998286366 ms · vale hasta 1165.9999998286366 ms
 
-f000005 · run recorrido-real-izq · status ok · captura 906.0 ms · llegada 36452.99999997951 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8633155822753906 · bbox [212.17510986328125, 223.92755126953125, 366.90380859375, 336.81036376953125] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36452.99999997951 ms · vale hasta 36852.99999997951 ms
-  error registrado: cuadro_viejo
+S09_f0005 · run recorrido-real-izq · status ok · captura 906.0 ms · llegada 1000.0 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8633159399032593 · bbox [212.17515563964844, 223.92755126953125, 366.90380859375, 336.81036376953125] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.863316); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 1000.0 ms · vale hasta 1400.0 ms
 
-f000006 · run recorrido-real-izq · status ok · captura 1140.0 ms · llegada 36594.00000004098 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8760005235671997 · bbox [209.747314453125, 221.30694580078125, 364.32952880859375, 342.08294677734375] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36594.00000004098 ms · vale hasta 36994.00000004098 ms
-  error registrado: cuadro_viejo
+S09_f0006 · run recorrido-real-izq · status ok · captura 1140.0 ms · llegada 1327.999999979511 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8760004043579102 · bbox [209.747314453125, 221.30694580078125, 364.32952880859375, 342.08294677734375] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.876); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 1327.999999979511 ms · vale hasta 1727.999999979511 ms
 
-f000007 · run recorrido-real-izq · status ok · captura 1390.0 ms · llegada 36750.0 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8538014888763428 · bbox [201.3192138671875, 220.98056030273438, 358.75103759765625, 344.8623962402344] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36750.0 ms · vale hasta 37150.0 ms
-  error registrado: cuadro_viejo
+S09_f0007 · run recorrido-real-izq · status ok · captura 1390.0 ms · llegada 1468.9999998081475 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8538007736206055 · bbox [201.3192138671875, 220.9805450439453, 358.75103759765625, 344.86236572265625] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.853801); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 1468.9999998081475 ms · vale hasta 1868.9999998081475 ms
 
-f000008 · run recorrido-real-izq · status ok · captura 1593.0 ms · llegada 36905.99999995902 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.9162412285804749 · bbox [196.2526092529297, 223.74391174316406, 355.53448486328125, 341.6654052734375] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 36905.99999995902 ms · vale hasta 37305.99999995902 ms
-  error registrado: cuadro_viejo
+S09_f0008 · run recorrido-real-izq · status ok · captura 1593.0 ms · llegada 1702.999999979511 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.9162412285804749 · bbox [196.2526092529297, 223.74395751953125, 355.53448486328125, 341.6654052734375] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.916241); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 1702.999999979511 ms · vale hasta 2102.999999979511 ms
 
-f000009 · run recorrido-real-izq · status ok · captura 1812.0 ms · llegada 37047.00000002049 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.88004469871521 · bbox [192.03392028808594, 223.621826171875, 354.8687744140625, 343.88885498046875] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 37047.00000002049 ms · vale hasta 37447.00000002049 ms
-  error registrado: cuadro_viejo
+S09_f0009 · run recorrido-real-izq · status ok · captura 1812.0 ms · llegada 1921.9999997876585 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8800449967384338 · bbox [192.03392028808594, 223.62179565429688, 354.8687744140625, 343.8888854980469] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.880045); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 1921.9999997876585 ms · vale hasta 2321.9999997876585 ms
 
-f000010 · run recorrido-real-izq · status ok · captura 2031.0 ms · llegada 37202.99999997951 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8959092497825623 · bbox [191.45433044433594, 222.62461853027344, 351.7889404296875, 346.4825439453125] -> centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 37202.99999997951 ms · vale hasta 37602.99999997951 ms
-  error registrado: cuadro_viejo
+S09_f0010 · run recorrido-real-izq · status ok · captura 2031.0 ms · llegada 2140.9999998286366 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8959094285964966 · bbox [191.45433044433594, 222.62461853027344, 351.7889404296875, 346.4825439453125] -> centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.895909); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 2140.9999998286366 ms · vale hasta 2540.9999998286366 ms
 
-f000011 · run recorrido-real-izq · status ok · captura 2297.0 ms · llegada 37391.00000006147 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.8810803294181824 · bbox [184.78294372558594, 221.46453857421875, 347.730712890625, 352.791748046875] -> izq, centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 37391.00000006147 ms · vale hasta 37791.00000006147 ms
-  error registrado: cuadro_viejo
+S09_f0011 · run recorrido-real-izq · status ok · captura 2297.0 ms · llegada 2390.9999998286366 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.8810805678367615 · bbox [184.78294372558594, 221.46453857421875, 347.730712890625, 352.791748046875] -> izq, centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.881081); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 2390.9999998286366 ms · vale hasta 2790.9999998286366 ms
 
-f000012 · run recorrido-real-izq · status ok · captura 2531.0 ms · llegada 37562.000000150874 ms · 640x480 px (xyxy)
-  detección: class_id 41 · confianza 0.9309038519859314 · bbox [177.42332458496094, 224.37826538085938, 343.102294921875, 351.2424621582031] -> izq, centro
-  decisión: DETENIDO -> DETENIDO · STOP (decidió supervisor) · cuadro_viejo
-  comando: STOP · speed 0 · steering 0.0 · t_command 37562.000000150874 ms · vale hasta 37962.000000150874 ms
-  error registrado: cuadro_viejo
+S09_f0012 · run recorrido-real-izq · status ok · captura 2531.0 ms · llegada 2640.9999998286366 ms · 640x480 px (xyxy)
+  detección: class_id 41 · confianza 0.9309038519859314 · bbox [177.42332458496094, 224.3782501220703, 343.102294921875, 351.24249267578125] -> izq, centro
+  decisión: GIRANDO_DER -> GIRANDO_DER · GIRAR_DER (decidió politica) · esperando_cuadros_libres 0/3: sigue girando hacia la derecha, que está libre. Obstáculo en el centro (class_id 41, confianza 0.930904); la derecha está libre: gira hacia allá.
+  comando: GIRAR_DER · speed 0.4 · steering 0.5 · t_command 2640.9999998286366 ms · vale hasta 3040.9999998286366 ms
 
 Órdenes sin cuadro:
-  shutdown a los 37562.000000150874 ms: STOP (cierre)
-Acciones por cuadro: STOP 12
+  shutdown a los 2640.9999998286366 ms: STOP (cierre)
+Acciones por cuadro: GIRAR_DER 12
