@@ -1,9 +1,8 @@
 # Mapa de casos (P5-12)
 
-Qué cuadros y qué entradas usa cada caso de `casos/`, y qué se espera de la percepción. **Borrador:**
-las secuencias todavía no están congeladas y **S6 depende de que el PM A acepte la toma nueva** (ver
-#13). Los tramos salen de las cajas anotadas (`datos/anotaciones.jsonl`) y de las zonas de
-`config/control/politica.yaml`, no del detector.
+Qué cuadros y qué entradas usa cada caso de `casos/`, y qué se espera de la percepción, sobre los datos
+congelados en `datos-evaluacion-v1` (#13). **Borrador:** falta C6. Los tramos salen de las cajas anotadas
+(`datos/anotaciones.jsonl`) y de las zonas de `config/control/politica.yaml`, no del detector.
 
 ## C1 a C7: cuadros reales
 
@@ -15,7 +14,7 @@ las secuencias todavía no están congeladas y **S6 depende de que el PM A acept
 | C3 · Obstáculo izquierdo | S3 | `S03_f0001`–`f0012` | `bottle` solo a la izquierda |
 | C4 · Obstáculo derecho | S4 | `S04_f0001`–`f0012` | `bottle` solo a la derecha |
 | C5 · Sin zona libre | S5 | `S05_f0001`–`f0012` | Dos `bottle` y una `cup` en las tres zonas |
-| C6 · Confianza | S7 | Pendiente | Ver [C6](#c6-pendiente-hasta-congelar) |
+| C6 · Confianza | S7 | Pendiente | Ver [C6](#c6-pendiente-hasta-el-paso-2) |
 | C7 · Libre → bloqueo → libre | S6 | Ver [C7](#c7-tramos-de-s6) | `cup` que entra y sale del centro |
 
 S1–S8 son evaluación. S9 y S10 no entran en este mapa: son solo para las pruebas del grupo B.
@@ -32,11 +31,12 @@ Los nombres son los de `casos/C7/expectativa.yaml`.
 | `bloqueo_otra_vez` | `S06_f0007`–`f0008` | Ocupado |
 | `libre_otra_vez` | `S06_f0009`–`f0020` | Libre: sin taza |
 
-### C6: pendiente hasta congelar
+### C6: pendiente hasta el paso 2
 
 Falta decir qué cuadros de S7 quedan bajo y sobre el umbral de 0.50, y con qué score. Sale de correr el
-detector **después de congelar** (D-06). S7 no se refilma por ese resultado: si no aparece un `cup` entre
-0.25 y 0.50, se reporta así.
+detector **después del paso 2 del congelamiento** (D-06 y #13), cuando se registre su configuración al
+fusionarse #75. S7 no se refilma por ese resultado: si no aparece un `cup` entre 0.25 y 0.50, se reporta
+así.
 
 ## C8 y C9: entradas fallidas
 
@@ -69,7 +69,6 @@ C10 puede usar cualquier secuencia.
 
 ## Falta
 
-- [ ] Congelar S1–S8 y confirmar S6 con el PM A.
 - [ ] Llenar C6 con los scores del detector congelado.
 - [ ] Lista de errores de A1 y corrección de `vacia.jpg` en `infer`.
 - [ ] B3 confirma que el mapa le sirve para armar C1–C9.

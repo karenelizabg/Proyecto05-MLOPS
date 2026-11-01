@@ -8,6 +8,5 @@ Aquí van, cuando existan:
 - `CARRO.md`: medidas del carro armado (P5-19).
 - Cuadros por secuencia, anotaciones y manifiesto con SHA-256 y partición ajuste / evaluación (P5-09 a P5-11).
 - `MAPA_CASOS.md`: caso → secuencia → cuadros (P5-12).
-- `fixtures/`: entradas fallidas sintéticas para C8 y C9 (P5-12).
 
 Los videos crudos **no** se suben (`.gitignore`): la guía pide imágenes extraídas, y el video no las sustituye.
