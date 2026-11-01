@@ -17,8 +17,11 @@ La copia se borra tras construir el modelo en memoria. Ultralytics recibe una
 ruta absoluta local existente, su resolvedor de descargas se restringe a esa
 copia durante la carga y la autoinstalación de paquetes se desactiva.
 
-El cargador fija un hilo de Torch y comprueba detección, clases 39/41, stride
-32, CPU, FP32 y modo de evaluación. Devuelve `model_sha256` calculado sobre
+El cargador fija un hilo intraop de Torch; `DetectorJPEG` vuelve a fijarlo
+después de `setup_model`, porque `select_device` de Ultralytics 8.3.0 lo
+restablece, y comprueba el valor con `torch.get_num_threads()`. También comprueba
+detección, clases 39/41, stride 32, CPU, FP32 y modo de evaluación. Devuelve
+`model_sha256` calculado sobre
 los pesos y el `config_sha256` independiente. No produce predicciones ni
 eventos del contrato todavía. La carga de checkpoints `.pt` usa la
 deserialización de PyTorch; por eso solo se permite el SHA-256 aprobado.
@@ -58,8 +61,11 @@ instalan ni descargan; se indica un `.pt` local cuyo SHA-256 coincida con
 `run_id` explícitos:
 
 ```bash
+# Copiar los mismos bytes a un nombre neutro; el original permanece intacto.
+mkdir -p /tmp/p5-05-demo
+cp docs/carro/objeto_taza_centro_cerca.jpg /tmp/p5-05-demo/S01_f0001.jpg
 uv run --locked python -m infer \
-  --input docs/carro/objeto_taza_centro_cerca.jpg \
+  --input /tmp/p5-05-demo/S01_f0001.jpg \
   --config config/detector.json \
   --weights /ruta/local/yolo11n.pt \
   --output resultados/ejemplo.jsonl \
@@ -72,8 +78,12 @@ predecir. No se leen anotaciones ni manifiestos. `--output` acepta un archivo
 `.jsonl` o una carpeta; en este último caso crea `<run-id>.jsonl`. No se
 sobrescribe una salida existente. `--config` tiene por defecto
 `config/detector.json`; `--sequence-id` es obligatorio para directorios y vale
-`independent` para un JPEG individual. Los IDs de cuadros son `f000001`,
-`f000002`, etc., únicos dentro del run y ajenos al nombre del JPEG.
+`independent` para un JPEG individual. `frame_id` es `Path.stem` del JPEG:
+`S01_f0001.jpg` produce `S01_f0001`. Antes de crear la salida se comprueban
+todos los IDs contra el patrón v1 `^[A-Za-z0-9._-]{1,64}$` y se rechazan
+repetidos dentro del run, incluidos `S01_f0001.jpg` y `S01_f0001.jpeg`.
+El nombre no determina las predicciones; debe ser neutro, sin clase ni caso,
+para respetar también la descripción del contrato.
 
 Para un directorio se exige **un `--capture-ms` por JPEG**, en el orden indicado
 arriba. Son instantes finitos, no negativos y estrictamente crecientes, en ms
@@ -92,7 +102,14 @@ mide su **recepción por el comando durante ese run**. No representa la hora
 original en que se tomó la fotografía. Si esa hora relativa es conocida, puede
 indicarse un `--capture-ms`. `t_emit_ms` mide el instante monotónico tras la
 inferencia, ambos relativos al mismo origen; el tiempo de carga inicial del
-modelo queda fuera del run.
+modelo y el calentamiento quedan fuera del run. Antes de fijar ese origen,
+`infer` pasa `np.zeros((480, 640, 3), dtype=np.uint8)` por la misma llamada
+`predictor(source=imagen, stream=False)` de la inferencia real, tanto para un
+JPEG individual como para un directorio. El resultado sintético se descarta:
+no genera evento ni consume `frame_id`. Si falla el calentamiento, el run no
+comienza. Esto no cambia los pesos, la configuración efectiva ni sus hashes.
+El hilo verificado es el pool intraop de PyTorch; no impone automáticamente
+límites a OpenCV, BLAS ni al pool interop.
 
 Cada línea es un evento A→B v1 con los 14 campos obligatorios, `status=ok` y
 `detections` (posiblemente `[]`), o `status=error`, `detections=[]` y
@@ -113,6 +130,27 @@ el usuario; no se infieren del nombre del archivo. La inferencia reutiliza un
 predictor CPU dentro del proceso. Una interrupción externa puede dejar un
 archivo con los eventos completos ya emitidos; esta fase no implementa
 transacciones del archivo entero ni la política temporal P5-06.
+
+### Copias neutrales del ensayo P5-04
+
+Las 29 fotografías históricas de P5-04 no forman parte del repositorio ni de
+las ocho secuencias oficiales de evaluación (D-06). Para reproducir la
+evidencia, ejecutar el script desde la raíz del clon con rutas locales propias:
+
+```bash
+.venv/bin/python resultados/p5-05-preparar-fotos.py \
+  --originales /ruta/fotos-p5-04 \
+  --manifiesto /ruta/manifiesto-historico-p5-04.csv \
+  --copias /ruta/fuera-del-repositorio/ensayo-p5-05 \
+  --tabla /ruta/tabla-nueva.csv
+```
+
+El script exige exactamente los 29 nombres y SHA-256 del manifiesto histórico,
+rechaza hashes duplicados, ordena por SHA-256 y copia bytes idénticos como
+`ensayo-0001.jpg` a `ensayo-0029.jpg`. Los destinos deben ser nuevos; las copias
+no pueden quedar dentro del repositorio. La [tabla publicada](../resultados/p5-05-fotos-neutrales.csv)
+contiene únicamente el nombre neutro y el SHA-256 completo. El manifiesto se
+usa **solo para preparar y verificar las copias**, nunca como entrada de `infer`.
 
 ## Rutas locales y límite de confianza
 

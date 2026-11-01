@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 import torch
 
+import infer.detector as modulo_detector
 from infer.config import cargar_config_detector
 from infer.detector import (
     DetectorJPEG,
@@ -86,10 +87,68 @@ def test_jpeg_valido_dimensiones_y_sin_detecciones(tmp_path):
     assert resultado.elapsed_ms >= 0
 
 
+def test_calentamiento_usa_predictor_con_bgr_sintetico(monkeypatch):
+    detector = _detector_falso([])
+    recibidas = []
+    llamar_original = type(detector.predictor).__call__
+
+    def registrar(self, source, stream=False):
+        recibidas.append(source.copy())
+        return llamar_original(self, source, stream=stream)
+
+    monkeypatch.setattr(type(detector.predictor), "__call__", registrar)
+    detector.calentar()
+    assert len(recibidas) == 1
+    assert recibidas[0].shape == (480, 640, 3)
+    assert recibidas[0].dtype == np.uint8
+    assert not np.any(recibidas[0])
+
+
+def test_setup_model_restaurara_hilos_intraop_y_se_mantienen_tras_inferir(tmp_path, monkeypatch):
+    config = cargar_config_detector()
+    cargado = ModeloCargado(SimpleNamespace(model=object()), "a" * 64, config.config_sha256)
+
+    class PredictorQueCambiaHilos:
+        tensor_shape = None
+
+        def __init__(self, overrides):
+            self.overrides = overrides
+
+        def setup_model(self, model, verbose=False):
+            torch.set_num_threads(7)
+            self.model = SimpleNamespace(device=torch.device("cpu"), fp16=False)
+
+        def __call__(self, source, stream=False):
+            self.tensor_shape = (1, 3, *source.shape[:2])
+            return [SimpleNamespace(orig_shape=source.shape[:2], boxes=_resultado_falso([]).boxes)]
+
+    monkeypatch.setattr(modulo_detector, "PredictorValidado", PredictorQueCambiaHilos)
+    hilos_anteriores = torch.get_num_threads()
+    try:
+        detector = DetectorJPEG(cargado, config)
+        assert torch.get_num_threads() == config.torch_threads == 1
+        detector.inferir(_jpeg(tmp_path / "S01_f0001.jpg"))
+        assert torch.get_num_threads() == config.torch_threads
+    finally:
+        torch.set_num_threads(hilos_anteriores)
+
+
 @pytest.mark.parametrize("contenido", [b"", b"no es JPEG", b"\xff\xd8\xff"])
 def test_jpeg_ilegible_no_se_confunde_con_cero_detecciones(tmp_path, contenido):
     ruta = tmp_path / "corrupto.jpg"
     ruta.write_bytes(contenido)
+    with pytest.raises(ErrorImagenJPEG, match="decodificar"):
+        _detector_falso([]).inferir(ruta)
+
+
+def test_error_de_opencv_al_decodificar_es_error_imagen(tmp_path, monkeypatch):
+    ruta = tmp_path / "vacio.jpg"
+    ruta.write_bytes(b"")
+
+    def imread_con_error(_ruta, _modo):
+        raise cv2.error("!buf.empty() en imdecode")
+
+    monkeypatch.setattr(cv2, "imread", imread_con_error)
     with pytest.raises(ErrorImagenJPEG, match="decodificar"):
         _detector_falso([]).inferir(ruta)
 
@@ -234,8 +293,13 @@ def test_checkpoint_real_jpeg_y_validacion_en_ruta_de_inferencia(monkeypatch, tm
     monkeypatch.setattr(downloads, "get_github_assets", descarga_prohibida)
     config = cargar_config_detector()
     detector = DetectorJPEG(cargar_pesos(ruta, config), config)
+    assert torch.get_num_threads() == config.torch_threads
     raiz = Path(__file__).resolve().parents[1]
     taza = detector.inferir(raiz / "docs/carro/objeto_taza_centro_cerca.jpg")
+    detector.calentar()
+    taza_tras_calentar = detector.inferir(raiz / "docs/carro/objeto_taza_centro_cerca.jpg")
+    assert taza_tras_calentar.detections == taza.detections
+    assert torch.get_num_threads() == config.torch_threads
     lateral = detector.inferir(raiz / "docs/carro/objeto_botella_der.jpg")
     otra_proporcion = detector.inferir(raiz / "docs/carro/atras.jpg")
     assert (taza.width, taza.height, taza.tensor_shape) == (640, 480, (1, 3, 480, 640))

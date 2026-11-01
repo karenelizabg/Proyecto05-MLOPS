@@ -151,13 +151,28 @@ class DetectorJPEG:
         self.predictor.setup_model(model=cargado.modelo.model, verbose=False)
         if self.predictor.model.device.type != "cpu" or self.predictor.model.fp16:
             raise ValueError("el predictor debe permanecer en CPU y FP32")
+        # setup_model -> select_device restablece los hilos intraop de Torch.
+        torch.set_num_threads(config.torch_threads)
+        if torch.get_num_threads() != config.torch_threads:
+            raise ValueError("no se pudo fijar el número de hilos intraop de Torch")
+
+    def calentar(self) -> None:
+        """Prepara la misma ruta predictor(BGR) antes de iniciar el reloj del run."""
+        imagen = np.zeros((480, 640, 3), dtype=np.uint8)
+        with self._lock:
+            resultados = self.predictor(source=imagen, stream=False)
+            if len(resultados) != 1:
+                raise ErrorSalidaInvalida("el calentamiento no devolvió exactamente un cuadro")
 
     def inferir(self, ruta: str | Path) -> ResultadoJPEG:
         """Decodifica el JPEG local y ejecuta la ruta nativa de predicción."""
         archivo = Path(ruta)
         if archivo.suffix.lower() not in {".jpg", ".jpeg"}:
             raise ErrorImagenJPEG("se requiere un archivo JPEG local")
-        imagen = cv2.imread(str(archivo), cv2.IMREAD_COLOR)
+        try:
+            imagen = cv2.imread(str(archivo), cv2.IMREAD_COLOR)
+        except cv2.error as exc:
+            raise ErrorImagenJPEG(f"no se pudo decodificar JPEG válido: {archivo}") from exc
         if (
             imagen is None
             or not isinstance(imagen, np.ndarray)

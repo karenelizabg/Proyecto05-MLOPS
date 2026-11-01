@@ -70,7 +70,10 @@ def _capturas(
 
 def _dimensiones_legibles(ruta: Path) -> tuple[int, int] | None:
     """Recupera dimensiones para un error posterior a la decodificación."""
-    imagen = cv2.imread(str(ruta), cv2.IMREAD_COLOR)
+    try:
+        imagen = cv2.imread(str(ruta), cv2.IMREAD_COLOR)
+    except cv2.error:
+        return None
     if imagen is None or imagen.ndim != 3 or imagen.shape[0] < 1 or imagen.shape[1] < 1:
         return None
     alto, ancho = imagen.shape[:2]
@@ -80,7 +83,7 @@ def _dimensiones_legibles(ruta: Path) -> tuple[int, int] | None:
 def _evento_base(
     run_id: str,
     sequence_id: str,
-    indice: int,
+    frame_id: str,
     captura: float,
     emision: float,
     detector: DetectorJPEG,
@@ -89,7 +92,7 @@ def _evento_base(
         "schema_version": "1",
         "run_id": run_id,
         "sequence_id": sequence_id,
-        "frame_id": f"f{indice:06d}",
+        "frame_id": frame_id,
         "t_capture_ms": captura,
         "t_emit_ms": emision,
         "image_width": None,
@@ -109,6 +112,7 @@ def _evento_cuadro(
     run_id: str,
     sequence_id: str,
     indice: int,
+    frame_id: str,
     captura: float,
     transcurrido: Callable[[], float],
 ) -> dict[str, Any]:
@@ -119,7 +123,7 @@ def _evento_cuadro(
             or resultado.config_sha256 != detector.config.config_sha256
         ):
             raise ErrorSalidaInvalida("los hashes del resultado cambiaron durante el run")
-        evento = _evento_base(run_id, sequence_id, indice, captura, transcurrido(), detector)
+        evento = _evento_base(run_id, sequence_id, frame_id, captura, transcurrido(), detector)
         evento["image_width"] = resultado.width
         evento["image_height"] = resultado.height
         evento["status"] = "ok"
@@ -151,7 +155,7 @@ def _evento_cuadro(
             codigo = "unreadable_image"
         # El detalle y la ruta quedan en stderr local, nunca en el JSONL publicable.
         print(f"infer: cuadro {indice} ({ruta}): {type(exc).__name__}: {exc}", file=sys.stderr)
-        evento = _evento_base(run_id, sequence_id, indice, captura, transcurrido(), detector)
+        evento = _evento_base(run_id, sequence_id, frame_id, captura, transcurrido(), detector)
         if dimensiones is not None:
             evento["image_width"], evento["image_height"] = dimensiones
         evento["error"] = {"code": codigo, "message": _MENSAJES_ERROR[codigo]}
@@ -187,12 +191,16 @@ def ejecutar_run(
     if secuencia is None or _ID.fullmatch(secuencia) is None:
         raise ErrorRunInfer("sequence_id válido es obligatorio para un directorio")
     tiempos = _capturas(capture_ms, len(archivos), directorio)
-    if len(archivos) > 999999:
-        raise ErrorRunInfer("el run excede el límite de frame_id")
+    frame_ids = [ruta.stem for ruta in archivos]
+    if any(_ID.fullmatch(frame_id) is None for frame_id in frame_ids):
+        raise ErrorRunInfer("cada frame_id debe cumplir [A-Za-z0-9._-]{1,64}")
+    if len(set(frame_ids)) != len(frame_ids):
+        raise ErrorRunInfer("frame_id repetido en el run")
 
     destino = Path(salida)
     if destino.suffix.lower() != ".jsonl":
         destino /= f"{run_id}.jsonl"
+    detector.calentar()
     destino.parent.mkdir(parents=True, exist_ok=True)
     eventos: list[dict[str, Any]] = []
     origen = reloj()
@@ -202,7 +210,7 @@ def ejecutar_run(
 
     errores = 0
     with destino.open("x", encoding="utf-8", newline="\n") as archivo:
-        for indice, ruta in enumerate(archivos, start=1):
+        for indice, (ruta, frame_id) in enumerate(zip(archivos, frame_ids, strict=True), start=1):
             if tiempos is None:
                 captura = transcurrido()  # Recepción del JPEG individual en este run.
             else:
@@ -211,7 +219,7 @@ def ejecutar_run(
                 if restante > 0:
                     dormir(restante / 1000)
             evento = _evento_cuadro(
-                detector, ruta, run_id, secuencia, indice, captura, transcurrido
+                detector, ruta, run_id, secuencia, indice, frame_id, captura, transcurrido
             )
             evento["t_emit_ms"] = transcurrido()
             linea = _serializar_evento(evento, eventos)

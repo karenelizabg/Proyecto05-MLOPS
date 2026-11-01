@@ -11,6 +11,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 import numpy as np
+import torch
 
 from infer.config import cargar_config_detector
 from infer.detector import DetectorJPEG
@@ -39,6 +40,7 @@ def main() -> None:
     config = cargar_config_detector()
     cargado = cargar_pesos(args.weights, config)
     detector = DetectorJPEG(cargado, config)
+    hilos_tras_setup = torch.get_num_threads()
     for _ in range(10):
         detector.inferir(args.image)
 
@@ -73,6 +75,9 @@ def main() -> None:
             for nombre in ("ultralytics", "torch", "torchvision", "opencv-python", "numpy")
         },
         "torch_threads": config.torch_threads,
+        "torch_threads_configured": config.torch_threads,
+        "torch_threads_after_setup": hilos_tras_setup,
+        "torch_threads_effective": torch.get_num_threads(),
         "device": "cpu",
         "image": args.image.name,
         "image_sha256": hashlib.sha256(args.image.read_bytes()).hexdigest(),

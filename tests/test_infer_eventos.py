@@ -5,18 +5,28 @@ from __future__ import annotations
 import math
 import os
 import shutil
+import threading
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
 import numpy as np
 import pytest
+import torch
 
+import infer.__main__ as modulo_cli
 import infer.eventos as modulo_eventos
 from contrato.validador import leer_eventos, validar_evento, validar_flujo
 from infer.__main__ import main
 from infer.config import cargar_config_detector
-from infer.detector import Deteccion, ErrorImagenJPEG, ErrorSalidaInvalida, ResultadoJPEG
+from infer.detector import (
+    Deteccion,
+    DetectorJPEG,
+    ErrorImagenJPEG,
+    ErrorSalidaInvalida,
+    ResultadoJPEG,
+)
 from infer.eventos import ErrorRunInfer, _serializar_evento, ejecutar_run
 from infer.pesos import ModeloCargado
 
@@ -33,6 +43,9 @@ class DetectorFalso:
         self.detecciones = detecciones
         self.error = error
         self.rutas = []
+
+    def calentar(self):
+        pass
 
     def inferir(self, ruta):
         self.rutas.append(ruta)
@@ -69,9 +82,58 @@ def test_un_jpeg_vacio_usa_recepcion_monotonica(tmp_path):
     eventos, errores = _run(tmp_path)
     ev = eventos[0]
     assert errores == 0
-    assert ev["sequence_id"] == "independent" and ev["frame_id"] == "f000001"
+    assert ev["sequence_id"] == "independent" and ev["frame_id"] == "cuadro"
     assert ev["status"] == "ok" and ev["detections"] == [] and "error" not in ev
     assert ev["t_emit_ms"] >= ev["t_capture_ms"] >= 0
+
+
+@pytest.mark.parametrize("directorio", [False, True])
+def test_calentamiento_de_35_segundos_no_envejece_primer_cuadro(tmp_path, directorio):
+    tiempo = [100.0]
+
+    class DetectorLento(DetectorFalso):
+        calentamientos = 0
+
+        def calentar(self):
+            self.calentamientos += 1
+            tiempo[0] += 35.0
+
+        def inferir(self, ruta):
+            tiempo[0] += 0.01
+            return super().inferir(ruta)
+
+    detector = DetectorLento()
+    entrada = tmp_path / "entrada" if directorio else _jpeg(tmp_path / "S01_f0001.jpg")
+    if directorio:
+        entrada.mkdir()
+        _jpeg(entrada / "S01_f0001.jpg")
+        _jpeg(entrada / "S01_f0002.jpg")
+
+    def reloj():
+        return tiempo[0]
+
+    def dormir(segundos):
+        tiempo[0] += segundos
+
+    eventos, errores = _run(
+        tmp_path,
+        detector,
+        entrada=entrada,
+        capturas=[0, 200] if directorio else None,
+        sequence_id="S01" if directorio else None,
+        reloj=reloj,
+        dormir=dormir,
+    )
+    assert errores == 0 and detector.calentamientos == 1
+    rutas_esperadas = (
+        [entrada / "S01_f0001.jpg", entrada / "S01_f0002.jpg"] if directorio else [entrada]
+    )
+    assert detector.rutas == rutas_esperadas
+    assert [evento["frame_id"] for evento in eventos] == (
+        ["S01_f0001", "S01_f0002"] if directorio else ["S01_f0001"]
+    )
+    assert eventos[0]["t_emit_ms"] - eventos[0]["t_capture_ms"] == pytest.approx(10)
+    assert eventos[0]["t_emit_ms"] < 100
 
 
 def test_bottle_y_cup_en_jsonl(tmp_path):
@@ -100,8 +162,76 @@ def test_directorio_reproduce_tiempos_explicitos_y_ids_unicos(tmp_path):
         sequence_id="S01",
     )
     assert [e["t_capture_ms"] for e in eventos] == [0.0, 1.0]
-    assert [e["frame_id"] for e in eventos] == ["f000001", "f000002"]
+    assert [e["frame_id"] for e in eventos] == ["a", "b"]
     assert [r.name for r in detector.rutas] == ["a.jpeg", "b.jpg"]
+
+
+@pytest.mark.parametrize("nombre", ["S01_f0001", "ensayo-0001"])
+def test_frame_id_es_stem_valido_en_jpeg_individual(tmp_path, nombre):
+    ruta = _jpeg(tmp_path / f"{nombre}.jpg")
+    eventos, _ = _run(tmp_path, entrada=ruta)
+    assert eventos[0]["frame_id"] == nombre
+
+
+def test_frame_id_neutral_en_directorio(tmp_path):
+    carpeta = tmp_path / "entrada"
+    carpeta.mkdir()
+    _jpeg(carpeta / "S01_f0001.jpg")
+    _jpeg(carpeta / "ensayo-0001.jpeg")
+    eventos, _ = _run(
+        tmp_path, entrada=carpeta, capturas=[0, 1], sequence_id="S01", run_id="neutral"
+    )
+    assert [evento["frame_id"] for evento in eventos] == ["S01_f0001", "ensayo-0001"]
+    assert {evento["run_id"] for evento in eventos} == {"neutral"}
+
+
+@pytest.mark.parametrize("nombre", ["nombre inválido", "a" * 65])
+def test_frame_id_invalido_se_rechaza_antes_de_crear_salida(tmp_path, nombre):
+    entrada = _jpeg(tmp_path / f"{nombre}.jpg")
+    salida = tmp_path / "nueva" / "salida.jsonl"
+    with pytest.raises(ErrorRunInfer, match="frame_id"):
+        ejecutar_run(DetectorFalso(), entrada, salida, run_id="prueba")
+    assert not salida.exists()
+    assert not salida.parent.exists()
+
+
+def test_frame_id_invalido_en_segundo_cuadro_no_deja_salida_parcial(tmp_path):
+    carpeta = tmp_path / "entrada"
+    carpeta.mkdir()
+    _jpeg(carpeta / "a.jpg")
+    _jpeg(carpeta / "b inválido.jpg")
+    salida = tmp_path / "nueva" / "salida.jsonl"
+    detector = DetectorFalso()
+    with pytest.raises(ErrorRunInfer, match="frame_id"):
+        ejecutar_run(
+            detector,
+            carpeta,
+            salida,
+            run_id="prueba",
+            sequence_id="S01",
+            capture_ms=[0, 1],
+        )
+    assert detector.rutas == []
+    assert not salida.exists() and not salida.parent.exists()
+
+
+def test_frame_id_duplicado_jpg_jpeg_se_rechaza_antes_de_crear_salida(tmp_path):
+    carpeta = tmp_path / "entrada"
+    carpeta.mkdir()
+    _jpeg(carpeta / "S01_f0001.jpg")
+    _jpeg(carpeta / "S01_f0001.jpeg")
+    salida = tmp_path / "nueva" / "salida.jsonl"
+    with pytest.raises(ErrorRunInfer, match="repetido"):
+        ejecutar_run(
+            DetectorFalso(),
+            carpeta,
+            salida,
+            run_id="prueba",
+            sequence_id="S01",
+            capture_ms=[0, 1],
+        )
+    assert not salida.exists()
+    assert not salida.parent.exists()
 
 
 def test_infer_no_abre_anotaciones_ni_manifiesto(tmp_path, monkeypatch):
@@ -145,6 +275,86 @@ def test_jpeg_corrupto_emite_unreadable_image(tmp_path):
     ruta.write_bytes(b"incorrecto")
     eventos, errores = _run(tmp_path, entrada=ruta)
     assert errores == 1 and eventos[0]["error"]["code"] == "unreadable_image"
+
+
+def test_cli_continua_despues_de_jpeg_vacio_con_cv2_error(tmp_path, monkeypatch):
+    carpeta = tmp_path / "entrada"
+    carpeta.mkdir()
+    (carpeta / "a_vacio.jpg").write_bytes(b"")
+    _jpeg(carpeta / "b_valido.jpg")
+    config = cargar_config_detector()
+    detector = object.__new__(DetectorJPEG)
+    detector.config = config
+    detector.cargado = ModeloCargado(object(), "a" * 64, config.config_sha256)
+    detector.clases = {39, 41}
+    detector._lock = threading.Lock()
+
+    class Predictor:
+        tensor_shape = None
+
+        def __call__(self, source, stream=False):
+            assert stream is False
+            self.tensor_shape = (1, 3, *source.shape[:2])
+            return [
+                SimpleNamespace(
+                    orig_shape=source.shape[:2],
+                    boxes=SimpleNamespace(data=torch.empty((0, 6))),
+                )
+            ]
+
+    detector.predictor = Predictor()
+    imread_original = cv2.imread
+
+    def imread_windows(ruta, modo):
+        if Path(ruta).name == "a_vacio.jpg":
+            raise cv2.error("!buf.empty() en imdecode")
+        return imread_original(ruta, modo)
+
+    monkeypatch.setattr(cv2, "imread", imread_windows)
+    monkeypatch.setattr(modulo_cli, "cargar_pesos", lambda _ruta, _config: detector.cargado)
+    monkeypatch.setattr(modulo_cli, "DetectorJPEG", lambda _cargado, _config: detector)
+    salida = tmp_path / "secuencia.jsonl"
+    codigo = main(
+        [
+            "--input",
+            str(carpeta),
+            "--weights",
+            str(tmp_path / "pesos.pt"),
+            "--output",
+            str(salida),
+            "--run-id",
+            "windows",
+            "--sequence-id",
+            "S01",
+            "--capture-ms",
+            "0",
+            "--capture-ms",
+            "200",
+        ]
+    )
+    eventos = leer_eventos(salida)
+    assert codigo == 1
+    assert len(eventos) == 2 and validar_flujo(eventos) == []
+    assert eventos[0]["status"] == "error"
+    assert eventos[0]["error"]["code"] == "unreadable_image"
+    assert eventos[0]["detections"] == []
+    assert (eventos[0]["image_width"], eventos[0]["image_height"]) == (None, None)
+    assert eventos[1]["status"] == "ok" and eventos[1]["detections"] == []
+    assert (eventos[1]["image_width"], eventos[1]["image_height"]) == (80, 60)
+
+
+def test_error_opencv_en_lectura_auxiliar_no_aborta_run(tmp_path, monkeypatch):
+    ruta = tmp_path / "corrupto.jpg"
+    ruta.write_bytes(b"")
+
+    def imread_con_error(_ruta, _modo):
+        raise cv2.error("!buf.empty() en imdecode")
+
+    monkeypatch.setattr(cv2, "imread", imread_con_error)
+    eventos, errores = _run(tmp_path, DetectorFalso(error=RuntimeError("falló")), entrada=ruta)
+    assert errores == 1
+    assert eventos[0]["status"] == "error"
+    assert eventos[0]["error"]["code"] == "unreadable_image"
 
 
 @pytest.mark.parametrize(
@@ -263,7 +473,7 @@ def test_fallo_durante_procesamiento_deja_solo_eventos_completos(tmp_path, monke
             sequence_id="S01",
             capture_ms=[0, 1],
         )
-    assert [evento["frame_id"] for evento in leer_eventos(salida)] == ["f000001"]
+    assert [evento["frame_id"] for evento in leer_eventos(salida)] == ["a"]
 
 
 def test_id_repetido_y_hash_cambiante_se_rechazan(tmp_path):
@@ -313,14 +523,15 @@ def test_deteccion_no_finita_emite_invalid_output_sin_json_especial(tmp_path, va
 
 
 def test_renombrar_jpeg_y_anotaciones_no_cambian_predicciones(tmp_path):
-    original = _jpeg(tmp_path / "botella.jpg")
-    renombrada = tmp_path / "vacio.jpg"
+    original = _jpeg(tmp_path / "ensayo-0001.jpg")
+    renombrada = tmp_path / "ensayo-0002.jpg"
     shutil.copyfile(original, renombrada)
     (tmp_path / "botella.json").write_text('{"class_id":41}')
     detector = DetectorFalso((Deteccion(39, 0.9, (1, 2, 20, 30)),))
     primero, _ = _run(tmp_path, detector, entrada=original)
     segundo, _ = _run(tmp_path, detector, entrada=renombrada, run_id="otro")
     assert primero[0]["detections"] == segundo[0]["detections"]
+    assert primero[0]["frame_id"] != segundo[0]["frame_id"]
 
 
 def test_cli_real_extremo_a_extremo_sin_descargas(tmp_path, monkeypatch):
@@ -336,10 +547,12 @@ def test_cli_real_extremo_a_extremo_sin_descargas(tmp_path, monkeypatch):
     monkeypatch.setattr(downloads, "get_github_assets", prohibido)
     raiz = Path(__file__).resolve().parents[1]
     salida = tmp_path / "real.jsonl"
+    entrada = tmp_path / "S01_f0001.jpg"
+    shutil.copyfile(raiz / "docs/carro/objeto_taza_centro_cerca.jpg", entrada)
     codigo = main(
         [
             "--input",
-            str(raiz / "docs/carro/objeto_taza_centro_cerca.jpg"),
+            str(entrada),
             "--weights",
             checkpoint,
             "--output",

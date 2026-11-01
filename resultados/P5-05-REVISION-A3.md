@@ -1,11 +1,11 @@
 # P5-05 · revisión independiente de A3 en Windows
 
-**Estado:** instrucciones preparadas; A3 no ha ejecutado ni aceptado esta revisión. Se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7) y a la [evidencia macOS](P5-05-ACEPTACION.md). Mantener Ultralytics 8.3.0, el checkpoint aprobado y la configuración actual. No cambiar umbrales ni código durante esta revisión.
+**Estado:** A3 ejecutó tres JPEG en Windows 11 y solicitó cambios en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75); todavía faltan una escena múltiple, una despejada y el dictamen sobre las omisiones. Estas instrucciones se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7) y a la [evidencia macOS](P5-05-ACEPTACION.md). Mantener Ultralytics 8.3.0, el checkpoint aprobado y la configuración actual. No cambiar umbrales durante esta revisión.
 
 ## Bloqueos previos
 
 1. La rama `p5-05-detector-infer` está publicada en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75). Clonar esa rama y registrar el commit exacto antes de la revisión; no cambiar modelo, umbrales ni dependencias.
-2. Los 29 JPEG de P5-04 están fuera del repositorio. Ale necesita recibir los bytes originales por un medio acordado o elegir sus propios cuatro JPEG. Para revisar específicamente varios_1 y varios_2 necesita esos dos archivos, con los SHA-256 indicados más abajo. Las anotaciones y los manifiestos no son entrada de inferencia.
+2. Los 29 JPEG de P5-04 están fuera del repositorio. Ale necesita recibir los bytes originales por un medio acordado o elegir sus propios cuatro JPEG. Para revisar específicamente varios_1 y varios_2 necesita esos dos archivos, con los SHA-256 indicados más abajo. Las anotaciones y los manifiestos no son entrada de inferencia. El CLI usa el nombre del JPEG sin extensión como `frame_id`: preparar copias con nombres neutros sin alterar los originales.
 3. El checkpoint no está en el repositorio. P5-04 lo obtuvo de la [release oficial de Ultralytics v8.3.0](https://github.com/ultralytics/assets/releases/tag/v8.3.0); la release contiene el artefacto yolo11n.pt de 5 613 764 bytes. La URL de abajo es la del procedimiento ya usado. Si GitHub está inaccesible, obtener una copia del mismo archivo aprobado mediante un medio acordado y comprobar su hash; no usar otro modelo ni permitir una descarga automática de infer.
 
 ## Preparación en Windows PowerShell
@@ -54,14 +54,14 @@ No continuar si el hash no coincide. El CLI repetirá la verificación **antes**
 
 Ale elige **independientemente** un JPEG con objeto central, uno lateral, uno con varios objetos y uno sin objetos. Registrar su elección y el SHA-256 de cada JPEG **antes de mirar las salidas macOS**. Puede usar las fotos recibidas de P5-04 o fotos propias. No introducir anotaciones, nombres de clase, manifiestos ni archivos CSV como entrada del comando. Evitar nombres con caracteres no ASCII hasta verificar que OpenCV los decodifique en su equipo.
 
-Sustituir las cuatro rutas por archivos reales. Cada imagen se procesa como JPEG individual: t_capture_ms es el instante de recepción durante ese run, **no una fecha histórica inventada**. Los cuatro run_id distintos generan cuatro JSONL; el nombre de archivo no determina las detecciones.
+Sustituir las cuatro rutas por archivos reales. Cada imagen se procesa como JPEG individual: t_capture_ms es el instante de recepción durante ese run, **no una fecha histórica inventada**. Los cuatro run_id distintos generan cuatro JSONL; el nombre de archivo determina solo `frame_id`, nunca las detecciones. Copiar cada JPEG a un nombre neutro `S01_f0001.jpg` a `S01_f0004.jpg` antes de inferir y comparar el SHA-256 de la copia.
 
 ~~~powershell
 $Central  = 'C:\ruta\de\Ale\central.jpg'
 $Lateral  = 'C:\ruta\de\Ale\lateral.jpg'
 $Varios   = 'C:\ruta\de\Ale\varios.jpg'
 $Vacio    = 'C:\ruta\de\Ale\despejado.jpg'
-$ReviewDir = Join-Path (Get-Location).Path 'resultados\revision-a3'
+$ReviewDir = Join-Path $WeightsDir 'revision-a3'
 New-Item -ItemType Directory -Force -Path $ReviewDir | Out-Null
 Start-Transcript -Path (Join-Path $ReviewDir 'comandos-powershell.txt')
 $Cases = @(
@@ -70,13 +70,20 @@ $Cases = @(
     @{ Name = 'varios';   Path = $Varios },
     @{ Name = 'despejado'; Path = $Vacio }
 )
+$FrameIndex = 1
 foreach ($Case in $Cases) {
     if (-not (Test-Path -LiteralPath $Case.Path -PathType Leaf)) { throw "Falta JPEG: $($Case.Path)" }
     $InputHash = (Get-FileHash -LiteralPath $Case.Path -Algorithm SHA256).Hash.ToLowerInvariant()
     "Entrada $($Case.Name): $($Case.Path), SHA-256=$InputHash"
+    $Neutral = Join-Path $ReviewDir ('S01_f{0:D4}.jpg' -f $FrameIndex)
+    if (Test-Path -LiteralPath $Neutral) { throw "La copia neutral ya existe: $Neutral" }
+    Copy-Item -LiteralPath $Case.Path -Destination $Neutral
+    if ((Get-FileHash -LiteralPath $Neutral -Algorithm SHA256).Hash.ToLowerInvariant() -ne $InputHash) {
+        throw "La copia neutral no coincide: $Neutral"
+    }
     $Out = Join-Path $ReviewDir ($Case.Name + '.jsonl')
     $RunId = 'a3-' + $Case.Name
-    & $Python -m infer --input $Case.Path --config .\config\detector.json --weights $Weights --output $Out --run-id $RunId
+    & $Python -m infer --input $Neutral --config .\config\detector.json --weights $Weights --output $Out --run-id $RunId
     if ($LASTEXITCODE -ne 0) { throw "infer falló en $($Case.Name); revisar JSONL y stderr" }
     & $Python -m contrato $Out
     if ($LASTEXITCODE -ne 0) { throw "Contrato v1 inválido en $Out" }
@@ -86,6 +93,7 @@ foreach ($Case in $Cases) {
     if ($Case.Name -eq 'despejado' -and ($Event.status -ne 'ok' -or $Event.detections.Count -ne 0)) {
         throw 'El caso despejado no dio status=ok con detections=[]'
     }
+    $FrameIndex++
 }
 Stop-Transcript
 ~~~
@@ -133,7 +141,7 @@ Tras la selección ciega, revisar también los **dos archivos exactos** de P5-04
 | varios_1.jpg | fcd354f2ae91480f872f672ef19d17bc7a17f00bde47c4ae04dadb | bottle 39, confianza 0.2691411376, bbox [296.1824,107.0134,346.9567,274.1030]; taza visible omitida |
 | varios_2.jpg | 12bf69b11bad6f4fbf70d7dae7655ae0cd4cea0e0c5e85ad7647806f935da6c6 | status=ok, detections=[]; botella y taza visibles omitidas |
 
-Sustituir las rutas, comprobar los bytes y ejecutarlos como JPEG individuales, con nuevos run_id y archivos de salida:
+Sustituir las rutas, comprobar los bytes y ejecutar **copias neutrales** como JPEG individuales, con nuevos run_id y archivos de salida. El SHA-256 completo de `varios_1` se comprobó contra el manifiesto histórico de P5-04:
 
 ~~~powershell
 $Varios1 = 'C:\ruta\de\Ale\varios_1.jpg'
@@ -142,11 +150,18 @@ $Hash1 = (Get-FileHash -LiteralPath $Varios1 -Algorithm SHA256).Hash.ToLowerInva
 $Hash2 = (Get-FileHash -LiteralPath $Varios2 -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($Hash1 -ne 'fcd354f2ae91480f872f672ef19d17bc7a17f00bde47c4ae04dadb') { throw 'varios_1 no coincide' }
 if ($Hash2 -ne '12bf69b11bad6f4fbf70d7dae7655ae0cd4cea0e0c5e85ad7647806f935da6c6') { throw 'varios_2 no coincide' }
+$Neutral1 = Join-Path $ReviewDir 'S01_f0005.jpg'
+$Neutral2 = Join-Path $ReviewDir 'S01_f0006.jpg'
+if ((Test-Path -LiteralPath $Neutral1) -or (Test-Path -LiteralPath $Neutral2)) { throw 'Las copias neutrales ya existen' }
+Copy-Item -LiteralPath $Varios1 -Destination $Neutral1
+Copy-Item -LiteralPath $Varios2 -Destination $Neutral2
+if ((Get-FileHash -LiteralPath $Neutral1 -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Hash1) { throw 'Copia de varios_1 alterada' }
+if ((Get-FileHash -LiteralPath $Neutral2 -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Hash2) { throw 'Copia de varios_2 alterada' }
 $Out1 = Join-Path $ReviewDir 'varios_1.jsonl'
 $Out2 = Join-Path $ReviewDir 'varios_2.jsonl'
-& $Python -m infer --input $Varios1 --config .\config\detector.json --weights $Weights --output $Out1 --run-id a3-varios-1
+& $Python -m infer --input $Neutral1 --config .\config\detector.json --weights $Weights --output $Out1 --run-id a3-varios-1
 if ($LASTEXITCODE -ne 0) { throw 'infer falló en varios_1' }
-& $Python -m infer --input $Varios2 --config .\config\detector.json --weights $Weights --output $Out2 --run-id a3-varios-2
+& $Python -m infer --input $Neutral2 --config .\config\detector.json --weights $Weights --output $Out2 --run-id a3-varios-2
 if ($LASTEXITCODE -ne 0) { throw 'infer falló en varios_2' }
 & $Python -m contrato $Out1 $Out2
 if ($LASTEXITCODE -ne 0) { throw 'Contrato v1 inválido en varios_1 o varios_2' }
