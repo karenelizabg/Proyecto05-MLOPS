@@ -23,14 +23,15 @@ versiones, así que se puede comprobar que se midió aquí.
 
 ```bash
 uv run python -m bench \
-  --entradas datos/cuadros/ \
+  --entradas datos/cuadros/S0*/ \
   --salida mediciones/<run>/ \
   --equipo "laptop de A3" \
   --detector <módulo del detector> \
   --model-sha256 <hash de los pesos congelados> --config-sha256 <hash de la configuración congelada>
 ```
 
-- `--entradas`: imágenes o carpetas (de una carpeta se toman `.jpg`, `.jpeg` y `.png` en orden de nombre). Se
+- `--entradas`: imágenes o carpetas (de una carpeta se toman `.jpg`, `.jpeg` y `.png` en orden de nombre, sin
+  entrar a subcarpetas: por eso van las de cada secuencia). Se
   recorren en ciclo hasta juntar las ejecuciones.
 - `--detector falso` (el valor por omisión) usa el detector de prueba del arnés. No tiene archivo de pesos, así que
   **solo corre con `--prueba`**. El detector real (P5-05) se
