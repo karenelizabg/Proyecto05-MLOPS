@@ -4,8 +4,9 @@ Qué acredita este proyecto y qué no, y cómo se contrastan los tiempos medidos
 salen de la corrida final de P5-15 (`python -m bench`) y de `python -m bench.limites`, que escribe
 `contraste.md` junto a ella. Aquí no se copian a mano: se enlaza la corrida.
 
-> **Estado:** la medición final espera al detector de P5-05. Las secciones marcadas *Pendiente* se completan
-> con esa corrida.
+> **Estado:** la medición final espera al paso 2 del congelamiento (#13): fusionar P5-05 (#75) con
+> `torch_threads: 2` y registrar su `config_sha256`. Hasta entonces nadie corre el detector sobre S01–S08.
+> Las secciones marcadas *Pendiente* se completan con esa corrida.
 
 ## Qué acredita el control virtual
 
@@ -89,22 +90,53 @@ Lo que deja: en batería no se cumplen los plazos, así que la corrida final va 
 lo advierte). El número de hilos cambia el resultado a casi la mitad, así que el detector de P5-05 debe fijarlo y
 `resumen.json` registrarlo.
 
-Otros dos hallazgos, ya reportados en la revisión de P5-05 (#75):
+### Cuántos hilos (decisión del PM A, 2026-10-31)
+
+Con 1 hilo, la evidencia de P5-05 en macOS dio p95 244 ms y máximo 314 ms, por encima del periodo de 200 ms.
+Karen fijó la regla **antes de medir**: el menor número de hilos con p95 ≤ 150 ms y máximo ≤ 200 ms; si
+ninguno cumple, 7. Se midió en el equipo de PEND-05, conectado, con el procedimiento de
+`resultados/p5-05-benchmark.py` de #75 (`calentar()`, 10 calentamientos y 50 mediciones de
+`detector_total_ms` sobre `docs/carro/objeto_taza_centro_cerca.jpg`), una configuración por proceso:
+
+| Hilos | Mediana | p95 | Máximo | Regla |
+|---|---|---|---|---|
+| 1 | 141 ms | 158 ms | 210 ms | no cumple |
+| **2** | **101 ms** | **138 ms** | **189 ms** | **cumple: se elige** |
+| 4 | 97 ms | 129 ms | 168 ms | cumple |
+| 7 | 83 ms | 161 ms | 218 ms | no cumple |
+
+Se midió una sola vez y no se repitió para escoger. Dos cosas que la medición final tiene que confirmar:
+
+- **El máximo con 2 hilos queda a 11 ms del límite.** Un cuadro lento basta para pasarlo.
+- **Las colas varían entre corridas.** Con 7 hilos, la prueba de P5-04 dio p95 113 ms y máximo 162 ms, y esta
+  dio 161 y 218 ms. Con más hilos compiten más con el sistema.
+
+Los hilos no cambian las detecciones (7 contra 1 hilo: Δconf ≤ 1.3e-6), pero sí el `config_sha256`, por eso
+se decidió antes del paso 2.
+
+### Otros hallazgos, ya corregidos en P5-05 (#75)
 
 - **El reloj de `infer`:** en el primer recorrido real (T16, `docs/recorrido-real.md`) los cuadros llegaron a
   B con unos 35 s de edad y todos terminaron en STOP por `cuadro_viejo`, porque la carga y el calentamiento
-  del modelo entraban en el reloj del run. El benchmark los deja fuera; `infer` también debe hacerlo.
-- **Los hilos de `infer`:** `config/detector.json` pide 1 hilo, pero Ultralytics lo cambia a 7 al preparar el
-  predictor. El adaptador del benchmark (`bench.yolo`) vuelve a fijar el de la configuración y registra el
-  que de verdad quedó.
+  del modelo entraban en el reloj del run. Con #75 el reloj empieza después de `calentar()`: el primer cuadro
+  sale con unos 15 ms de edad.
+- **Los hilos de `infer`:** `config/detector.json` pedía 1 hilo, pero Ultralytics lo cambiaba a 7 al preparar
+  el predictor. Con #75, `DetectorJPEG` vuelve a fijar el de la configuración y falla si no queda.
+  `bench.yolo` usa ese mismo detector, no tiene opción para cambiar los hilos y registra los que de verdad
+  quedaron.
+- **El `frame_id`:** `infer` numeraba los cuadros por posición (`f000001`) y el conjunto usa el nombre de la
+  captura (`S01_f0001`), así que no se unía ningún cuadro con sus anotaciones. Con #75 usa el nombre del JPEG.
 
 ## Conjunto, umbrales y condiciones
 
-- **Conjunto:** 8 secuencias (S01–S08), todas de evaluación (D-06), con 107 cuadros anotados en P5-10. E3
-  pide al menos 60. *Pendiente:* la cifra y el hash finales al congelar (P5-11). Es un conjunto chico: las
-  métricas tienen la incertidumbre de una muestra así. S09 y S10 son solo para las pruebas de B y no cuentan.
+- **Conjunto:** 8 secuencias (S01–S08), todas de evaluación (D-06), con 107 cuadros anotados en P5-10: 71 con
+  obstáculo y 36 despejados. E3 pide al menos 60. Congelado en el tag `datos-evaluacion-v1` (P5-11, #13), con
+  SHA-256 `8a75e271…` del manifiesto y `7e842784…` de `anotaciones.jsonl`. Es un conjunto chico: las métricas
+  tienen la incertidumbre de una muestra así. S09 y S10 son solo para las pruebas de B y no cuentan.
+- **Una excepción a D-06, declarada en #13:** antes de congelar se corrió el detector sobre S01, una toma
+  fallida de S01 y la primera S02, que después se repitió.
 - **Umbrales:** `conf` 0.25 e `iou` 0.70, propuestos en P5-04 (`modelo/configuracion.p5-04.propuesta.json`),
-  fijados antes de correr sobre los cuadros. *Pendiente:* el hash de la configuración congelada de P5-05.
+  fijados antes de correr sobre los cuadros. *Pendiente:* el `config_sha256` del paso 2 (con 2 hilos).
 - **Objetos y escena (PEND-04):** botella (39) y taza (41), según P5-03; interior, piso plano, buena luz.
 - **Iluminación:** solo luz de interior. No se probó con poca luz, contraluz ni exteriores.
 
