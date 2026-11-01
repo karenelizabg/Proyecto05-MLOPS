@@ -16,7 +16,8 @@ SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 def _sha256(ruta: Path) -> str:
     digest = hashlib.sha256()
-    with ruta.open("rb") as archivo:
+    # S8707: lectura local de originales o copias; ambos hashes se contrastan con el manifiesto.
+    with ruta.open("rb") as archivo:  # NOSONAR
         for bloque in iter(lambda: archivo.read(1024 * 1024), b""):
             digest.update(bloque)
     return digest.hexdigest()
@@ -34,7 +35,8 @@ def preparar_fotos(
     if not originales.is_dir():
         raise ValueError("falta la carpeta de 29 JPEG originales")
 
-    with Path(manifiesto).open(encoding="utf-8-sig", newline="") as archivo:
+    # S8707: manifiesto local del operador; se validan sus 29 filas, nombres y hashes.
+    with Path(manifiesto).open(encoding="utf-8-sig", newline="") as archivo:  # NOSONAR
         filas = list(csv.DictReader(archivo))
     if len(filas) != 29 or any(not {"archivo", "sha256", "bytes"} <= fila.keys() for fila in filas):
         raise ValueError("el manifiesto P5-04 debe contener 29 filas con archivo, sha256 y bytes")
@@ -70,9 +72,11 @@ def preparar_fotos(
             shutil.copyfile(origen, destino)
             if _sha256(destino) != sha:
                 raise ValueError("una copia neutral no conserva los bytes originales")
-        preparadas.rename(copias)
+        # S8707: copias verificadas; destino nuevo fuera del repositorio en un padre confiable.
+        preparadas.rename(copias)  # NOSONAR
 
-    with tabla.open("x", encoding="utf-8", newline="\n") as archivo:
+    # S8707: tabla local nueva; el modo exclusivo impide reemplazar un archivo o enlace final.
+    with tabla.open("x", encoding="utf-8", newline="\n") as archivo:  # NOSONAR
         archivo.write("neutral_name,sha256\n")
         for nombre, sha in correspondencias:
             archivo.write(f"{nombre},{sha}\n")

@@ -61,7 +61,7 @@ No continuar si el hash no coincide. El CLI repetirá la verificación **antes**
 
 Ale elige **independientemente** un JPEG con objeto central, uno lateral, uno con varios objetos y uno sin objetos. Registrar su elección y el SHA-256 de cada JPEG **antes de mirar las salidas macOS**. Puede usar las fotos recibidas de P5-04 o fotos propias. No introducir anotaciones, nombres de clase, manifiestos ni archivos CSV como entrada del comando. Evitar nombres con caracteres no ASCII hasta verificar que OpenCV los decodifique en su equipo.
 
-Sustituir las cuatro rutas por archivos reales. Cada imagen se procesa como JPEG individual: t_capture_ms es el instante de recepción durante ese run, **no una fecha histórica inventada**. Los cuatro run_id distintos generan cuatro JSONL; el nombre de archivo determina solo `frame_id`, nunca las detecciones. Copiar cada JPEG a un nombre neutro `S01_f0001.jpg` a `S01_f0004.jpg` antes de inferir y comparar el SHA-256 de la copia.
+Sustituir las cuatro rutas por archivos reales. Cada imagen se procesa como JPEG individual: t_capture_ms es el instante de recepción durante ese run, **no una fecha histórica inventada**. Los cuatro run_id distintos generan cuatro JSONL; el nombre de archivo determina solo `frame_id`, nunca las detecciones. Copiar cada JPEG a un nombre neutro `ensayo-1001.jpg` a `ensayo-1004.jpg` antes de inferir y comparar el SHA-256 de la copia. Estos nombres son exclusivos de la revisión A3 y no representan cuadros de la secuencia oficial S01 ni filas de la tabla de 29 copias.
 
 ~~~powershell
 $Central  = 'C:\ruta\de\Ale\central.jpg'
@@ -77,12 +77,12 @@ $Cases = @(
     @{ Name = 'varios';   Path = $Varios },
     @{ Name = 'despejado'; Path = $Vacio }
 )
-$FrameIndex = 1
+$FrameIndex = 1001
 foreach ($Case in $Cases) {
     if (-not (Test-Path -LiteralPath $Case.Path -PathType Leaf)) { throw "Falta JPEG: $($Case.Path)" }
     $InputHash = (Get-FileHash -LiteralPath $Case.Path -Algorithm SHA256).Hash.ToLowerInvariant()
     "Entrada $($Case.Name): $($Case.Path), SHA-256=$InputHash"
-    $Neutral = Join-Path $ReviewDir ('S01_f{0:D4}.jpg' -f $FrameIndex)
+    $Neutral = Join-Path $ReviewDir ('ensayo-{0:D4}.jpg' -f $FrameIndex)
     if (Test-Path -LiteralPath $Neutral) { throw "La copia neutral ya existe: $Neutral" }
     Copy-Item -LiteralPath $Case.Path -Destination $Neutral
     if ((Get-FileHash -LiteralPath $Neutral -Algorithm SHA256).Hash.ToLowerInvariant() -ne $InputHash) {
@@ -145,7 +145,7 @@ Tras la selección ciega, revisar también los **dos archivos exactos** de P5-04
 
 | JPEG | SHA-256 esperado | macOS P5-05 |
 |---|---|---|
-| varios_1.jpg | fcd354f2ae91480f872f672ef19d17bc7a17f00bde47c4ae04dadb | bottle 39, confianza 0.2691411376, bbox [296.1824,107.0134,346.9567,274.1030]; taza visible omitida |
+| varios_1.jpg | fcd354f2ae91480f872f672ef19d17bc7a17b47109bb17f00bde47c4ae04dadb | bottle 39, confianza 0.2691411376, bbox [296.1824,107.0134,346.9567,274.1030]; taza visible omitida |
 | varios_2.jpg | 12bf69b11bad6f4fbf70d7dae7655ae0cd4cea0e0c5e85ad7647806f935da6c6 | status=ok, detections=[]; botella y taza visibles omitidas |
 
 Sustituir las rutas, comprobar los bytes y ejecutar **copias neutrales** como JPEG individuales, con nuevos run_id y archivos de salida. El SHA-256 completo de `varios_1` se comprobó contra el manifiesto histórico de P5-04:
@@ -155,10 +155,10 @@ $Varios1 = 'C:\ruta\de\Ale\varios_1.jpg'
 $Varios2 = 'C:\ruta\de\Ale\varios_2.jpg'
 $Hash1 = (Get-FileHash -LiteralPath $Varios1 -Algorithm SHA256).Hash.ToLowerInvariant()
 $Hash2 = (Get-FileHash -LiteralPath $Varios2 -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($Hash1 -ne 'fcd354f2ae91480f872f672ef19d17bc7a17f00bde47c4ae04dadb') { throw 'varios_1 no coincide' }
+if ($Hash1 -ne 'fcd354f2ae91480f872f672ef19d17bc7a17b47109bb17f00bde47c4ae04dadb') { throw 'varios_1 no coincide' }
 if ($Hash2 -ne '12bf69b11bad6f4fbf70d7dae7655ae0cd4cea0e0c5e85ad7647806f935da6c6') { throw 'varios_2 no coincide' }
-$Neutral1 = Join-Path $ReviewDir 'S01_f0005.jpg'
-$Neutral2 = Join-Path $ReviewDir 'S01_f0006.jpg'
+$Neutral1 = Join-Path $ReviewDir 'ensayo-0026.jpg'
+$Neutral2 = Join-Path $ReviewDir 'ensayo-0006.jpg'
 if ((Test-Path -LiteralPath $Neutral1) -or (Test-Path -LiteralPath $Neutral2)) { throw 'Las copias neutrales ya existen' }
 Copy-Item -LiteralPath $Varios1 -Destination $Neutral1
 Copy-Item -LiteralPath $Varios2 -Destination $Neutral2
