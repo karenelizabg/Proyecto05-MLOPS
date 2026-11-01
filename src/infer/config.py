@@ -32,7 +32,7 @@ _EJECUCION = {
     "device": "cpu",
     "dtype": "float32",
     "batch": 1,
-    "torch_threads": 1,
+    "torch_threads": 2,
     "augment": False,
 }
 _PREPROCESO = {

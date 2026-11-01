@@ -1,20 +1,27 @@
-# P5-05 · evidencia de aceptación CPU (actualizada 2026-10-31)
+# P5-05 · evidencia de aceptación CPU (actualizada 2026-11-01)
 
-Rama `p5-05-detector-infer`, publicada en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75). Esta actualización se ejecutó sobre los commits **locales** `c9c49b9` y `f915763`, este último con `origin/main=4ed9d385` integrado; todavía no se publicaron en el PR. Se contrastó el [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7) con el contrato A→B v1 y las ejecuciones de esta carpeta. Estas fotos son las **29 capturas de selección** que P5-04 atribuye a la ESP32-CAM; no son las ocho secuencias finales ni una verdad de referencia anotada. Las fotos y los pesos permanecen fuera del repositorio.
+Rama `p5-05-detector-infer`, publicada en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75). La evidencia de dos hilos se generó localmente después de `0bb2719`, sin commit ni push todavía. Se contrastó el [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7) con el contrato A→B v1. Las copias neutrales `ensayo-NNNN.jpg` son las **29 capturas de selección** que P5-04 atribuye a la ESP32-CAM; no son las ocho secuencias oficiales congeladas bajo `datos-evaluacion-v1` ni una verdad de referencia anotada. Las fotos y los pesos permanecen fuera del repositorio. No se ejecutó el detector sobre S01–S08 ni se usó `datos/cuadros/` para esta decisión.
 
-La [guía de revisión independiente para A3](P5-05-REVISION-A3.md) contiene comandos PowerShell, plantilla de registro y criterios para evaluar las omisiones. Ale ya comprobó tres JPEG y la instalación en Windows; faltan las escenas múltiples, la despejada y su dictamen sobre las omisiones. La aceptación de A3 sigue pendiente.
+**Restricción del conjunto congelado:** está prohibido ejecutar el detector
+sobre S01–S08 antes de completar el paso 2 del congelamiento y publicar el
+segundo tag. El segundo tag y el registro del nuevo `config_sha256` corresponden
+al procedimiento coordinado en el [issue #13](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/13).
+La elección de dos hilos se basó exclusivamente en las mediciones independientes
+de Ale en Windows; ni S01–S08 ni las mediciones macOS fueron criterio de selección.
+
+La [guía de revisión independiente para A3](P5-05-REVISION-A3.md) contiene comandos PowerShell. Ale aprobó formalmente el PR en el commit `621fbcc` tras revisar Windows y las omisiones. Sus mediciones posteriores de hilos fundamentan `torch_threads=2`; esta configuración nueva aún no forma parte de esa aprobación y debe revisarse después de publicarse.
 
 ## Entorno y artefactos
 
 - MacBook Air `Mac15,12`, Apple M3 (8 núcleos: 4 rendimiento, 4 eficiencia), 16 GB RAM; macOS 27.0.1 arm64. Es una medición **macOS**, no Windows.
-- Python 3.12.14; Ultralytics 8.3.0; torch 2.9.0; torchvision 0.24.0; OpenCV 4.11.0.86; NumPy 1.26.4; Pillow 12.3.0 tras integrar P5-09 desde `main`. CPU, FP32, batch 1. `DetectorJPEG` restablece un hilo intraop de PyTorch después de `setup_model` y verifica `torch.get_num_threads()`; esto no controla todos los pools de OpenCV, BLAS o interop.
+- Python 3.12.14; Ultralytics 8.3.0; torch 2.9.0; torchvision 0.24.0; OpenCV 4.11.0.86; NumPy 1.26.4; Pillow 12.3.0 tras integrar P5-09 desde `main`. CPU, FP32, batch 1. `DetectorJPEG` restablece **dos hilos intraop** de PyTorch después de `setup_model` y verifica `torch.get_num_threads()`; esto no controla todos los pools de OpenCV, BLAS o interop.
 - Checkpoint local de 5 613 764 bytes: `model_sha256=0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1`.
-- Configuración efectiva: `config_sha256=bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf`.
-- [Corrida A](p5-05-aceptacion-a.jsonl), [corrida B](p5-05-aceptacion-b.jsonl): 29 eventos cada una. [Casos extra](p5-05-casos-extra.jsonl): 4 eventos. [Ejecución sin red](p5-05-sin-red.jsonl): 1 evento. [Ejemplo del paso 4](p5-05-step4-real.jsonl): 1 evento. [JSONL de la captura integrada](p5-05-comando-integrado.jsonl): 1 evento válido.
-- [Captura auténtica integrada](P5-05-COMANDO-INTEGRADO.png): muestra ambos comandos completos, `1 cuadros, 0 errores` y `OK (1 eventos)` sobre el JSONL enlazado arriba. Heri la tomó en Terminal el 31 de octubre de 2026; la copia publicada conserva exactamente los bytes del PNG del Escritorio (SHA-256 `298513b774c519b4fc2b09325b082eb751dd38810284debb6087fad67c98f1bd`). No muestra rutas privadas ni credenciales.
+- Configuración efectiva actual: `config_sha256=6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08`. Solo cambió `torch_threads: 1 → 2`; el hash histórico de un hilo es `bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf`.
+- [Corrida A de dos hilos](p5-05-aceptacion-2h-a.jsonl), [corrida B de dos hilos](p5-05-aceptacion-2h-b.jsonl): 29 eventos cada una. [CLI individual de dos hilos](p5-05-comando-2h.jsonl): 1 evento. Son los JSONL vigentes. Las [corridas A](p5-05-aceptacion-a.jsonl) y [B](p5-05-aceptacion-b.jsonl) anteriores, [casos extra](p5-05-casos-extra.jsonl), [sin red](p5-05-sin-red.jsonl), [paso 4](p5-05-step4-real.jsonl) y [captura integrada anterior](p5-05-comando-integrado.jsonl) quedan como evidencia histórica de un hilo; sus hashes no deben confundirse con el actual.
+- [Captura auténtica integrada](P5-05-COMANDO-INTEGRADO.png): muestra ambos comandos completos, `1 cuadros, 0 errores` y `OK (1 eventos)` sobre el JSONL histórico de un hilo. Heri la tomó en Terminal el 31 de octubre de 2026; la copia publicada conserva exactamente los bytes del PNG del Escritorio (SHA-256 `298513b774c519b4fc2b09325b082eb751dd38810284debb6087fad67c98f1bd`). No muestra rutas privadas ni credenciales. No existe todavía una captura de Terminal de dos hilos; el JSONL nuevo se generó con el mismo CLI y pasó el validador.
 - [Captura auténtica de Terminal](P5-05-COMANDO.png): muestra la ejecución publicada anterior al cambio de `frame_id`, con [su JSONL original](p5-05-captura-evidencia.jsonl). Ambos se conservan como evidencia histórica, no como demostración del nuevo identificador; la imagen no muestra rutas privadas ni credenciales.
 - [Tabla neutral por SHA-256](p5-05-fotos-neutrales.csv) y [script de copias](p5-05-preparar-fotos.py): 29 pares `neutral_name,sha256`, sin nombres originales ni fotografías en Git.
-- [Latencia integrada, 50 muestras](p5-05-latencia.json), [réplica integrada, 50 muestras](p5-05-latencia-replica.json) y [script reproducible](p5-05-benchmark.py). Los dos JSON se regeneraron con el lock integrado, sin sustituir una serie rápida por otra.
+- [Latencia de dos hilos A](p5-05-latencia-2h-a.json), [réplica B](p5-05-latencia-2h-b.json) y [script reproducible](p5-05-benchmark.py): 50 muestras medidas por proceso. Las [series A](p5-05-latencia.json) y [B](p5-05-latencia-replica.json) de un hilo permanecen como evidencia histórica.
 
 ## Matriz de aceptación
 
@@ -22,16 +29,16 @@ La [guía de revisión independiente para A3](P5-05-REVISION-A3.md) contiene com
 |---|---|---|---|
 | JPEG real → caja, clase y confianza en CPU sin red | `botella_centro_cerca`, `botella_der`, `taza_centro_cerca`; ejecución con `socket.connect` bloqueado | Cajas visualmente alineadas; 39/41; salida sin red válida | **Cumplido en macOS** |
 | Preprocesamiento BGR→RGB, letterbox y `/255` explícitos | `config/DETECTOR.md`, `src/infer/detector.py`, pruebas de tensor y proporciones | Tensor 640×480 → `1×3×480×640`; 1200×1600 → `1×3×640×480` | **Cumplido** |
-| Confianza 0.25, NMS 0.70 por clase, clases `[39,41]`, cajas originales | Configuración y `tests/test_detector_jpeg.py` (NMS y `scale_boxes`) | Cajas finitas y dentro de límites en los 62 eventos | **Cumplido** |
+| Confianza 0.25, NMS 0.70 por clase, clases `[39,41]`, cajas originales | Configuración y `tests/test_detector_jpeg.py` (NMS y `scale_boxes`) | Cajas finitas y dentro de límites en las 58 líneas nuevas | **Cumplido** |
 | Pesos alterados → rechazo por SHA-256 | Copia temporal con último byte invertido; CLI terminó 2 | Hash obtenido `110fb84c…456529`; no se creó JSONL | **Cumplido** |
-| Dos corridas idénticas o diferencias cuantificadas | Corridas A/B de 29 JPEG, mismo orden, pesos, configuración y entorno | 29/29 vectores de detecciones idénticos: conteo, orden, clase, confianza y bbox; diferencias máximas 0 | **Cumplido en este equipo** |
+| Dos corridas idénticas o diferencias cuantificadas | Corridas A/B nuevas de 29 JPEG, mismo orden, pesos, configuración y entorno | 29/29 vectores idénticos; diferencias máximas 0, también frente a la corrida anterior de un hilo en este Mac | **Cumplido en este equipo** |
 | JPEG central, lateral, varios y despejado; cajas originales | 29 fotos de P5-04 e inspección visual de imágenes seleccionadas | Centro/lateral correctos; ambos `vacio_*` dan `ok=[]`; en `varios_1` solo botella, en `varios_2` ninguna aunque hay objetos visibles | **Parcial: cobertura de varios objetos** |
-| Cuatro imágenes escogidas por otra persona | A1 reutilizó las fotos de P5-04; [guía y plantilla para A3](P5-05-REVISION-A3.md) listas | Ale revisó tres JPEG en Windows; faltan escena múltiple, despejada y dictamen independiente | **Parcial** |
+| Revisión independiente de A3 | A3 instaló y ejecutó el PR en Windows; revisión formal en `621fbcc`; [guía](P5-05-REVISION-A3.md) | Ale aceptó las omisiones para P5-05 y aprobó el PR. La nueva configuración de dos hilos requiere revisión del commit futuro | **Parcial para la revisión nueva** |
 | Copia renombrada conserva resultado; no se abren anotaciones/manifiesto | Dos copias con SHA `8e360d41…ae07` y nombres opuestos dieron la misma detección; prueba `test_infer_no_abre_anotaciones_ni_manifiesto` falla si se abre un archivo señuelo | Misma clase, confianza y bbox; señuelos ignorados | **Cumplido** |
-| JSON estricto, sin `NaN` ni `Infinity` | Parseo con `parse_constant` que falla, búsqueda textual y `python -m contrato` | 63/63 eventos válidos en A, B, casos extra y captura integrada; ninguna línea contiene esos literales | **Cumplido** |
-| Un evento por cuadro; `ok=[]` y errores diferenciados | 29+29+4 eventos; JPEG corrupto | 22 cuadros vacíos `ok=[]` en cada corrida; corrupto `error/unreadable_image`; 4/4 en extra | **Cumplido** |
-| Evidencia JSONL en `resultados/` y captura del comando | [JSONL integrado](p5-05-comando-integrado.jsonl) y [captura auténtica integrada](P5-05-COMANDO-INTEGRADO.png), junto a corridas A/B | `ensayo-0012` dio `1 cuadros, 0 errores`; el mismo JSONL pasó `OK (1 eventos)` y contiene `frame_id=ensayo-0012` | **Cumplido para evidencia del comando** |
-| Rendimiento frente a B/PEND-05 | Calentamiento sintético, 10 JPEG excluidos y 50 medidas por serie, dos series integradas; `config/control/plazos.yaml` | p95 del detector 244.04 y 121.53 ms en este Mac; carga y calentamiento medidos por separado. Falta repetir Windows y el recorrido S09 con el código actual | **Pendiente para P5-06/P5-15/PEND-05** |
+| JSON estricto, sin `NaN` ni `Infinity` | `python -m contrato` en los tres JSONL nuevos | 59/59 eventos válidos en A, B y CLI individual de dos hilos; ninguna línea contiene esos literales | **Cumplido** |
+| Un evento por cuadro; `ok=[]` y errores diferenciados | 29+29 eventos nuevos; caso corrupto y sus pruebas previas | 22 cuadros vacíos `ok=[]` en cada corrida nueva; la prueba de corrupto conserva `error/unreadable_image` | **Cumplido** |
+| Evidencia JSONL en `resultados/` y captura del comando | [JSONL nuevo](p5-05-comando-2h.jsonl), [captura auténtica anterior](P5-05-COMANDO-INTEGRADO.png) y corridas A/B nuevas | Con dos hilos, `ensayo-0012` dio `1 cuadros, 0 errores` y `OK (1 eventos)`. La captura anterior documenta un hilo; falta captura nueva si se exige correspondencia visual con el hash actual | **Parcial para captura actual** |
+| Rendimiento frente a B/PEND-05 | Selección de hilos por medición independiente Windows; dos series macOS nuevas; `config/control/plazos.yaml` | Windows con dos hilos: p95 138 y máximo 189 ms, según Ale. Mac: p95 40.72 y 46.86 ms. No es prueba extremo a extremo de B | **Pendiente para P5-06/P5-15/PEND-05** |
 
 El issue no exige que cada objeto visible en una escena múltiple sea detectado, pero esa omisión es relevante para seguridad y no se cuenta como una detección acertada. No se calculó recall ni F1 porque no hay cajas de verdad de referencia para este conjunto.
 
@@ -72,18 +79,17 @@ capture_args=()
 for ((i=0; i<29; i++)); do capture_args+=(--capture-ms "$((i*200))"); done
 .venv/bin/python -m infer --input "$P5_05_NEUTRALES" \
   --config config/detector.json --weights "$P5_05_YOLO11N_PT" \
-  --output /ruta/local/fuera-del-repo/salidas/p5-05-aceptacion-a.jsonl \
-  --run-id p5-05-aceptacion-a --sequence-id ESP32-ensayo "${capture_args[@]}"
-# Repetir con output p5-05-aceptacion-b.jsonl y run-id p5-05-aceptacion-b.
-.venv/bin/python -m contrato /ruta/local/fuera-del-repo/salidas/p5-05-aceptacion-a.jsonl
+  --output /ruta/local/fuera-del-repo/salidas/p5-05-aceptacion-2h-a.jsonl \
+  --run-id p5-05-aceptacion-2h-a --sequence-id ESP32-ensayo "${capture_args[@]}"
+# Repetir con output p5-05-aceptacion-2h-b.jsonl y run-id p5-05-aceptacion-2h-b.
+.venv/bin/python -m contrato /ruta/local/fuera-del-repo/salidas/p5-05-aceptacion-2h-a.jsonl
 ```
 
-El calendario `0, 200, …, 5600 ms` es **un ritmo de reproducción suministrado para esta prueba**, no una medición de la captura histórica. En un JPEG individual sin tiempos originales, el CLI mide recepción durante el run. La salida de las dos corridas fue `29 cuadros, 0 errores` cada una y el validador imprimió `OK (29 eventos)` para ambas.
+El calendario `0, 200, …, 5600 ms` es **un ritmo de reproducción suministrado para esta prueba**, no una medición de la captura histórica. En un JPEG individual sin tiempos originales, el CLI mide recepción durante el run. La salida de las dos corridas nuevas fue `29 cuadros, 0 errores` cada una y el validador imprimió `OK (29 eventos)` para ambas.
 
-La [captura integrada](P5-05-COMANDO-INTEGRADO.png) corresponde a una ejecución
-real de Heri en Terminal. Después de definir las variables anteriores y
-ocultar sus rutas privadas de la pantalla, ejecutó estos comandos con un
-**destino nuevo**:
+La [captura integrada histórica](P5-05-COMANDO-INTEGRADO.png) corresponde a una
+ejecución real de Heri en Terminal **con un hilo**. Después de definir las
+variables anteriores y ocultar sus rutas privadas de la pantalla, ejecutó:
 
 ```bash
 .venv/bin/python -m infer --input "$P5_05_NEUTRALES/ensayo-0012.jpg" \
@@ -93,10 +99,13 @@ ocultar sus rutas privadas de la pantalla, ejecutó estos comandos con un
 ```
 
 La captura muestra ambos comandos completos, `1 cuadros, 0 errores` y
-`OK (1 eventos)`. [Su JSONL](p5-05-comando-integrado.jsonl) pasó el contrato
-v1 y contiene `run_id=p5-05-comando-integrado`, `frame_id=ensayo-0012`,
-`status=ok`, una detección y los hashes aprobados. La captura anterior
-permanece como evidencia histórica de [su propio JSONL](p5-05-captura-evidencia.jsonl).
+`OK (1 eventos)`. [Su JSONL histórico](p5-05-comando-integrado.jsonl) pasó el
+contrato v1 y contiene `frame_id=ensayo-0012`, `status=ok` y una detección.
+Para dos hilos, repetir con `--output resultados/p5-05-comando-2h.jsonl` y
+`--run-id p5-05-comando-2h`, usando un destino nuevo. El [JSONL nuevo](p5-05-comando-2h.jsonl)
+fue generado realmente y validado (`1 cuadros, 0 errores`; `OK (1 eventos)`),
+pero no tiene una captura de Terminal nueva. La captura más antigua permanece
+como evidencia histórica de [su propio JSONL](p5-05-captura-evidencia.jsonl).
 
 Para el conjunto adicional se copiaron dos veces los mismos bytes de `botella_der.jpg` como `S00_f0001.jpg` y `S00_f0002.jpg`, se copió `docs/carro/atras.jpg` como `S00_f0003.jpg` y se creó `S00_f0004.jpg` corrupto. Se añadieron `anotaciones.json` y `manifiesto.csv` señuelo en la prueba original; no son entrada del detector. La nueva ejecución usó `--capture-ms 0 --capture-ms 200 --capture-ms 400 --capture-ms 600`, devolvió código 1 por el cuadro corrupto y produjo **cuatro eventos válidos** con las mismas detecciones y estados anteriores. Las dos copias del mismo JPEG tienen SHA-256 idéntico y detecciones iguales, pero `frame_id` diferentes. La ejecución sin red usó una copia `S01_f0001.jpg` y la del paso 4 una copia `S02_f0001.jpg`. `error.message` conserva un texto estable sin ruta local y `error.code` conserva `unreadable_image`. El detalle original, incluida la ruta, queda en stderr local para diagnóstico y no forma parte del JSONL publicable.
 
@@ -104,38 +113,53 @@ La prueba de pesos alterados cambió **una copia temporal** (no el checkpoint or
 
 ## Reproducibilidad y latencia
 
-Se compararon por `frame_id` los 29 arrays `detections` de las nuevas corridas A y B, excluyendo `run_id` y tiempos. Coinciden exactamente clase, confianza, cuatro coordenadas, número, orden y estado: `29/29` vectores idénticos, diferencia máxima de confianza `0` y de bbox `0 px`. Cada run contiene 7 detecciones y 22 cuadros sin detecciones. Frente a la evidencia neutral anterior al calentamiento y a la restauración de hilos, se conservaron `29/29` estados, conteos, clases y orden; diferencia máxima de confianza `8.344650268554688e-7` y de bbox `6.103515625e-5 px`. Por ello se documenta equivalencia numérica dentro de esas tolerancias observadas, no identidad bit a bit con la versión anterior. La edad del primer cuadro fue 111.15 ms en A y 114.12 ms en B, en esta reproducción macOS. Los hashes son constantes en los 62 eventos de A, B y casos extra.
+Se compararon por `frame_id` los 29 arrays `detections` de las corridas nuevas de **dos hilos** A y B, excluyendo `run_id` y tiempos. Coinciden exactamente estado, conteo, orden, clase, confianza y cuatro coordenadas: `29/29` vectores idénticos, diferencia máxima de confianza `0` y de bbox `0 px`. Cada run contiene 7 detecciones y 22 cuadros sin detecciones. Frente a la corrida A histórica de **un hilo**, también coincidieron los `29/29` vectores exactamente en este Mac; esto es una observación de estas ejecuciones, no una garantía bit a bit entre plataformas. El primer `t_emit_ms` fue 38.23 ms en A y 37.13 ms en B; el calentamiento ocurrió antes del reloj. Los 59 eventos nuevos tienen `config_sha256=6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08` y el mismo `model_sha256` aprobado.
 
-El benchmark integrado usó `ensayo-0012.jpg`, copia byte a byte de la taza central con SHA-256 `670fec5473ceda61b5a6283711596d610d75577dfb1bc9d5ffc8de52c1e9cbcc`: 640×480, tensor `1×3×480×640`. Se ejecutó dos veces en procesos independientes sobre macOS arm64, Python 3.12.14, Torch 2.9.0, Ultralytics 8.3.0 y OpenCV 4.11.0.86. En cada serie se cronometraron **por separado** la carga verificada de pesos, la construcción del detector, un calentamiento sintético mediante `predictor(...)` y diez inferencias JPEG de calentamiento. Después se midieron 50 inferencias JPEG. `detector_total_ms` comprende lectura JPEG, predictor y validación/posprocesamiento; no incluye carga ni calentamientos. `forward_ms` es `Results.speed["inference"]`. p95 usa interpolación lineal de NumPy. Los JSON conservan todas las muestras y registran un hilo intraop configurado, uno tras `setup_model`, uno tras calentar y uno después de inferir; no miden los otros pools de hilos.
+## Selección de hilos en Windows
+
+Ale midió independientemente en Windows 11, i5-1135G7 y 8 GB RAM, con la laptop conectada. Para cada número de hilos usó un proceso independiente, calentamiento del predictor, diez inferencias JPEG excluidas y 50 medidas; verificó el número efectivo. Karen fijó **antes** la regla: elegir el menor número con p95 ≤ 150 ms y máximo ≤ 200 ms. Son resultados comunicados por Ale; los archivos de muestras Windows no se generaron en este Mac ni están en este repositorio.
+
+| Hilos efectivos | p95 Windows, ms | Máximo Windows, ms | Regla |
+|---:|---:|---:|---|
+| 1 | 158 | 210 | No cumple |
+| **2** | **138** | **189** | **Elegido: menor que cumple** |
+| 4 | 129 | 168 | Cumple, pero usa más hilos |
+| 7 | 161 | 218 | No cumple |
+
+Dos hilos dejan **12 ms** de margen hasta el límite p95 y **11 ms** hasta el máximo. Es un margen observado en esa laptop conectada; la latencia puede variar entre procesos, carga del equipo y estados de energía. Una sola serie por configuración no caracteriza todas esas condiciones. No se ajustaron el modelo, umbral ni clases usando las secuencias oficiales congeladas.
+
+## Benchmark macOS con dos hilos
+
+El benchmark usó `ensayo-0012.jpg`, copia byte a byte de la taza central con SHA-256 `670fec5473ceda61b5a6283711596d610d75577dfb1bc9d5ffc8de52c1e9cbcc`: 640×480, tensor `1×3×480×640`. Se ejecutó dos veces en procesos independientes sobre macOS arm64, Python 3.12.14, Torch 2.9.0, Ultralytics 8.3.0 y OpenCV 4.11.0.86. En cada serie se cronometraron **por separado** la carga verificada de pesos, la construcción del detector, un calentamiento sintético mediante `predictor(...)` y diez inferencias JPEG de calentamiento. Después se midieron 50 inferencias JPEG. `detector_total_ms` comprende lectura JPEG, predictor y validación/posprocesamiento; no incluye carga ni calentamientos. `forward_ms` es `Results.speed["inference"]`. p95 usa interpolación lineal de NumPy. Ambos JSON conservan todas las muestras y registran **dos** hilos intraop configurados, tras `setup_model`, tras calentar y después de inferir; no miden los otros pools de hilos. Las mediciones de este Mac **no** determinaron la elección de dos hilos.
 
 | Serie, ms | Media | p50 | p95 | Mínimo | Máximo |
 |---|---:|---:|---:|---:|---:|
-| Detector total A | 117.92 | 99.29 | 244.04 | 67.95 | 313.94 |
-| Forward A | 111.49 | 93.50 | 236.78 | 64.18 | 294.94 |
-| Detector total B | 103.82 | 106.51 | 121.53 | 83.44 | 135.13 |
-| Forward B | 97.73 | 100.16 | 114.55 | 78.46 | 127.44 |
+| Detector total A | 32.61 | 31.00 | 40.72 | 29.64 | 47.07 |
+| Forward A | 30.66 | 29.07 | 37.92 | 27.89 | 45.07 |
+| Detector total B | 37.49 | 35.00 | 46.86 | 30.69 | 48.70 |
+| Forward B | 35.23 | 32.59 | 44.18 | 28.87 | 46.36 |
 
 | Preparación excluida de las 50 medidas, ms | Serie A | Serie B |
 |---|---:|---:|
-| Carga y SHA-256 de pesos | 44.04 | 60.79 |
-| Construcción y `setup_model` | 31.70 | 48.44 |
-| Calentamiento sintético `480×640×3` | 667.10 | 1435.43 |
-| Diez JPEG de calentamiento | 571.95 | 909.07 |
+| Carga y SHA-256 de pesos | 45.98 | 25.89 |
+| Construcción y `setup_model` | 30.23 | 16.57 |
+| Calentamiento sintético `480×640×3` | 666.29 | 574.15 |
+| Diez JPEG de calentamiento | 316.89 | 351.10 |
 
-Antes de la corrección de hilos, las dos series históricas de este Mac dieron p95 de **29.62 y 49.95 ms**; ya no describen el código actual. Una comprobación temporal intermedia dio 167.31 ms. La variación actual entre A y B es considerable; no se eligió solo la serie rápida ni se extrapola a Windows. Reproducción desde un clon con los 29 JPEG autorizados y copiados fuera de Git:
+Las nuevas series A/B difieren **6.13 ms en p95** (40.72 frente a 46.86 ms), aun con el mismo checkpoint y configuración. Las series históricas de un hilo dieron p95 de **244.04 y 121.53 ms** en este Mac, una diferencia considerable; quedan en sus JSON originales y no se mezclan con las nuevas. Los resultados macOS no se extrapolan a Windows. Reproducción desde un clon con los 29 JPEG autorizados y copiados fuera de Git:
 
 ```bash
 .venv/bin/python resultados/p5-05-benchmark.py \
   --weights "$P5_05_YOLO11N_PT" \
   --image "$P5_05_NEUTRALES/ensayo-0012.jpg" \
-  --output /ruta/salida/latencia-nueva-a.json
-# Repetir en otro proceso con un destino nuevo: latencia-nueva-b.json.
+  --output /ruta/salida/p5-05-latencia-2h-a.json
+# Repetir en otro proceso con un destino nuevo: p5-05-latencia-2h-b.json.
 ```
 
-El plazo inicial de B es `detector_timeout_ms=500` y `max_frame_age_ms=500` (`config/control/plazos.yaml`). El calentamiento del CLI ocurre **antes** del origen temporal del run y no emite eventos, pero estas series no demuestran por sí solas cumplimiento extremo a extremo de B. La captura histórica y el recorrido S09 de T16 preceden a esa corrección. Es necesario repetir S09 y medir Windows con el código actual. P5-06 debe aplicar `stale`/timeout según la política; no se afirma cumplimiento de plazos de B en Windows.
+El plazo inicial de B es `detector_timeout_ms=500` y `max_frame_age_ms=500` (`config/control/plazos.yaml`). El calentamiento del CLI ocurre **antes** del origen temporal del run y no emite eventos, pero estas series no demuestran por sí solas cumplimiento extremo a extremo de B. La captura histórica y el recorrido S09 de T16 preceden a esa corrección. P5-06 debe aplicar `stale`/timeout según la política; los resultados Windows comunicados no prueban por sí solos los plazos extremo a extremo de B.
 
 ## Pendientes para cierre
 
-1. A3 revisó tres JPEG en Windows. Debe completar la escena múltiple, la despejada y el juicio sobre `varios_1`/`varios_2`; las escenas múltiples actuales revelan omisiones de botella/taza. Cualquier ajuste de umbral/modelo requiere una decisión separada porque cambia configuración, hash y evidencia aprobada de P5-04.
+1. Ale aprobó formalmente el PR y consideró aceptables para P5-05 las omisiones repetidas de `varios_1`/`varios_2`. La configuración de dos hilos requiere una nueva revisión del cambio y del hash. Las escenas múltiples siguen revelando omisiones relevantes para métricas; cualquier ajuste de umbral/modelo requeriría una decisión separada.
 2. P5-06 debe manejar `stale` y timeout. El calentamiento queda fuera del run, pero un cuadro realmente capturado antes del inicio o una reproducción retrasada aún puede llegar viejo; el contrato v1 valida la estructura, no demuestra seguridad temporal.
-3. Ale ejecutó instalación e inferencia real en Windows 11 y observó un p95 aproximado de 153 ms con siete hilos efectivos, antes de esta corrección. La latencia vigente debe medirse de nuevo. Las dos series de la tabla superior son solo de macOS Apple M3 y usan un hilo intraop efectivo.
+3. Los cuatro resultados de selección Windows proceden de Ale; faltan sus muestras brutas en el repositorio y una ejecución Windows con el nuevo `config_sha256` una vez publicado. La captura auténtica actual es histórica y no demuestra visualmente el hash de dos hilos. Las dos series de la tabla macOS son solo de Apple M3 y usan dos hilos intraop efectivos.

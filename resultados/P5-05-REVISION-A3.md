@@ -1,13 +1,22 @@
 # P5-05 · revisión independiente de A3 en Windows
 
-**Estado:** A3 ejecutó tres JPEG en Windows 11 y solicitó cambios en el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75); todavía faltan una escena múltiple, una despejada y el dictamen sobre las omisiones. Su medición Windows previa (p95 aproximado de 153 ms) usó siete hilos intraop efectivos. La [evidencia macOS integrada](P5-05-ACEPTACION.md) usa el código local con un hilo efectivo, calentamiento sintético antes del reloj y Pillow de P5-09; las cifras no son directamente comparables hasta repetir la revisión en Windows con el mismo commit. Estas instrucciones se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7). Mantener Ultralytics 8.3.0, el checkpoint aprobado y la configuración actual. No cambiar umbrales durante esta revisión.
+**Estado:** A3 aprobó formalmente el [PR #75](https://github.com/karenelizabg/Proyecto05-MLOPS/pull/75) sobre `621fbcc` tras comprobar Windows y aceptar para P5-05 las omisiones repetidas. Después midió el efecto de los hilos en Windows 11 y Karen eligió `torch_threads=2` según la regla previa: menor número con p95 ≤ 150 ms y máximo ≤ 200 ms. Esta configuración y su nuevo hash todavía requieren revisión después de publicarse. La [evidencia macOS de dos hilos](P5-05-ACEPTACION.md) usa calentamiento sintético antes del reloj y Pillow de P5-09; no determina la selección ni se extrapola a Windows. Estas instrucciones se aplican al [issue #7](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/7). Mantener Ultralytics 8.3.0, el checkpoint aprobado y los umbrales.
 
-Heri añadió una [captura auténtica del CLI integrado](P5-05-COMANDO-INTEGRADO.png)
-y [su JSONL validado](p5-05-comando-integrado.jsonl): un JPEG neutral,
+**Límite de esta revisión:** S01–S08 están congeladas bajo el tag
+`datos-evaluacion-v1`. Está prohibido ejecutar el detector sobre ellas antes de
+completar el paso 2 del congelamiento y publicar el segundo tag; el registro del
+hash y ese tag siguen el [issue #13](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/13).
+Las 29 copias neutrales `ensayo-NNNN.jpg` de P5-04 no pertenecen a esas ocho
+secuencias. La selección de dos hilos usó exclusivamente las mediciones
+independientes de Ale en Windows, sin S01–S08 ni cifras macOS.
+
+Heri añadió una [captura auténtica histórica del CLI](P5-05-COMANDO-INTEGRADO.png)
+y [su JSONL validado con un hilo](p5-05-comando-integrado.jsonl): un JPEG neutral,
 `1 cuadros, 0 errores` y contrato v1 `OK (1 eventos)`. La
 [captura anterior](P5-05-COMANDO.png) y [su JSONL](p5-05-captura-evidencia.jsonl)
-permanecen como evidencia histórica. Esta ejecución macOS no sustituye la
-selección independiente ni las mediciones Windows de A3.
+permanecen como evidencia histórica. El [JSONL nuevo de dos hilos](p5-05-comando-2h.jsonl)
+también pasó el contrato, pero no tiene una captura nueva. Esta ejecución
+macOS no sustituye las mediciones Windows de A3.
 
 ## Bloqueos previos
 
@@ -17,7 +26,7 @@ selección independiente ni las mediciones Windows de A3.
 
 ## Preparación en Windows PowerShell
 
-Requisitos: Windows x86_64, Git, conexión **solo para obtener uv/dependencias/checkpoint**, espacio suficiente para el entorno PyTorch y cuatro JPEG. Python 3.12 está fijado en .python-version y pyproject.toml. El lockfile integrado fija Ultralytics 8.3.0, PyTorch 2.9.0, Torchvision 0.24.0, OpenCV 4.11.0.86, NumPy 1.26.4 y Pillow 12.3.0 de P5-09. Esta revisión debe esperar la publicación de los commits locales de P5-05; registrar el HEAD realmente instalado. Estas instrucciones son para PowerShell, no Git Bash. El comando de instalación de uv sigue la [documentación oficial de Astral](https://docs.astral.sh/uv/getting-started/installation/).
+Requisitos: Windows x86_64, Git, conexión **solo para obtener uv/dependencias/checkpoint**, espacio suficiente para el entorno PyTorch y cuatro JPEG. Python 3.12 está fijado en .python-version y pyproject.toml. El lockfile integrado fija Ultralytics 8.3.0, PyTorch 2.9.0, Torchvision 0.24.0, OpenCV 4.11.0.86, NumPy 1.26.4 y Pillow 12.3.0 de P5-09. Para revisar dos hilos, esperar la publicación del commit que incluya `config_sha256=6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08` y registrar el HEAD realmente instalado. Estas instrucciones son para PowerShell, no Git Bash. El comando de instalación de uv sigue la [documentación oficial de Astral](https://docs.astral.sh/uv/getting-started/installation/).
 
 En un directorio nuevo:
 
@@ -176,9 +185,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Contrato v1 inválido en varios_1 o varios_2' 
 
 Registrar si Windows reproduce el mismo conteo, orden, clase, confianza y bbox; para diferencias numéricas anotar Δconfianza máximo y Δbbox máximo en píxeles. Comparar **solo las detecciones**, no los timestamps ni el run_id.
 
-Un JPEG legible con status=ok, dimensiones correctas, hashes aprobados y una omisión repetida en ambos equipos apunta al comportamiento del detector con confianza 0.25/NMS 0.70. Un status=error, dimensiones erróneas, hash distinto, cajas fuera de límites o discrepancia Windows/macOS no explicada obliga a investigar el pipeline o entorno. No atribuir automáticamente toda omisión al modelo ni declararla aceptable sin la revisión de A3.
+Un JPEG legible con status=ok, dimensiones correctas, hashes aprobados y una omisión repetida en ambos equipos apunta al comportamiento del detector con confianza 0.25/NMS 0.70. Un status=error, dimensiones erróneas, hash distinto, cajas fuera de límites o discrepancia Windows/macOS no explicada obliga a investigar el pipeline o entorno. Ale ya aceptó las omisiones para el alcance de P5-05 en `621fbcc`; cualquier cambio futuro del modelo o umbral exigiría otra evaluación.
 
-Ale debe concluir por escrito: **¿son aceptables estas omisiones para el alcance aprobado de P5-05?** Indicar fundamento, objetos visibles perdidos, impacto y si solicita una evaluación posterior de modelo/umbral. No cambiar el modelo ni la configuración en esta revisión: hacerlo alteraría config_sha256 y la evidencia de P5-04.
+Al revisar la nueva configuración, registrar si persisten las mismas omisiones y si aparece alguna diferencia de estados, clases o cajas. No cambiar el modelo ni los umbrales en esta revisión; `torch_threads=2` es la única diferencia efectiva autorizada.
 
 ## Entorno y registro que entregará Ale
 
@@ -204,9 +213,14 @@ final existente; para repetirlo, usar otro nombre. Los directorios padres
 enlazados pueden redirigir la salida y deben ser confiables. Registrar el
 SHA-256 de la imagen antes y después de medir; si cambia, descartar esa serie.
 Comprobar `torch_threads_configured`, `torch_threads_after_setup`,
-`torch_threads_after_warmup` y `torch_threads_effective`: deben valer 1.
-Comparar p50, p95 y máximo de ambas series con la evidencia macOS actual;
-no usar el p95 Windows previo de 153 ms como medición de esta versión.
+`torch_threads_after_warmup` y `torch_threads_effective`: deben valer **2**.
+Comparar p50, p95 y máximo de ambas series con las mediciones Windows de Ale
+(dos hilos: p95 138 ms, máximo 189 ms, laptop conectada), considerando la
+variabilidad de carga y energía. El margen observado al límite es 12 ms en
+p95 y 11 ms en el máximo. Las series macOS están en la matriz de aceptación,
+pero no fueron el criterio de elección. Guardar los datos brutos de la nueva
+revisión; los valores comunicados por Ale no sustituyen una medición del nuevo
+commit y hash.
 
 Entregar: (1) commit revisado, SO/CPU/RAM y versiones; (2) SHA-256 de pesos, config y cada JPEG; (3) cuatro JSONL y resultado de python -m contrato; (4) PNG con cajas y juicio visual, incluida la escena vacía; (5) resultados específicos de varios_1/varios_2 y conclusión de aceptabilidad; (6) diferencias numéricas frente a macOS, si son los mismos bytes; (7) transcript/captura del comando; (8) latencia Windows si se ejecutó. El registro puede añadirse a una copia de este archivo o en un documento nuevo, **sin modificar la evidencia macOS**.
 
@@ -221,4 +235,6 @@ Entregar: (1) commit revisado, SO/CPU/RAM y versiones; (2) SHA-256 de pesos, con
 | varios_1 | pendiente | pendiente | pendiente | pendiente | pendiente |
 | varios_2 | pendiente | pendiente | pendiente | pendiente | pendiente |
 
-**Dictamen sobre omisiones:** pendiente de A3. **Aceptación de P5-05:** pendiente de A3.
+**Dictamen histórico sobre omisiones:** Ale las consideró aceptables para el
+alcance de P5-05 en su revisión de `621fbcc`. **Configuración de dos hilos:**
+pendiente de revisión del nuevo commit; esta guía no constituye su aprobación.

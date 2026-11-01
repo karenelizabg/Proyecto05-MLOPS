@@ -32,7 +32,7 @@ def test_carga_config_valida_y_argumentos_efectivos():
     assert config.expected_model_sha256 == (
         "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
     )
-    assert config.torch_threads == 1
+    assert config.torch_threads == 2
     assert config.predict_kwargs() == {
         "device": "cpu",
         "half": False,
@@ -134,7 +134,7 @@ def test_rechaza_json_no_finito(tmp_path: Path, datos, literal):
 
 def test_hash_canonico_y_copia_inmutable(datos):
     a = validar_config_detector(datos)
-    assert a.config_sha256 == "bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf"
+    assert a.config_sha256 == "6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08"
     datos_reordenados = {
         "effective": {
             clave: dict(reversed(list(valor.items())))

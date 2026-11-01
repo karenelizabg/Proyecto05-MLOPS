@@ -126,7 +126,7 @@ def test_setup_model_restaurara_hilos_intraop_y_se_mantienen_tras_inferir(tmp_pa
     hilos_anteriores = torch.get_num_threads()
     try:
         detector = DetectorJPEG(cargado, config)
-        assert torch.get_num_threads() == config.torch_threads == 1
+        assert torch.get_num_threads() == config.torch_threads == 2
         detector.inferir(_jpeg(tmp_path / "S01_f0001.jpg"))
         assert torch.get_num_threads() == config.torch_threads
     finally:

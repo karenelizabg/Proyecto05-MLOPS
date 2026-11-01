@@ -17,7 +17,7 @@ La copia se borra tras construir el modelo en memoria. Ultralytics recibe una
 ruta absoluta local existente, su resolvedor de descargas se restringe a esa
 copia durante la carga y la autoinstalación de paquetes se desactiva.
 
-El cargador fija un hilo intraop de Torch; `DetectorJPEG` vuelve a fijarlo
+El cargador fija dos hilos intraop de Torch; `DetectorJPEG` vuelve a fijarlos
 después de `setup_model`, porque `select_device` de Ultralytics 8.3.0 lo
 restablece, y comprueba el valor con `torch.get_num_threads()`. También comprueba
 detección, clases 39/41, stride 32, CPU, FP32 y modo de evaluación. Devuelve
@@ -134,8 +134,16 @@ transacciones del archivo entero ni la política temporal P5-06.
 ### Copias neutrales del ensayo P5-04
 
 Las 29 fotografías históricas de P5-04 no forman parte del repositorio ni de
-las ocho secuencias oficiales de evaluación (D-06). Para reproducir la
-evidencia, ejecutar el script desde la raíz del clon con rutas locales propias:
+las ocho secuencias oficiales de evaluación (D-06).
+
+**Restricción de datos:** S01–S08 están congeladas bajo el tag
+`datos-evaluacion-v1`. Está prohibido ejecutar el detector sobre ellas antes de
+completar el paso 2 del congelamiento y publicar el segundo tag. Las copias
+neutrales `ensayo-NNNN.jpg` de P5-04 son un ensayo separado. El segundo tag y el
+registro del hash se coordinan en el [issue #13](https://github.com/karenelizabg/Proyecto05-MLOPS/issues/13).
+
+Para reproducir la evidencia, ejecutar el script desde la raíz del clon con
+rutas locales propias:
 
 ```bash
 .venv/bin/python resultados/p5-05-preparar-fotos.py \
@@ -190,7 +198,7 @@ El objeto `effective` completo participa en `config_sha256`:
 |---|---|---|
 | `model` | `name`, `backend` | YOLO11n con checkpoint PyTorch `.pt`. |
 | `runtime` | `ultralytics`, `torch`, `torchvision`, `opencv-python`, `numpy` | Versiones fijadas; Torchvision ejecuta NMS y OpenCV decodifica, redimensiona y rellena. |
-| `execution` | `device`, `dtype`, `batch`, `torch_threads`, `augment` | CPU, FP32, batch 1, un hilo (`torch.set_num_threads(1)` antes de inferir) y sin aumentación. |
+| `execution` | `device`, `dtype`, `batch`, `torch_threads`, `augment` | CPU, FP32, batch 1, dos hilos (`torch.set_num_threads(2)` después de `setup_model`) y sin aumentación. |
 | `preprocess` | `decoder`, `input_channels`, `model_channels`, `layout`, `imgsz`, `letterbox`, `stride`, `scale_fill`, `scaleup`, `center`, `padding_value`, `interpolation`, `normalization_divisor` | `cv2.imread` entrega BGR; el predictor hace `LetterBox(auto=True)` por batch 1 y `.pt`, BGR→RGB, BCHW, FP32 y `/255`. |
 | `postprocess` | `confidence`, `nms_iou`, `agnostic_nms`, `max_det`, `class_ids`, `bbox_format`, `bbox_unit`, `coordinates`, `clip_boxes` | Umbrales y NMS por clase; solo botella/taza; cajas `xyxy` en píxeles originales mediante `scale_boxes`, que recorta. |
 
@@ -231,8 +239,11 @@ entra: los bytes reales del checkpoint tendrán su propio `model_sha256` del
 contrato A→B v1. Cambiar la ubicación del mismo checkpoint deja intacto
 `config_sha256`.
 
-Con los valores actuales, `config_sha256` es
-`bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf`.
+Con los valores actuales (`torch_threads=2`), `config_sha256` es
+`6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08`.
+El valor anterior con un hilo,
+`bd736aff92ac6ae39348272ec48763764edf16b30c6ba0d3847cf9bae0658fdf`,
+solo identifica la evidencia histórica. `model_sha256` no cambió.
 
 ## Reproducción y Windows
 
@@ -248,11 +259,14 @@ runtime de P5-05 y sus índices CPU permanecen fijados. `uv sync --locked` pasó
 en macOS y las resoluciones Linux x86_64 y Windows x86_64 se simularon con
 `uv sync --locked --dry-run --python-platform`, sin instalar allí.
 
-Ale ya instaló el lock anterior y ejecutó tres JPEG en Windows 11: observó
-cajas prácticamente equivalentes a macOS y p95 aproximado de 153 ms, cuando
-Ultralytics dejaba siete hilos intraop efectivos. Es una medición histórica,
-anterior a la restauración de un hilo y al calentamiento antes del reloj. La
-[evaluación actual](../resultados/P5-05-ACEPTACION.md) contiene dos series
-macOS con el lock integrado y un hilo efectivo, sin extrapolarlas a Windows.
-La revisión Windows con el código integrado y el dictamen de A3 siguen
-pendientes.
+Ale instaló el lock integrado y aprobó el PR con cajas equivalentes en Windows
+11. Después midió, en procesos independientes y con la laptop conectada, un
+calentamiento del predictor, diez inferencias JPEG excluidas y 50 medidas por
+configuración. La regla fijada por Karen exige el **menor** número de hilos con
+p95 ≤ 150 ms y máximo ≤ 200 ms. Un hilo dio p95 158 y máximo 210 ms; dos dieron
+138 y 189 ms; cuatro, 129 y 168 ms; siete, 161 y 218 ms. Por ello se eligieron
+dos hilos, con margen de 12 ms en p95 y 11 ms en el máximo. La selección se
+basó exclusivamente en esas mediciones independientes de Ale en Windows, sin
+usar S01–S08; el [ensayo macOS](../resultados/P5-05-ACEPTACION.md)
+documenta la nueva configuración pero no se extrapola a Windows. Esta opción
+solo controla el pool intraop de PyTorch, no los de OpenCV, BLAS o interop.
