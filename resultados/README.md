@@ -38,15 +38,31 @@ el detector nunca emitió: siguen en el denominador de las métricas.
 **`ordenes_sin_cuadro.jsonl`**: las órdenes de B que no vienen de un cuadro (reloj, emergencia, rearme,
 cierre).
 
+**`errores_sin_cuadro.jsonl`**: los errores de B que no son de ningún cuadro de la corrida, como
+`orden_vencida` (`frame_id: null`). También entran en `conteos.errores`, que tiene todos los de
+`errores.jsonl`, y se cuentan por motivo en `conteos.errores_sin_cuadro`.
+
 **`resumen.json`**: las métricas de P5-13 (micro, por clase, criterio 1.4, procedencia, cobertura y mínimos
 de E3), los conteos por secuencia (acciones, estados del detector y errores por motivo), la lista de errores
 con su `frame_id`, los `model_sha256` y `config_sha256` vistos, la configuración de B con sus hashes
 (`run.json`), el SHA-256 de cada entrada y de cada archivo escrito, y las advertencias. Nada se quita: un
 cuadro sin decisión o sin comando es una advertencia.
 
-**Recálculo:** `recalcular` lee solo `por_cuadro.jsonl` y `ordenes_sin_cuadro.jsonl` y vuelve a producir
-las métricas, el TP/FP/FN de cada cuadro, los conteos y los hashes. Sale con `0` si da exactamente lo mismo
-que `resumen.json` y con `1` si algo difiere o un archivo cambió desde que se escribió.
+**Recálculo:** `recalcular` lee solo los tres `.jsonl` de arriba y vuelve a producir las métricas, el
+TP/FP/FN de cada cuadro, los conteos y los hashes. Sale con `0` si da exactamente lo mismo que
+`resumen.json` y con `1` si algo difiere o un archivo cambió desde que se escribió.
+
+**Fin de línea:** todo se escribe con LF, y cada SHA-256 (de lo escrito y de la corrida) se calcula sobre
+el texto con LF. Así, un clon que saque los archivos con CRLF, o una corrida de `control` escrita en
+Windows, da los mismos hashes.
+
+**Una corrida de pocas secuencias:** `construir` une un `run_id` a la vez. Si la corrida no cubre todo el
+conjunto, `--secuencia S04` (repetible) une solo las anotaciones de esas secuencias; sin eso, los cuadros
+de las demás contarían como FN. Los eventos tienen que ser de las secuencias elegidas, y quedan anotadas
+en `resumen.json`.
+
+**Qué no se une** (sale con `2`): eventos que no cumplen el contrato v1, anotaciones inválidas o con un
+`frame_id` repetido, y una `--salida` que no es una carpeta vacía.
 
 **El `frame_id` tiene que ser el mismo** en el detector y en las anotaciones. Si ninguno coincide,
 `construir` no une nada y sale con `2`. `infer` (P5-05, #75) usa el nombre del JPEG sin extensión, que es el

@@ -246,3 +246,100 @@ def test_entradas_que_no_se_pueden_unir(tmp_path, corrida, capsys):
     assert main(["recalcular", str(tmp_path / "no-existe")]) == 2
     with pytest.raises(SystemExit):
         main(["construir", "--corrida", str(corrida), "--salida", "y", "--model-sha256", "abc"])
+
+
+def test_con_crlf_del_clon_el_recalculo_da_lo_mismo(corrida, unida):
+    # Git saca los archivos con CRLF en algunas máquinas, y control escribe con CRLF en Windows:
+    # los hashes son del texto con LF, así que ni el recálculo ni los de la corrida cambian.
+    escritos = sorted(unida.iterdir())
+    assert all(b"\r" not in ruta.read_bytes() for ruta in escritos)
+    for ruta in escritos:
+        ruta.write_bytes(ruta.read_bytes().replace(b"\n", b"\r\n"))
+    assert main(["recalcular", str(unida)]) == 0
+
+    for ruta in corrida.iterdir():
+        texto = ruta.read_bytes().replace(b"\r\n", b"\n")
+        ruta.write_bytes(texto.replace(b"\n", b"\r\n"))
+    otra = corrida.parent / "traza-crlf"
+    main(["construir", "--corrida", str(corrida), "--salida", str(otra)])
+    assert resumen_de(otra)["corrida"]["archivos"] == resumen_de(unida)["corrida"]["archivos"]
+
+
+def test_los_errores_sin_cuadro_tambien_se_cuentan(tmp_path):
+    # En C10 la orden de avanzar vence antes del cuadro viejo: orden_vencida no tiene frame_id.
+    salida = tmp_path / "c10"
+    entrada = RAIZ / "resultados" / "casos" / "C10" / "detecciones.jsonl"
+    argumentos = ["--entrada", str(entrada), "--config", str(CONFIG), "--salida", str(salida)]
+    assert correr(argumentos) == 0
+    registrados = [json.loads(linea) for linea in (salida / "errores.jsonl").open(encoding="utf-8")]
+    assert any(e["frame_id"] is None for e in registrados)
+
+    traza = tmp_path / "traza"
+    main(["construir", "--corrida", str(salida), "--salida", str(traza)])
+    conteos = resumen_de(traza)["conteos"]
+    assert len(conteos["errores"]) == len(registrados)
+    assert {"frame_id": None, "motivo": "orden_vencida"} in conteos["errores"]
+    assert conteos["errores_sin_cuadro"] == {"orden_vencida": 1}
+    sin_cuadro = (traza / "errores_sin_cuadro.jsonl").read_text("utf-8").splitlines()
+    assert [json.loads(linea)["motivo"] for linea in sin_cuadro] == ["orden_vencida"]
+    assert main(["recalcular", str(traza)]) == 0
+
+    # Quitar el error del archivo se nota en el recálculo.
+    (traza / "errores_sin_cuadro.jsonl").write_text("", encoding="utf-8")
+    assert main(["recalcular", str(traza)]) == 1
+
+
+def test_eventos_fuera_del_contrato_no_se_unen(tmp_path, capsys):
+    sin_frame = {k: v for k, v in eventos()[1].items() if k != "frame_id"}
+    for nombre, malo in (("sin-frame", sin_frame), ("no-objeto", [1])):
+        entrada = escribir_jsonl(tmp_path / f"{nombre}.jsonl", [*eventos()[:3], malo])
+        salida = tmp_path / nombre
+        assert (
+            correr(["--entrada", str(entrada), "--config", str(CONFIG), "--salida", str(salida)])
+            == 0
+        )
+        traza = tmp_path / f"traza-{nombre}"
+        assert main(["construir", "--corrida", str(salida), "--salida", str(traza)]) == 2
+        assert "evento 4" in capsys.readouterr().err
+        assert not traza.exists()
+
+
+def test_anotaciones_repetidas_no_se_unen(corrida, tmp_path, capsys):
+    filas = anotaciones()
+    anot = escribir_jsonl(tmp_path / "repetidas.jsonl", [*filas, {**filas[1], "objetos": []}])
+    salida = tmp_path / "traza"
+    argumentos = ["construir", "--corrida", str(corrida), "--anotaciones", str(anot)]
+    assert main([*argumentos, "--salida", str(salida)]) == 2
+    assert "repetido" in capsys.readouterr().err
+    assert not salida.exists()
+
+
+def test_resumen_incompleto_o_salida_que_es_un_archivo(corrida, unida, tmp_path):
+    resumen = resumen_de(unida)
+    del resumen["conteos"]
+    (unida / "resumen.json").write_text(json.dumps(resumen), encoding="utf-8")
+    assert main(["recalcular", str(unida)]) == 2
+
+    archivo = tmp_path / "un-archivo.txt"
+    archivo.write_text("x", encoding="utf-8")
+    assert main(["construir", "--corrida", str(corrida), "--salida", str(archivo)]) == 2
+
+
+def test_una_corrida_de_una_secuencia(corrida, tmp_path, capsys):
+    # Las anotaciones de otra secuencia contarían como FN: con --secuencia se une solo la suya.
+    otra = {**anotaciones()[1], "frame_id": "S02_f0001", "sequence_id": "S02"}
+    anot = escribir_jsonl(tmp_path / "dos.jsonl", [*anotaciones(), otra])
+    argumentos = ["construir", "--corrida", str(corrida), "--anotaciones", str(anot)]
+
+    todas, solo_s01 = tmp_path / "todas", tmp_path / "s01"
+    main([*argumentos, "--salida", str(todas)])
+    main([*argumentos, "--salida", str(solo_s01), "--secuencia", "S01"])
+    assert resumen_de(todas)["metricas"]["micro"]["fn"] == 3
+    assert resumen_de(solo_s01)["metricas"]["micro"]["fn"] == 2
+    assert resumen_de(solo_s01)["anotaciones"]["secuencias"] == ["S01"]
+    assert main(["recalcular", str(solo_s01)]) == 0
+
+    capsys.readouterr()
+    assert main([*argumentos, "--salida", str(tmp_path / "x"), "--secuencia", "S02"]) == 2
+    assert "S01" in capsys.readouterr().err
+    assert main([*argumentos, "--salida", str(tmp_path / "y"), "--secuencia", "S03"]) == 2

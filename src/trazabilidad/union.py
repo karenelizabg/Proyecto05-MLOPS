@@ -12,6 +12,12 @@ de P5-10, `construir` arma una fila por cuadro con todo lo de ese cuadro, unido 
 - `decision` y `comando`: lo que decidió B y la orden que registró el adaptador.
 - `errores`: lo que registró el supervisor para ese cuadro, con su motivo.
 
+Lo que B registra sin cuadro también queda, aparte: las órdenes (reloj, emergencia, rearme, cierre)
+y los errores (p. ej. `orden_vencida`, que tiene `frame_id: null`).
+
+Solo se une una corrida cuyos eventos cumplen el contrato v1 y unas anotaciones válidas (sin
+`frame_id` repetidos): si no, `ErrorTrazabilidad`.
+
 `recalcular` vuelve a producir las métricas de P5-13 y los conteos **solo** desde esas filas, sin
 leer la corrida ni las anotaciones: si da lo mismo que el reporte, el reporte no tiene cifras
 pegadas a mano.
@@ -25,11 +31,12 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from contrato import validar_evento
 from control.__main__ import NOMBRE_DECISIONES, NOMBRE_DETECCIONES, NOMBRE_RUN
 from control.adaptador_virtual import NOMBRE_REGISTRO
 from control.supervisor import NOMBRE_ERRORES
 from metricas import evaluar
-from metricas.evaluacion import EntradaInvalida
+from metricas.evaluacion import EntradaInvalida, validar_anotaciones
 
 ARCHIVOS_CORRIDA = (NOMBRE_DETECCIONES, NOMBRE_DECISIONES, NOMBRE_REGISTRO, NOMBRE_ERRORES)
 CAMPOS_DECISION = ("event", "t_ms", "state_before", "state_after", "action", "reason", "decidio")
@@ -43,6 +50,8 @@ CAMPOS_COMANDO = (
     "valid_until_ms",
     "received",
 )
+CAMPOS_ERROR = ("run_id", "frame_id", "t_ms", "motivo", "errores")
+MAX_PROBLEMAS = 5
 
 
 class ErrorTrazabilidad(ValueError):
@@ -64,6 +73,13 @@ def leer_corrida(carpeta: Path) -> dict[str, Any]:
     datos = {nombre: leer_jsonl(carpeta / nombre) for nombre in ARCHIVOS_CORRIDA}
     datos[NOMBRE_RUN] = json.loads((carpeta / NOMBRE_RUN).read_text(encoding="utf-8"))  # NOSONAR
     return datos
+
+
+def _rechazar(que: str, problemas: list[str]) -> None:
+    if problemas:
+        resto = len(problemas) - MAX_PROBLEMAS
+        texto = "; ".join(problemas[:MAX_PROBLEMAS]) + (f"; y {resto} más" if resto > 0 else "")
+        raise ErrorTrazabilidad(f"{que}: {texto}")
 
 
 def _por_cuadro(registros: Iterable[Mapping[str, Any]]) -> dict[tuple[Any, Any], list[Any]]:
@@ -153,8 +169,16 @@ def _orden(campo: str):
     return lambda fila: (fila[campo] is None, fila[campo] or 0)
 
 
-def _conteos(filas: list[dict[str, Any]], ordenes_sin_cuadro: list[dict[str, Any]]) -> dict:
-    """Lo que se cuenta del lado de B, por cuadro y por secuencia, sin ocultar nada."""
+def _conteos(
+    filas: list[dict[str, Any]],
+    ordenes_sin_cuadro: list[dict[str, Any]],
+    errores_sin_cuadro: list[dict[str, Any]],
+) -> dict:
+    """Lo que se cuenta del lado de B, por cuadro y por secuencia, sin ocultar nada.
+
+    `errores` lista todos los de `errores.jsonl`: primero los de cada cuadro y luego los que no
+    tienen cuadro (p. ej. `orden_vencida`, con `frame_id: null`).
+    """
     por_secuencia: dict[str, dict[str, Counter]] = {}
     for fila in filas:
         secuencia = por_secuencia.setdefault(
@@ -172,7 +196,11 @@ def _conteos(filas: list[dict[str, Any]], ordenes_sin_cuadro: list[dict[str, Any
         },
         "errores": [
             {"frame_id": f["frame_id"], "motivo": e["motivo"]} for f in filas for e in f["errores"]
-        ],
+        ]
+        + [{"frame_id": e["frame_id"], "motivo": e["motivo"]} for e in errores_sin_cuadro],
+        "errores_sin_cuadro": dict(
+            sorted(Counter(e["motivo"] for e in errores_sin_cuadro).items())
+        ),
         "sin_decision": [f["frame_id"] for f in filas if f["evento"] and not f["decision"]],
         "sin_comando": [f["frame_id"] for f in filas if f["evento"] and not f["comando"]],
         "ordenes_sin_cuadro": dict(
@@ -190,6 +218,7 @@ def _conteo_por_cuadro(resultado: Any) -> dict[str, dict[str, int]]:
 def recalcular(
     filas: list[dict[str, Any]],
     ordenes_sin_cuadro: list[dict[str, Any]],
+    errores_sin_cuadro: list[dict[str, Any]],
     model_sha256: str | None = None,
     config_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -208,7 +237,7 @@ def recalcular(
                 f["frame_id"] for f in filas if f["conteo"] != por_cuadro.get(f["frame_id"])
             ]
         },
-        "conteos": _conteos(filas, ordenes_sin_cuadro),
+        "conteos": _conteos(filas, ordenes_sin_cuadro, errores_sin_cuadro),
         "detector": {
             campo: sorted({e[campo] for e in eventos})
             for campo in ("model_sha256", "config_sha256")
@@ -226,9 +255,14 @@ def construir(
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[str]]:
     """Filas por cuadro, cifras del reporte y advertencias de una corrida."""
     eventos = corrida[NOMBRE_DETECCIONES]
+    _rechazar(
+        "la corrida tiene eventos fuera del contrato v1",
+        [f"evento {n}: {m}" for n, e in enumerate(eventos, 1) for m in validar_evento(e)],
+    )
+    anotaciones = anotaciones or []
+    _rechazar("las anotaciones no son válidas", validar_anotaciones(anotaciones))
     if len({e["run_id"] for e in eventos}) > 1:
         raise ErrorTrazabilidad("la corrida mezcla varios run_id: se une un run a la vez")
-    anotaciones = anotaciones or []
     frames_evento = {e["frame_id"] for e in eventos}
     frames_anotados = {a["frame_id"] for a in anotaciones}
     if eventos and anotaciones and not frames_evento & frames_anotados:
@@ -251,10 +285,17 @@ def construir(
         for o in comandos
         if o.get("frame_id") is None
     ]
+    # Los errores que no son de ningún cuadro de la corrida no se pierden: van aparte.
+    claves = {(f["run_id"], f["frame_id"]) for f in filas if f["evento"]}
+    errores_sin_cuadro = [
+        {c: e.get(c) for c in CAMPOS_ERROR}
+        for e in corrida[NOMBRE_ERRORES]
+        if (e.get("run_id"), e.get("frame_id")) not in claves
+    ]
     por_cuadro = _conteo_por_cuadro(_evaluar(filas, model_sha256, config_sha256))
     for fila in filas:
         fila["conteo"] = por_cuadro.get(fila["frame_id"])
-    cifras = recalcular(filas, ordenes_sin_cuadro, model_sha256, config_sha256)
+    cifras = recalcular(filas, ordenes_sin_cuadro, errores_sin_cuadro, model_sha256, config_sha256)
 
     advertencias = []
     if not anotaciones:
@@ -268,9 +309,16 @@ def construir(
     ):
         if conteos[clave]:
             advertencias.append(f"{len(conteos[clave])} {texto}: {conteos[clave]}")
+    ajenos = [e["frame_id"] for e in errores_sin_cuadro if e["frame_id"] is not None]
+    if ajenos:
+        advertencias.append(f"errores con un frame_id que no está en la corrida: {ajenos}")
     repetidos = [
         f"{frame}" for (_, frame), registros in _por_cuadro(comandos).items() if len(registros) > 1
     ]
     if repetidos:
         advertencias.append(f"cuadros con más de un comando (se guarda el último): {repetidos}")
-    return filas, {**cifras, "ordenes_sin_cuadro": ordenes_sin_cuadro}, advertencias
+    sin_cuadro = {
+        "ordenes_sin_cuadro": ordenes_sin_cuadro,
+        "errores_sin_cuadro": errores_sin_cuadro,
+    }
+    return filas, {**cifras, **sin_cuadro}, advertencias
