@@ -78,7 +78,8 @@ del cuadro original. A2 dibujó las cajas a mano, salvo las 53 ajustadas que se 
   alguna caja, aunque el centro quede libre.
 
 **Revisión visual:** `python -m conjunto hojas --salida <carpeta nueva>` dibuja las cajas sobre los
-cuadros, una hoja por secuencia a resolución completa, y avisa si una caja se repite entre cuadros.
+cuadros, una hoja por secuencia a resolución completa. Avisa de las cajas que parecen copiadas: la misma
+caja en dos cuadros o más, o el mismo ancho × alto en tres o más.
 
 **Revisión cruzada:** Ale (A3) revisó los 107 cuadros el 2026-10-31, 47 de ellos con zoom (S5, S6 y
 S7), en hojas a la mitad de resolución. No encontró cajas mal puestas ni objetos sin anotar, pero a esa

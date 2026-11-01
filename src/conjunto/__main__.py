@@ -17,7 +17,8 @@ para congelarlo. Con `--sha256` además exige que el manifiesto sea el congelado
 `hueco_intencional` sale como aviso por stderr, con su cuadro y su hueco, y la última línea dice
 `OK con N excepciones`. La regla es cero excepciones, salvo las que apruebe el PM A en #13.
 `hojas` es la revisión visual de P5-10: dibuja las cajas sobre los cuadros, una hoja PNG por
-secuencia a resolución completa, y avisa por stderr de cada caja repetida entre cuadros.
+secuencia a resolución completa, y avisa por stderr de las cajas que parecen copiadas: la misma
+caja en dos cuadros o más, o el mismo ancho x alto en tres o más.
 
 Salida: 0 si todo cumple, 1 si alguna regla se rompe, 2 si una entrada no se puede leer o la salida
 no se puede escribir.

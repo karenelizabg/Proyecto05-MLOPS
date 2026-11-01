@@ -16,23 +16,47 @@ from PIL import Image, ImageDraw
 from control.config import ConfigPolitica, cargar_config_politica
 
 COLUMNAS = 4
+# Dos cajas pueden medir igual por casualidad; en tres o más cuadros ya parece una copia movida.
+MIN_MISMO_TAMANO = 3
 COLOR_CLASE = {39: (74, 222, 128), 41: (255, 213, 74)}
 COLOR_OTRA = (248, 113, 113)
 COLOR_ZONA = (96, 165, 250)
 
 
 def cajas_repetidas(anotaciones: Sequence[Mapping[str, Any]]) -> list[str]:
-    """La misma caja en más de un cuadro de una secuencia: suele ser una caja copiada."""
-    cuadros_de: dict[tuple[Any, ...], list[str]] = {}
+    """Cajas que parecen copiadas dentro de una secuencia.
+
+    Avisa de la misma caja en dos cuadros o más y del mismo ancho x alto en `MIN_MISMO_TAMANO`
+    cuadros o más, aunque se haya movido (las 8 de S06 en #79). Los cuadros de una caja idéntica
+    que ya salen en un aviso de tamaño no se repiten.
+    """
+    cuadros_caja: dict[tuple[Any, ...], list[str]] = {}
+    cuadros_tamano: dict[tuple[Any, ...], list[str]] = {}
     for anotacion in anotaciones:
+        secuencia, frame = anotacion["sequence_id"], anotacion["frame_id"]
         for objeto in anotacion["objetos"]:
-            clave = (anotacion["sequence_id"], objeto["class_id"], tuple(objeto["bbox"]))
-            cuadros_de.setdefault(clave, []).append(anotacion["frame_id"])
-    return [
-        f"{clave[0]}: clase {clave[1]}, caja {list(clave[2])} repetida en {', '.join(cuadros)}"
-        for clave, cuadros in cuadros_de.items()
-        if len(cuadros) > 1
-    ]
+            x1, y1, x2, y2 = objeto["bbox"]
+            tamano = (round(x2 - x1, 1), round(y2 - y1, 1))
+            cuadros_caja.setdefault((secuencia, objeto["class_id"], x1, y1, x2, y2), []).append(
+                frame
+            )
+            cuadros_tamano.setdefault((secuencia, objeto["class_id"], *tamano), []).append(frame)
+
+    avisos, cubiertas = [], set()
+    for (secuencia, clase, ancho, alto), cuadros in cuadros_tamano.items():
+        if len(set(cuadros)) >= MIN_MISMO_TAMANO:
+            cubiertas.add((secuencia, clase, ancho, alto))
+            avisos.append(
+                f"{secuencia}: clase {clase}, mismo tamaño {ancho} x {alto} en {', '.join(cuadros)}"
+            )
+    for (secuencia, clase, x1, y1, x2, y2), cuadros in cuadros_caja.items():
+        tamano = (round(x2 - x1, 1), round(y2 - y1, 1))
+        if len(cuadros) > 1 and (secuencia, clase, *tamano) not in cubiertas:
+            caja = [x1, y1, x2, y2]
+            avisos.append(
+                f"{secuencia}: clase {clase}, caja {caja} repetida en {', '.join(cuadros)}"
+            )
+    return avisos
 
 
 def _cuadro(ruta: Path, anotacion: Mapping[str, Any], config: ConfigPolitica) -> Image.Image:

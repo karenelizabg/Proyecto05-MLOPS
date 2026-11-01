@@ -14,6 +14,7 @@ from PIL import Image
 
 import conjunto.__main__ as cli
 from conjunto import ErrorManifiesto, construir, verificar, zonas_de
+from conjunto.hojas import cajas_repetidas
 from control.config import cargar_config_politica
 
 CONFIG = cargar_config_politica()
@@ -627,7 +628,29 @@ def test_hojas_dibuja_las_cajas_a_resolucion_completa(tmp_path, capsys):
         assert hoja.getpixel((100, 150)) != fondo  # el borde de la caja, en el píxel anotado
         assert hoja.getpixel((640 + 100, 150)) != fondo  # también en el segundo cuadro
         assert hoja.getpixel((100, 480 + 150)) == fondo  # el quinto cuadro no lleva caja
-    assert "repetida en S01_f0001, S01_f0002, S01_f0003, S01_f0004" in capsys.readouterr().err
+    assert "mismo tamaño 100.0 x 100.0 en S01_f0001, S01_f0002, S01_f0003, S01_f0004" in (
+        capsys.readouterr().err
+    )
+
+
+def test_avisa_de_una_caja_movida_con_el_mismo_tamano():
+    # Como las 8 de S06: solo dos eran idénticas, y las demás se habían movido.
+    cajas = ([10.0, 10.0, 110.4, 60.4], [50.0, 20.0, 150.4, 70.4], [90.0, 30.0, 190.4, 80.4])
+    avisos = cajas_repetidas([_anotacion(f"S01_f000{n}", "S01", c) for n, c in enumerate(cajas)])
+    assert avisos == ["S01: clase 41, mismo tamaño 100.4 x 50.4 en S01_f0000, S01_f0001, S01_f0002"]
+    # Dos cuadros con el mismo tamaño pueden ser casualidad, y dos cajas del mismo cuadro también.
+    assert (
+        cajas_repetidas([_anotacion(f"S01_f000{n}", "S01", c) for n, c in enumerate(cajas[:2])])
+        == []
+    )
+    assert cajas_repetidas([_anotacion("S01_f0001", "S01", *cajas)]) == []
+
+
+def test_avisa_una_sola_vez_de_la_caja_identica_con_el_mismo_tamano():
+    caja, movida = [10.0, 10.0, 110.0, 60.0], [50.0, 20.0, 150.0, 70.0]
+    cuadros = [caja, caja, movida]
+    avisos = cajas_repetidas([_anotacion(f"S01_f000{n}", "S01", c) for n, c in enumerate(cuadros)])
+    assert len(avisos) == 1 and "mismo tamaño" in avisos[0]
 
 
 def test_hojas_no_avisa_si_las_cajas_son_distintas(tmp_path, capsys):
@@ -637,7 +660,7 @@ def test_hojas_no_avisa_si_las_cajas_son_distintas(tmp_path, capsys):
         _anotacion("S02_f0001", "S02", [100.0, 100.0, 200.0, 200.0]),
     ]
     assert cli.main([*_hojas_de(tmp_path, anotaciones), "--salida", str(tmp_path / "h")]) == 0
-    assert "repetida" not in capsys.readouterr().err
+    assert "aviso" not in capsys.readouterr().err
 
 
 def test_hojas_no_escribe_en_una_carpeta_ocupada_ni_sin_cuadros(tmp_path, capsys):
