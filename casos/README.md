@@ -6,7 +6,7 @@ sus acciones y su expectativa, y `casos/runner.py` los corre todos (T15, T17).
 | Paso | Ticket | Qué deja |
 |---|---|---|
 | Qué debe pasar | **T15** | `casos/Cn/expectativa.yaml` (este formato). |
-| Con qué se prueba | T16 | La entrada de cada caso, con las secuencias de A (P5-09, P5-12). |
+| Con qué se prueba | Por asignar | La entrada de cada caso, con las secuencias de A (P5-09, P5-12). |
 | Correrlo y comparar | T17 | `casos/runner.py`: corre `python -m control` y juzga cada caso con su expectativa. |
 | Revisión | T24 | Ale revisa las expectativas. |
 
@@ -61,7 +61,7 @@ version: 1
 caso: C2
 titulo: Obstáculo central
 objetivo: Qué se prueba, en una o dos frases.
-entrada: Qué debe traer la entrada del caso (la arma T16).
+entrada: Qué debe traer la entrada del caso.
 tramos:
   - nombre: obstaculo
     origen: cuadros
@@ -82,7 +82,7 @@ stop_con_evento: []
 | `caso` | `C1` a `C10`. Coincide con el nombre de la carpeta. |
 | `titulo` | Nombre corto del caso. |
 | `objetivo` | Qué se prueba, en palabras. |
-| `entrada` | Qué debe traer la entrada del caso. Es la guía para T16: secuencia, estados y orden de los cuadros. |
+| `entrada` | Qué debe traer la entrada del caso. Es la guía para armarla: secuencia, estados y orden de los cuadros. |
 | `tramos` | Partes del caso, en orden. Cada una dice qué órdenes se esperan. |
 | `stop_con_evento` | Eventos sin cuadro (`clock`, `emergency`, `shutdown`) que deben dejar al menos una orden STOP con ese `event` en el run. |
 
@@ -90,7 +90,7 @@ stop_con_evento: []
 
 | Campo | Qué es |
 |---|---|
-| `nombre` | Identificador del tramo, en minúsculas con `_`. La entrada de T16 dice qué `frame_id` le toca a cada tramo por este nombre. |
+| `nombre` | Identificador del tramo, en minúsculas con `_`. La entrada del caso dice qué `frame_id` le toca a cada tramo por este nombre. |
 | `origen` | Qué órdenes se juzgan en el tramo. Con `cuadros`, las órdenes con `event=frame` de los cuadros del tramo. Con `clock`, `emergency`, `rearm` o `shutdown`, las órdenes con ese `event` que salen entre el tramo anterior y el siguiente. |
 | `cuadros` | En palabras, qué cuadros o eventos forman el tramo. |
 | `acciones_permitidas` | Acciones aceptadas una vez que el carrito reaccionó (ver abajo). No puede estar vacía. |

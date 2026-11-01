@@ -34,6 +34,8 @@ Funciona igual en Windows, macOS y Linux. En Windows, los comandos con `bash` ne
 | Validar eventos del contrato | `uv run python -m contrato config/contrato/ejemplos/flujo.jsonl` |
 | Métricas de detección (P5-13) | `uv run python -m metricas --detecciones run.jsonl --anotaciones anotaciones.jsonl --salida resultados/metricas/ --model-sha256 … --config-sha256 …` (ver [`config/anotaciones/`](config/anotaciones/README.md)) |
 | Benchmark (P5-15) | `uv run python -m bench --entradas datos/cuadros/ --salida mediciones/<run>/ --equipo "laptop de A3" --detector … --model-sha256 … --config-sha256 …` (ver [`mediciones/`](mediciones/README.md)) |
+| Capturar una secuencia del carro (P5-09) | `uv run python -m captura --url http://IP:81/stream --secuencia S01 [--cuadros 12]` (guarda en `datos/cuadros/S01/` solo si sale completa; un intento fallido va a `datos/cuadros/_fallidas/`; ver [`datos/DOMINIO.md`](datos/DOMINIO.md)) |
+| Manifiesto y `verify_dataset` (P5-11) | `uv run python -m conjunto manifiesto` · `uv run python -m conjunto verificar [--sha256 HASH_CONGELADO]` (lee `datos/cuadros/`, `datos/anotaciones.jsonl` y `datos/manifiesto.jsonl`) |
 | Inferir, reproducir | Se agregan con sus tickets: `infer` (P5-05), `python -m control` (T14). |
 
 Para agregar una dependencia: `uv add paquete` (o `uv add --dev paquete`) y sube `pyproject.toml` y `uv.lock` en el
