@@ -4,8 +4,9 @@ Qué acredita este proyecto y qué no, y cómo se contrastan los tiempos medidos
 salen de la corrida final de P5-15 (`python -m bench`) y de `python -m bench.limites`, que escribe
 `contraste.md` junto a ella. Aquí no se copian a mano: se enlaza la corrida.
 
-> **Estado:** la medición final espera al paso 2 del congelamiento (#13): fusionar P5-05 (#75) con
-> `torch_threads: 2` y registrar su `config_sha256`. Hasta entonces nadie corre el detector sobre S01–S08.
+> **Estado:** la medición final espera al paso 2 del congelamiento (#13): fusionar P5-05 (#75, aprobado en
+> `8d86f44` con `torch_threads: 2` y `config_sha256` `6428a259…`) y registrar ese hash en #13. Hasta entonces
+> nadie corre el detector sobre S01–S08.
 > Las secciones marcadas *Pendiente* se completan con esa corrida.
 
 ## Qué acredita el control virtual
@@ -111,6 +112,21 @@ Se midió una sola vez y no se repitió para escoger. Dos cosas que la medición
 - **Las colas varían entre corridas.** Con 7 hilos, la prueba de P5-04 dio p95 113 ms y máximo 162 ms, y esta
   dio 161 y 218 ms. Con más hilos compiten más con el sistema.
 
+**Repetición sobre `8d86f44` (2026-11-01).** Al revisar el cambio a 2 hilos en #75 se repitió el mismo
+procedimiento, conectada, con el plan de energía Equilibrado y OneDrive y VS Code abiertos:
+
+| Serie | Mediana | p95 | Máximo |
+|---|---|---|---|
+| 2 hilos, `detector.json` tal cual (4 procesos) | 93–153 ms | 104–206 ms | 137–264 ms |
+| 2 hilos, como la medición de la tabla (2 procesos) | 95 ms | 120–123 ms | 155–158 ms |
+| 1 hilo | 146 ms | 160 ms | 181 ms |
+| 4 hilos | 94 ms | 98 ms | 162 ms |
+
+1 hilo vuelve a fallar el p95, así que la regla sigue dando 2. Pero en 3 de las 4 series de 2 hilos con la
+configuración tal cual, el p95 o el máximo pasaron la regla: las colas dependen de lo que más corra en el
+equipo. Por eso la corrida final se hace con las demás aplicaciones cerradas, y si el máximo sale cerca de
+algún plazo se repite y se reportan todas las corridas, no la mejor.
+
 Los hilos no cambian las detecciones (7 contra 1 hilo: Δconf ≤ 1.3e-6), pero sí el `config_sha256`, por eso
 se decidió antes del paso 2.
 
@@ -123,7 +139,8 @@ se decidió antes del paso 2.
 - **Los hilos de `infer`:** `config/detector.json` pedía 1 hilo, pero Ultralytics lo cambiaba a 7 al preparar
   el predictor. Con #75, `DetectorJPEG` vuelve a fijar el de la configuración y falla si no queda.
   `bench.yolo` usa ese mismo detector, no tiene opción para cambiar los hilos y registra los que de verdad
-  quedaron.
+  quedaron. `resumen.json` también muestra `OMP_NUM_THREADS=1`: lo pone Ultralytics al importarse, y no
+  cambia los hilos de PyTorch, que `DetectorJPEG` fija después.
 - **El `frame_id`:** `infer` numeraba los cuadros por posición (`f000001`) y el conjunto usa el nombre de la
   captura (`S01_f0001`), así que no se unía ningún cuadro con sus anotaciones. Con #75 usa el nombre del JPEG.
 
@@ -136,7 +153,9 @@ se decidió antes del paso 2.
 - **Una excepción a D-06, declarada en #13:** antes de congelar se corrió el detector sobre S01, una toma
   fallida de S01 y la primera S02, que después se repitió.
 - **Umbrales:** `conf` 0.25 e `iou` 0.70, propuestos en P5-04 (`modelo/configuracion.p5-04.propuesta.json`),
-  fijados antes de correr sobre los cuadros. *Pendiente:* el `config_sha256` del paso 2 (con 2 hilos).
+  fijados antes de correr sobre los cuadros. Con 2 hilos, `config_sha256` es
+  `6428a259f22939fe5055dc101cec4517612dad5fb573d5852187932f39954e08` (#75); *pendiente* que quede registrado
+  en el paso 2 (#13).
 - **Objetos y escena (PEND-04):** botella (39) y taza (41), según P5-03; interior, piso plano, buena luz.
 - **Iluminación:** solo luz de interior. No se probó con poca luz, contraluz ni exteriores.
 
