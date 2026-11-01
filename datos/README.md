@@ -13,7 +13,7 @@ manifiesto.
 | `pruebas-b/` | S9 y S10 con sus anotaciones: solo para las pruebas de B, **fuera de la evaluación** | P5-03 |
 | [`DOMINIO.md`](DOMINIO.md) | Escena, clases, regla obstáculo / transitable y lo que no se cubre | P5-03 |
 | [`CARRO.md`](CARRO.md) | Medidas del carro armado y configuración de la cámara | P5-19 |
-| `MAPA_CASOS.md` y `fixtures/` | Caso → secuencia → cuadros, y entradas fallidas de C8 y C9 | P5-12 |
+| `MAPA_CASOS.md` y `fixtures/` | Caso → secuencia → cuadros, y entradas fallidas de C8 y C9 (llegan con #77) | P5-12 |
 
 Los videos crudos **no** se suben (`.gitignore`): la guía pide imágenes extraídas, y el video no las
 sustituye. Tampoco se suben las tomas descartadas de `_fallidas/` ni las fotos de selección de
@@ -78,12 +78,16 @@ del cuadro original. A2 dibujó las cajas a mano, salvo las 53 ajustadas que se 
   alguna caja, aunque el centro quede libre.
 
 **Revisión cruzada:** Ale (A3) revisó los 107 cuadros el 2026-10-31, 47 de ellos con zoom (S5, S6 y
-S7), sin diferencias. En las hojas de revisión no se distinguen diferencias de menos de unos 2 px.
+S7), en hojas a la mitad de resolución. No encontró cajas mal puestas ni objetos sin anotar, pero a esa
+escala no se veía que algunas cajas eran copias.
 
 **Cajas ajustadas antes de congelar:** en la revisión de #79, Ale vio que las 8 cajas de la taza en S6
-eran una misma caja copiada de un cuadro a otro. En S4, S5 y S7 había 45 más. Claude Code midió esas 53
-a ojo, sobre recortes ampliados y sin detector, con un margen de 2 a 3 px. Ale las revisó a resolución
-completa sobre `69f92c3`. Las zonas ocupadas no cambiaron en ningún cuadro.
+tenían el mismo tamaño en todos los cuadros (134.4 × 94.4 px), y Andy, con Claude Code, encontró 45 más
+en S4, S5 y S7 que se repetían de un cuadro a otro aunque la imagen se moviera. Claude Code midió esas 53
+a ojo, sobre recortes ampliados y sin detector. Ale las revisó a resolución completa sobre `69f92c3`,
+comparándolas con las anteriores y, en las tazas, con la segmentación del color. Los bordes quedan a
+0–3 px, salvo el izquierdo de S7, que queda a 3–6 px por el lado en sombra y el borroso, como pide el
+criterio. Las zonas ocupadas no cambiaron en ningún cuadro.
 
 ## Sin ajuste (D-06)
 
