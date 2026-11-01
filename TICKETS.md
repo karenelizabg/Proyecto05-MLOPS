@@ -94,7 +94,7 @@ Nada de esto frena el arranque: cada fila dice qué usé mientras tanto.
 | PEND-05 | **Máquina de evaluación y benchmark:** SO, CPU, RAM. El benchmark debe medirse en el equipo declarado. | A3 | P5-15 | La laptop que use A3; si es la ASUS de P4 (i5-7300HQ, 8 GB, Windows 10), ya hay ficha de hardware en P4. |
 | PEND-06 | **Cámara y quién filma.** El carro es el que recomendó el profe: **Kit Carrito ESP32-CAM 4WD** (UNIT Electronics SKU AR4510, TSCINBUNY ZYC0024-EN). Trae una placa ESP32-CAM con sensor OV2640, ranura SD, puente H L298, 4 motorreductores y 4 llantas de goma, y transmite video por WiFi a una página web. La ficha **no** dice la resolución de transmisión, si el foco es fijo o ajustable, el ángulo de visión ni a qué altura queda la cámara. El OV2640 comprime en JPEG y rinde peor con poca luz (confirmar en el módulo). Hay que anotar altura y ángulo de la cámara montada. | PM A | P5-03, P5-04, P5-09 | Filmar con la propia ESP32-CAM (misma óptica, resolución y compresión que vería el carro), a 640×480. Plan B si no transmite a tiempo: celular a baja altura, horizontal y reescalado a 640×480 (D-07). |
 | PEND-07 | **Rúbrica detallada y prompt de evaluación** (la guía los enlaza como "Entregables detallados" y "Rúbrica y prompt de evaluación"; no están en el HTML). Incluye topes y detalles del criterio 1.4. | PM A | — (cerrado) | **Cerrado 2026-10-26:** Karen consiguió los dos documentos (`entregables-proyecto-5.md` y `prompt-evaluacion-proyecto-5.md`, en `~/Downloads`, no están en el repo). Cambiaron D-05, D-06, PEND-04, P5-03, P5-04, P5-05, P5-10, P5-11 y P5-13. |
-| PEND-08 | **Formato de caja y de anotación** acordado con B (`xyxy` o `xywh`, píxeles del cuadro original, origen arriba-izquierda). | PM A + PM B | P5-02, P5-10 | `xyxy` en píxeles del cuadro original (ver D-04). |
+| PEND-08 | **Formato de caja y de anotación** acordado con B (`xyxy` o `xywh`, píxeles del cuadro original, origen arriba-izquierda). | PM A + PM B | — (cerrado) | **Cerrado 2026-11-01:** `xyxy`, píxeles del cuadro original. Es DC-1 en `config/contrato/CONTRATO.md`, resuelta por omisión (nadie pidió otro formato) y vigente desde #1. La política de B también acepta `xywh` y lo convierte a `xyxy`. Las anotaciones usan `xyxy` (`config/anotaciones/anotaciones.v1.schema.json`). |
 | PEND-09 | **Ritmo de entrada** (fps de las secuencias) y plazos que B usará en el watchdog. A debe poder cumplirlos con su p95. | PM B | P5-05, P5-16 | Secuencias a ~5 fps (200 ms entre cuadros); ajustar cuando B declare plazos. |
 | PEND-10 | **Fechas internas** de cada bloque (los campos "Fecha objetivo" de la guía están vacíos). | PM A + PM B | Plan de la sección 5 | Las fechas sugeridas de la sección 5. |
 | PEND-11 | **Dónde viven los archivos grandes** (pesos, imágenes): dentro de Git o fuera con descarga automatizable + hash (la guía lo permite). | PM A + PM B | P5-07, P5-11 | Si pesan poco (< 50 MB) dentro de Git; si no, GitHub Release con SHA-256 y script de descarga. |
@@ -149,7 +149,7 @@ Cada ticket lleva su revisor en la línea `Revisa el PR`. P5-19 lo hacen los tre
 | Ticket | Depende de |
 |---|---|
 | P5-01 | PEND-03 |
-| P5-02 | PEND-02, PEND-08 |
+| P5-02 | PEND-02 |
 | P5-03 | PEND-04, PEND-06, PEND-12 |
 | P5-04 | PEND-04 (y P5-19 para las fotos con la ESP32-CAM) |
 | P5-05 | P5-02, P5-04 |
@@ -210,7 +210,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 #### P5-02 · Contrato A → B v1 (esquema, ejemplos y validador)
 - **Responsable:** A1 (con B3) · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 1 · **Marca:** `[GUÍA]`
 - **Revisa el PR:** A3 · Ale (`AleSarahi`)
-- **Depende de:** PEND-02, PEND-08
+- **Depende de:** PEND-02
 - **Por qué:** es la frontera entre los dos grupos; si cambia coordenadas, clases o tiempos sin versión, B produce comandos equivocados.
 - **Alcance**
   - JSON Schema versionado (`v1`) para el evento de percepción: `run_id`, `sequence_id`, `frame_id`, `t_capture_ms` (tiempo relativo **monotónico**), `image_width/height`, `model_sha256`, `config_sha256`, `status` (`ok`/`stale`/`error`), `detections[]` (`class_id`, `confidence`, `bbox`) y `bbox_format` con su unidad.
@@ -222,7 +222,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] **Ambos PM aceptan el mismo contrato** (comentario o aprobación del PR de B3 y del PM B).
   - [ ] Documentadas las unidades de `bbox` y `t_capture_ms` y el significado de `stale`.
 - **Evidencia:** PR aprobado por A y B; ejemplos en `config/`.
-- **Pendientes:** PEND-02, PEND-08.
+- **Pendientes:** PEND-02 (PEND-08 quedó cerrado el 2026-11-01).
 - **Estado:** v1 en `main` (esquema, 4 ejemplos, flujo de ejemplo, [CONTRATO.md](config/contrato/CONTRATO.md)) con validador en `src/contrato/` y pruebas en `tests/test_contrato.py`. Aceptado por el PM A y revisado por el PM B (2026-10-26). Solo queda abierta DC-5 (clases, con P5-04) y el recorrido con el detector real (P5-08).
 
 #### P5-03 · Dominio de obstáculos, clases y plan de filmación
@@ -391,7 +391,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
 - **Revisa el PR:** A3 · Ale (`AleSarahi`)
 - **Depende de:** P5-09
 - **Alcance**
-  - Anotar cajas con clase en cada cuadro (herramienta de D-03) en el formato acordado (PEND-08) y registrar el **estado esperado** del cuadro (obstáculo/despejado y, útil para B, la zona: izquierda / centro / derecha).
+  - Anotar cajas con clase en cada cuadro (herramienta de D-03) en el formato acordado (`xyxy`; PEND-08, cerrado) y registrar el **estado esperado** del cuadro (obstáculo/despejado y, útil para B, la zona: izquierda / centro / derecha).
   - Las etiquetas reales **se guardan aparte** de las detecciones.
   - **Revisión cruzada:** A3 revisa una muestra (≥ 20 %) y se corrigen discrepancias antes de congelar.
   - Se anotan **todos** los objetos de las clases elegidas, también los que quedan fuera de la zona de riesgo (laterales, lejanos, parciales): C3 y C4 necesitan el lado ocupado anotado, y un objeto sin anotar que el detector sí encuentra cuenta como falso positivo. Si se fija un tamaño mínimo, queda escrito y se aplica igual en todos los cuadros.
@@ -401,7 +401,7 @@ y **tener el primer recorrido completo el lunes**, no el miércoles.
   - [ ] Muestra revisada por otra persona con las discrepancias resueltas y anotadas.
   - [ ] Las cajas caen sobre los objetos al dibujarlas (script de revisión visual).
   - [ ] En los cuadros de C3 y C4 el objeto lateral está anotado, y en los cuadros con varios objetos están todos.
-- **Pendientes:** PEND-08.
+- **Pendientes:** ninguno (PEND-08 quedó cerrado el 2026-11-01).
 
 #### P5-11 · Manifiesto, verificación del conjunto y congelamiento
 - **Responsable:** A2 · **Tamaño:** M · **Prioridad:** P0 · **Bloque:** 3 · **Marca:** `[GUÍA]` E3
