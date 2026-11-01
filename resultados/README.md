@@ -49,8 +49,8 @@ las métricas, el TP/FP/FN de cada cuadro, los conteos y los hashes. Sale con `0
 que `resumen.json` y con `1` si algo difiere o un archivo cambió desde que se escribió.
 
 **El `frame_id` tiene que ser el mismo** en el detector y en las anotaciones. Si ninguno coincide,
-`construir` no une nada y sale con `2`. Hoy pasa entre `infer` (P5-05), que numera los cuadros por posición
-(`f000001`), y el conjunto, que usa el nombre de la captura (`S01_f0001`). Pendiente de decidir en P5-05.
+`construir` no une nada y sale con `2`. `infer` (P5-05, #75) usa el nombre del JPEG sin extensión, que es el
+`frame_id` del conjunto (`S01_f0001`), así que hay que pasarle los cuadros con su nombre original.
 
 Salida de `construir`: `0` sin advertencias · `1` con advertencias (cuadros sin evento, errores del detector,
 mínimos de E3, procedencia sin comprobar...) · `2` si no se puede leer o unir; no se escribe nada.

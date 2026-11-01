@@ -212,7 +212,8 @@ def test_cambiar_la_config_de_b_cambia_sus_hashes(corrida, tmp_path, unida):
 
 
 def test_frame_id_que_no_coincide_con_las_anotaciones(corrida, tmp_path, capsys):
-    # Lo que pasa hoy entre infer (f000001) y el conjunto (S01_f0001): no se une nada.
+    # Un detector que numera por posición (f000001) contra el conjunto (S01_f0001): no se une
+    # nada. Era el caso de infer antes de #75, que ahora usa el nombre del archivo.
     posicionales = [{**a, "frame_id": f"f{n:06d}"} for n, a in enumerate(anotaciones(), 1)]
     anot = escribir_jsonl(tmp_path / "posicionales.jsonl", posicionales)
     salida = tmp_path / "traza"
