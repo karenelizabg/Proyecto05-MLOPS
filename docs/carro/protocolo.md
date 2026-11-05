@@ -160,9 +160,11 @@ reloj (sincronizándolo con las respuestas) y rechace órdenes más viejas que u
 | Derecha atrás | 15 | Pin de arranque. En v1 se queda en bajo. |
 | LED de flash | 4 | No se usa. Se queda en bajo. |
 
+- El firmware está en [`firmware/carro_p5`](../../firmware/carro_p5/README.md). Los valores
+  de esta sección están en su `config_carro.h`.
 - El PWM va en los pines de adelante del L298N, con los puentes de ENA/ENB puestos. Usa LEDC a
-  1 kHz y 8 bits en los **canales 2 a 5** (timers 1 y 2). La cámara ocupa el canal 0 y el
-  timer 0 para XCLK y **no se pueden tocar**.
+  1 kHz y 8 bits en los **canales 8 y 10**, del grupo de baja velocidad. La cámara ocupa el
+  canal 0 y el timer 0 del grupo de alta velocidad para XCLK, y **no se pueden tocar**.
 - Todos los pines de motor se ponen en bajo en las primeras líneas de `setup()`, antes de la
   cámara y del WiFi. Entre el reinicio y `setup()` los pines quedan sin control unos
   milisegundos. Por eso **la batería de motores va apagada al encender la placa** y se prende
@@ -183,7 +185,7 @@ el piso, y entran a este documento en el PR de esa prueba.
 | `TECHO` (PWM máximo) | 160 | pendiente | El más bajo que mueve el carro en piso a una velocidad segura para el video |
 | `MINIMO` (zona muerta) | 90 | pendiente | El PWM más bajo con el que giran las cuatro ruedas en el piso, desde parado |
 | Tope de vigencia | 500 ms | — | Fijo en el firmware |
-| Periodo de revisión del paro | 10 ms | — | Fijo en el firmware |
+| Periodo de revisión del paro | 5 ms (`PERIODO_REVISION_MS`) | — | Fijo en el firmware |
 | Tiempo de paro tras la última orden | ≤ 510 ms | pendiente | Video a 60 fps con `python -m carro --enviar prueba corte` |
 | Tiempo de paro tras cortar el WiFi | ≤ 510 ms | pendiente | Video a 60 fps, apagando el router o el punto de acceso |
 

@@ -37,3 +37,6 @@ requirements.txt
 Thumbs.db
 .idea/
 .vscode/
+
+# Firmware del carro (P5-20): la red y la clave del WiFi nunca se suben.
+firmware/**/secretos.h
