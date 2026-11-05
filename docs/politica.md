@@ -99,6 +99,37 @@ En `politica.yaml`: `clases_obstaculo: [39, 41]` y `clases_provisionales: false`
   - sin ningún lado libre, o con `permitir_giro: false` → **STOP**.
 - **STOP siempre lleva `speed = 0` y `steering = 0`.**
 
+### Umbral lateral (P5-22, solo en el lazo en vivo)
+
+Es para el carro real y el video, **no para lo calificado**. `config/control/politica.yaml` no
+trae esta clave, así que las corridas de S01 a S10 y los casos C1 a C10 dan lo mismo que antes,
+byte por byte (`tests/test_umbral_lateral.py`).
+
+- **Problema (C5):** en `S05_f0001`, la botella de la izquierda sale con confianza 0.44. Como
+  queda debajo de 0.5, para la política la izquierda está libre y gira hacia la botella.
+- **Regla:** con `umbral_lateral`, una detección de obstáculo con
+  `umbral_lateral ≤ confianza < umbral_confianza` en un lado deja ese lado **no comprobado
+  libre**. La política no gira hacia él, y si ningún lado queda libre, **STOP**.
+  - El centro lo sigue decidiendo `umbral_confianza`: una detección dudosa al centro no frena.
+  - Con el centro libre no cambia nada: los lados no se miran para avanzar.
+  - `reason` lo dice: `No comprobado libre: la izquierda (class_id 39, confianza 0.439228);
+    umbral lateral 0.25: no se gira hacia allá.`
+  - En la histéresis, si venía girando hacia un lado que queda sin comprobar, deja de girar.
+- **Dónde va:** solo en la sección `politica` de `config/vivo.yaml` (0.25). Se carga con
+  `cargar_politica_vivo()`. `vivo.yaml` solo puede agregar claves opcionales; los valores
+  calificados se cambian en `politica.yaml`.
+- **Sin la clave:** vale lo mismo que `umbral_confianza` y la política se porta exactamente igual.
+- **Con 0.25, en S01 a S10:** solo cambia S05.
+  - La acción cambia en un solo cuadro: `S05_f0001` pasa de `GIRAR_IZQ` a `STOP`.
+  - `S05_f0002` llega con `state_before` `DETENIDO` en vez de `GIRANDO_IZQ`.
+  - Otros cuadros de S05 siguen en `STOP`, pero su `reason` ya no dice "la izquierda está
+    libre".
+  - C5 pasa y C1, C3, C4 y C6 siguen pasando. Para correr los casos así, se arma una carpeta con
+  `plazos.yaml` y el resultado de `datos_politica_vivo()` como `politica.yaml`, y se pasa con
+  `casos/runner.py --config <carpeta>`.
+- **No cambia el modelo ni sus hashes.** Que la botella salga con 0.44 sigue siendo un límite del
+  detector: el umbral lateral solo hace que la política no se arriesgue con ese lado.
+
 ## 5. Histéresis (C7)
 
 Sirve para no arrancar y frenar a cada cuadro cuando la detección parpadea.
@@ -189,6 +220,7 @@ cargar y, si algo no cumple, falla con un mensaje que dice qué valor corregir.
 | `velocidad_avance` | 0.4 | 0 < x ≤ 1 | Velocidad de AVANZAR y de los giros. |
 | `giro` | 0.5 | 0 < x ≤ 1 (0 solo sin giro) | Magnitud del `steering` al girar. |
 | `permitir_giro` | `true` | true/false | Con `false`, un obstáculo al centro siempre es STOP. |
+| `umbral_lateral` | *(no está)* | 0 ≤ x ≤ `umbral_confianza` | Opcional. Solo en `config/vivo.yaml` (0.25). Ver [Umbral lateral](#umbral-lateral-p5-22-solo-en-el-lazo-en-vivo). |
 
 Los plazos (`max_frame_age_ms`, `watchdog_ms`, etc.) no son de la política: están en
 `config/control/plazos.yaml` (T01).

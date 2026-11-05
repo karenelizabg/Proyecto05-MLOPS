@@ -1,0 +1,13 @@
+# Configuración del lazo en vivo (P5-20 a P5-23): el carro real y el video.
+#
+# Ninguna corrida calificada lee este archivo. Las salidas de S01 a S10, los casos C1 a C10 y
+# los hashes del detector y de config/control/ no cambian por lo que haya aquí.
+#
+# Sección `politica`: solo admite claves OPCIONALES de la política (src/control/config.py,
+# _OPCIONALES). Los valores que ya están en config/control/politica.yaml se cambian ahí, con un
+# PR revisado. Se carga con control.config.cargar_politica_vivo().
+politica:
+  # P5-22 (C5): una detección de obstáculo con confianza de 0.25 o más en un lado deja ese lado
+  # "no comprobado libre" y la política no gira hacia él; sin lado libre, STOP. El centro lo
+  # sigue decidiendo umbral_confianza (0.5). Ver docs/politica.md, "Umbral lateral".
+  umbral_lateral: 0.25

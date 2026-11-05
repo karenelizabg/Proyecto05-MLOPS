@@ -4,6 +4,9 @@
 - T09 (#29): `decidir` convierte el evento en un comando AVANZAR / GIRAR_IZQ / GIRAR_DER / STOP.
 - T10 (#30): las detecciones con poca confianza no cuentan y quedan en `reason`.
 - T11 (#31): histéresis; tras un STOP por obstáculo reanuda solo con N cuadros libres seguidos.
+- P5-22: con `umbral_lateral` (opcional, solo en config/vivo.yaml), un lado con una detección
+  entre ese umbral y `umbral_confianza` queda "no comprobado libre" y no se gira hacia él. Sin
+  la clave, ninguna decisión ni `reason` cambia.
 """
 
 from __future__ import annotations
@@ -168,11 +171,52 @@ def _comando(
     return comando, nuevo
 
 
+def dudosas_por_zona(
+    evento: Mapping[str, Any], config: ConfigPolitica
+) -> dict[str, list[Mapping[str, Any]]]:
+    """Detecciones de obstáculo con `umbral_lateral <= confianza < umbral_confianza`, por zona.
+
+    No ocupan la zona (el centro lo sigue decidiendo `umbral_confianza`), pero un lado con una
+    de ellas no está comprobado libre y la política no gira hacia él (P5-22, C5). Sin
+    `umbral_lateral` en la configuración, los dos umbrales son iguales y todo queda vacío.
+    """
+    por_zona: dict[str, list[Mapping[str, Any]]] = {nombre: [] for nombre in ZONAS}
+    minimo = config.umbral_lateral_efectivo
+    if minimo >= config.umbral_confianza:
+        return por_zona
+    ancho = float(evento["image_width"])
+    for det in evento["detections"]:
+        if det["class_id"] not in config.clases_obstaculo:
+            continue
+        if not minimo <= det["confidence"] < config.umbral_confianza:
+            continue
+        x1, _, x2, _ = caja_a_xyxy(det["bbox"], evento["bbox_format"])
+        for nombre in _zonas_de_caja(x1, x2, ancho, config):
+            por_zona[nombre].append(det)
+    return por_zona
+
+
+def _nota_no_comprobado(
+    dudosas: Mapping[str, Sequence[Mapping[str, Any]]], lados: Sequence[str], config: ConfigPolitica
+) -> str:
+    """Texto para `reason` con los lados que quedan sin comprobar; vacío si no hay ninguno."""
+    partes = [f"{NOMBRE_ZONA[z]} ({_describir(dudosas[z])})" for z in lados if dudosas[z]]
+    if not partes:
+        return ""
+    return (
+        f" No comprobado libre: {', '.join(partes)}; umbral lateral "
+        f"{config.umbral_lateral_efectivo:g}: no se gira hacia allá."
+    )
+
+
 def _lado_para_girar(
-    evento: Mapping[str, Any], por_zona: Mapping[str, Sequence[Mapping[str, Any]]]
+    evento: Mapping[str, Any],
+    por_zona: Mapping[str, Sequence[Mapping[str, Any]]],
+    dudosas: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> str | None:
-    """Zona lateral LIBRE hacia la cual girar, o None. Nunca devuelve una zona ocupada."""
-    libres = [z for z in ("izq", "der") if not por_zona[z]]
+    """Zona lateral LIBRE hacia la cual girar, o None. Nunca devuelve una zona ocupada ni una
+    sin comprobar (`dudosas`)."""
+    libres = [z for z in ("izq", "der") if not por_zona[z] and not dudosas[z]]
     if len(libres) != 2:
         return libres[0] if libres else None
     # Las dos están libres: gira al lado contrario de donde cae el centro de los
@@ -220,13 +264,17 @@ def _regla_de_zonas(
     en_centro = _describir(por_zona["centro"])
     if not config.permitir_giro:
         return "STOP", f"Obstáculo en el centro ({en_centro}); giro desactivado: STOP.", 0, 0
-    lado = _lado_para_girar(evento, por_zona)
+    dudosas = dudosas_por_zona(evento, config)
+    nota = _nota_no_comprobado(dudosas, ("izq", "der"), config)
+    lado = _lado_para_girar(evento, por_zona, dudosas)
     if lado is None:
-        return "STOP", f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP.", 0, 0
+        razon = f"Obstáculo en el centro ({en_centro}) y ningún lado libre: STOP.{nota}"
+        return "STOP", razon, 0, 0
     accion = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
     steering = -config.giro if lado == "izq" else config.giro
     razon = (
         f"Obstáculo en el centro ({en_centro}); {NOMBRE_ZONA[lado]} está libre: gira hacia allá."
+        f"{nota}"
     )
     return accion, razon, config.velocidad_avance, steering
 
@@ -336,13 +384,16 @@ def _con_histeresis(
     espera = f"esperando_cuadros_libres {libres}/{n}"
 
     lado = LADO_DEL_GIRO.get(_nombre_de(estado))
-    if lado is not None and not detecciones_por_zona(evento, config)[lado]:
+    dudosas = dudosas_por_zona(evento, config) if lado is not None else {}
+    if lado is not None and not detecciones_por_zona(evento, config)[lado] and not dudosas[lado]:
         repetida = "GIRAR_IZQ" if lado == "izq" else "GIRAR_DER"
         giro = -config.giro if lado == "izq" else config.giro
         razon = f"{espera}: sigue girando hacia {NOMBRE_ZONA[lado]}, que está libre. {razon}"
         return _comando(evento, estado, repetida, razon, config.velocidad_avance, giro, extra)
     if lado is not None:
         razon = f"{espera}: {NOMBRE_ZONA[lado]} ya no está libre, deja de girar: STOP. {razon}"
+        if dudosas[lado] and "No comprobado libre" not in razon:
+            razon += _nota_no_comprobado(dudosas, (lado,), config)
         return _comando(evento, estado, "STOP", razon, 0, 0, extra)
     return _comando(evento, estado, "STOP", f"{espera}: {razon}", 0, 0, extra)
 

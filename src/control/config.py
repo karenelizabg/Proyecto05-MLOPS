@@ -3,6 +3,10 @@
 `cargar_config_politica(ruta)` lee `config/control/politica.yaml`, revisa que cada valor
 esté en su rango y devuelve un `ConfigPolitica` inmutable. Si algo no cumple, lanza
 `ErrorConfigPolitica` con todos los problemas juntos, para corregirlos de una vez.
+
+`cargar_politica_vivo()` (P5-22) es la misma configuración más la sección `politica` de
+`config/vivo.yaml`, que solo puede agregar claves opcionales (`umbral_lateral`). Las corridas
+calificadas usan `politica.yaml` sin esas claves, y la política se porta igual que siempre.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ import yaml
 
 RAIZ = Path(__file__).resolve().parents[2]
 RUTA_CONFIG_POLITICA = RAIZ / "config" / "control" / "politica.yaml"
+RUTA_CONFIG_VIVO = RAIZ / "config" / "vivo.yaml"
 
 ZONAS = ("izq", "centro", "der")
 _CLAVES = (
@@ -28,6 +33,8 @@ _CLAVES = (
     "giro",
     "permitir_giro",
 )
+# Claves que pueden faltar. Sin ellas, la política decide igual que antes de existir (P5-22).
+_OPCIONALES = ("umbral_lateral",)
 # Tolerancia para comparar fracciones en coma flotante (bordes de zonas).
 _TOL = 1e-9
 
@@ -49,6 +56,14 @@ class ConfigPolitica:
     velocidad_avance: float
     giro: float
     permitir_giro: bool
+    # P5-22: confianza mínima para que una detección deje un lado como "no comprobado libre".
+    # None = igual que umbral_confianza, y entonces no cambia ninguna decisión.
+    umbral_lateral: float | None = None
+
+    @property
+    def umbral_lateral_efectivo(self) -> float:
+        """El umbral lateral en uso: `umbral_lateral`, o `umbral_confianza` si no está."""
+        return self.umbral_confianza if self.umbral_lateral is None else self.umbral_lateral
 
 
 def _es_numero(valor: Any) -> bool:
@@ -121,7 +136,7 @@ def validar_config_politica(datos: Any) -> ConfigPolitica:
         raise ErrorConfigPolitica("la configuración debe ser un mapa clave: valor")
     errores: list[str] = []
     faltan = [c for c in _CLAVES if c not in datos]
-    sobran = sorted(set(datos) - set(_CLAVES))
+    sobran = sorted(set(datos) - set(_CLAVES) - set(_OPCIONALES))
     if faltan:
         errores.append(f"faltan claves: {faltan}")
     if sobran:
@@ -144,6 +159,15 @@ def validar_config_politica(datos: Any) -> ConfigPolitica:
         errores.append(f"cuadros_libres_para_reanudar: debe ser entero >= 1, hay {cuadros!r}")
         cuadros = 1
 
+    umbral_lateral = None
+    if "umbral_lateral" in datos:
+        umbral_lateral = _revisar_fraccion(datos, "umbral_lateral", errores, cero_valido=True)
+        if umbral_lateral > umbral:
+            errores.append(
+                f"umbral_lateral: no puede ser mayor que umbral_confianza ({umbral:g}), "
+                f"hay {umbral_lateral:g}"
+            )
+
     if errores:
         raise ErrorConfigPolitica("; ".join(errores))
     return ConfigPolitica(
@@ -156,16 +180,52 @@ def validar_config_politica(datos: Any) -> ConfigPolitica:
         velocidad_avance=velocidad,
         giro=giro,
         permitir_giro=permitir_giro,
+        umbral_lateral=umbral_lateral,
     )
 
 
-def cargar_config_politica(ruta: Path | str = RUTA_CONFIG_POLITICA) -> ConfigPolitica:
-    """Lee el YAML de la política y lo revisa. Lanza ErrorConfigPolitica si algo falla."""
-    ruta = Path(ruta)
+def _leer_yaml(ruta: Path) -> Any:
     try:
-        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        return yaml.safe_load(ruta.read_text(encoding="utf-8"))
     except OSError as e:
         raise ErrorConfigPolitica(f"no se pudo leer {ruta}: {e}") from e
     except yaml.YAMLError as e:
         raise ErrorConfigPolitica(f"{ruta} no es YAML válido: {e}") from e
-    return validar_config_politica(datos)
+
+
+def cargar_config_politica(ruta: Path | str = RUTA_CONFIG_POLITICA) -> ConfigPolitica:
+    """Lee el YAML de la política y lo revisa. Lanza ErrorConfigPolitica si algo falla."""
+    return validar_config_politica(_leer_yaml(Path(ruta)))
+
+
+def datos_politica_vivo(
+    ruta_vivo: Path | str = RUTA_CONFIG_VIVO, ruta_politica: Path | str = RUTA_CONFIG_POLITICA
+) -> dict[str, Any]:
+    """`politica.yaml` más la sección `politica` de `vivo.yaml`, todavía sin revisar.
+
+    `vivo.yaml` solo puede agregar claves opcionales (`umbral_lateral`). Los valores que ya
+    están en `politica.yaml` se cambian ahí, con un PR, porque son los de las corridas
+    calificadas.
+    """
+    ruta_vivo = Path(ruta_vivo)
+    datos = _leer_yaml(Path(ruta_politica))
+    vivo = _leer_yaml(ruta_vivo) or {}
+    if not isinstance(datos, dict) or not isinstance(vivo, dict):
+        raise ErrorConfigPolitica("politica.yaml y vivo.yaml deben ser mapas clave: valor")
+    extra = vivo.get("politica") or {}
+    if not isinstance(extra, dict):
+        raise ErrorConfigPolitica(f"{ruta_vivo}: la sección politica debe ser un mapa")
+    prohibidas = sorted(set(extra) - set(_OPCIONALES))
+    if prohibidas:
+        raise ErrorConfigPolitica(
+            f"{ruta_vivo}: la sección politica solo admite {list(_OPCIONALES)}; "
+            f"{prohibidas} se cambian en politica.yaml"
+        )
+    return {**datos, **extra}
+
+
+def cargar_politica_vivo(
+    ruta_vivo: Path | str = RUTA_CONFIG_VIVO, ruta_politica: Path | str = RUTA_CONFIG_POLITICA
+) -> ConfigPolitica:
+    """La configuración de la política para el lazo en vivo (P5-21 a P5-23)."""
+    return validar_config_politica(datos_politica_vivo(ruta_vivo, ruta_politica))
